@@ -16,9 +16,10 @@ if 'sl_pct' not in st.session_state: st.session_state.sl_pct = 1.5
 if 'whale_factor' not in st.session_state: st.session_state.whale_factor = 2.5
 if 'radar_sens' not in st.session_state: st.session_state.radar_sens = 1.5
 if 'reinvest_pct' not in st.session_state: st.session_state.reinvest_pct = 50.0
+if 'ado_target' not in st.session_state: st.session_state.ado_target = 0.0
 
-st.title("⚙️ ROCKET PROTOCOL LAB - Gemelo Digital Quant")
-st.markdown("Aislamiento de ADN Estratégico y Optimización Anti-Overfitting Activa.")
+st.title("⚙️ ROCKET PROTOCOL LAB - Inteligencia Adaptativa")
+st.markdown("Control de Decaimiento Algorítmico, ADO Target y Dictamen de Vida Útil Institucional.")
 
 # --- 1. PANEL DE CONTROL ---
 st.sidebar.markdown("### 🚀 ROCKET PROTOCOL LAB")
@@ -41,7 +42,8 @@ iv_download, iv_resample = intervalos[intervalo_sel]
 
 hoy = datetime.today().date()
 limite_dias = 30 if iv_download == "1m" else 730 if iv_download in ["5m", "15m", "30m"] else 1800
-start_date, end_date = st.sidebar.slider("📅 Time Frame", min_value=hoy - timedelta(days=limite_dias), max_value=hoy, value=(hoy - timedelta(days=30), hoy), format="YYYY-MM-DD")
+start_date, end_date = st.sidebar.slider("📅 Time Frame (Extracción)", min_value=hoy - timedelta(days=limite_dias), max_value=hoy, value=(hoy - timedelta(days=30), hoy), format="YYYY-MM-DD")
+dias_analizados = max((end_date - start_date).days, 1)
 
 st.sidebar.markdown("---")
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=13364.0, step=1000.0)
@@ -51,7 +53,7 @@ comision_pct = st.sidebar.number_input("Comisión Exacta (%)", value=0.25, step=
 st.sidebar.header("🧠 Selección de Arquitectura")
 estrategia_activa = st.sidebar.radio("Motor:", ["TRINITY V357", "JUGGERNAUT V356", "DEFCON V329"])
 
-st.sidebar.header(f"🎯 Calibración")
+st.sidebar.header(f"🎯 Calibración de Combate")
 with st.sidebar.form("calibracion_form"):
     st.session_state.tp_pct = st.slider("🎯 Take Profit (%)", 0.5, 15.0, value=float(st.session_state.tp_pct), step=0.1)
     st.session_state.sl_pct = st.slider("🛑 Stop Loss (%)", 0.5, 10.0, value=float(st.session_state.sl_pct), step=0.1)
@@ -98,7 +100,7 @@ def cargar_datos_ccxt(exchange_id, sym, start, end, iv_down, iv_res):
         return df
     except Exception: return pd.DataFrame()
 
-with st.spinner('Construyendo Matrices Temporales...'):
+with st.spinner('Ensamblando Matrices Temporales...'):
     df = cargar_datos_ccxt(id_exchange, ticker, start_date, end_date, iv_download, iv_resample)
 
 # --- 4. PRE-CÁLCULO BLINDADO ---
@@ -127,12 +129,10 @@ if not df.empty and len(df) > 5:
     df['Pivot_Low_30'] = df['Low'].rolling(window=30, center=False).min().fillna(df['Low'])
     df['Pivot_High_30'] = df['High'].rolling(window=30, center=False).max().fillna(df['High'])
     
-    # --- 5. SIMULADOR QUANT ESTRICTO ---
+    # --- 5. SIMULADOR QUANT ---
     def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh):
         df_sim['Whale_Cond'] = df_sim['Cuerpo_Vela'] > (df_sim['ATR'] * 0.3)
         df_sim['Vol_Anormal'] = (df_sim['Volume'] > (df_sim['Vol_MA'] * w_factor)) & df_sim['Whale_Cond']
-        
-        # 🛠️ CORRECCIÓN TIPOGRÁFICA (df_sim_ eliminado)
         df_sim['Radar_Activo'] = ((abs(df_sim['Close'] - df_sim['Pivot_Low_30']) / df_sim['Close']) * 100 <= r_sens) | ((abs(df_sim['Close'] - df_sim['Pivot_High_30']) / df_sim['Close']) * 100 <= r_sens)
         
         df_sim['Neon_Up'] = df_sim['Squeeze_On'] & (df_sim['Close'] >= df_sim['BBU'] * 0.999) & df_sim['Vela_Verde']
@@ -141,7 +141,6 @@ if not df.empty and len(df) > 5:
         df_sim['Defcon_Sell'] = df_sim['Neon_Dn'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['ADX'] > 20)
         df_sim['Therm_Wall_Sell'] = (df_sim['RSI'] > 70) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Roja']
 
-        # AISLAMIENTO DE ADN
         if "TRINITY" in strat:
             df_sim['Signal_Buy'] = (df_sim['Vol_Anormal'] & df_sim['Vela_Verde']) | ((df_sim['Radar_Activo'] | df_sim['Defcon_Buy']) & df_sim['Vela_Verde'])
             df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell']
@@ -205,44 +204,51 @@ if not df.empty and len(df) > 5:
             curva_capital[i] = (cap_activo + divs) if "TRINITY" in strat else cap_activo
         return curva_capital, divs, cap_activo, registro_trades
 
-    # --- 6. CEREBRO IA: FUNCIÓN DE APTITUD CON AISLAMIENTO ---
+    # --- 6. CEREBRO IA: OPTIMIZACIÓN ADAPTATIVA Y ANCLA ADO ---
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🧠 Centro IA Estricto")
-    if st.sidebar.button("🔬 Optimizar por Robustez (Anti-Overfit)", type="primary"):
-        with st.spinner('IA Evaluando Funciones de Aptitud en aislamiento...'):
+    st.sidebar.markdown("### 🧠 Centro de Inteligencia Adaptativa")
+    
+    st.session_state.ado_target = st.sidebar.slider("🎯 Target ADO (0.0 = IA Decide)", 0.0, 10.0, value=float(st.session_state.ado_target), step=0.1, help="Obliga a la IA a buscar una estrategia que intente acercarse a este número de operaciones por día.")
+    
+    if st.sidebar.button("🔬 IA Estocástica Dirigida", type="primary"):
+        with st.spinner('IA Vectorizando Universos Paralelos...'):
             best_fitness = -999999
             best_params = {}
-            for _ in range(120):
-                # AISLAMIENTO: La IA solo muta lo que le importa a la estrategia actual
-                t_tp = round(random.uniform(1.5, 8.0), 1)
+            for _ in range(150):
+                t_tp = round(random.uniform(1.2, 8.0), 1)
                 t_sl = round(random.uniform(0.5, 3.5), 1)
-                
-                # Trinity muta reinversión. Juggernaut/Defcon la ignoran (se fuerza a 0.0)
                 t_reinvest = round(random.uniform(20, 100), -1) if "TRINITY" in estrategia_activa else 0.0
-                
-                # Defcon ignora Ballenas y Radares (se mantienen los actuales para no estorbar)
                 t_whale = round(random.uniform(1.5, 3.5), 1) if "DEFCON" not in estrategia_activa else st.session_state.whale_factor
                 t_radar = round(random.uniform(0.5, 3.0), 1) if "DEFCON" not in estrategia_activa else st.session_state.radar_sens
                 
                 df_test = generar_senales(df.copy(), estrategia_activa, t_whale, t_radar, use_macro_shield, use_atr_shield)
                 curva_test, _, _, trades_test = ejecutar_simulacion(df_test, estrategia_activa, t_tp, t_sl, capital_inicial, t_reinvest, comision_pct)
                 
-                # CÁLCULO DE FITNESS
+                # FITNESS SCORE AVANZADO CON PENALIZACIÓN ADO
                 df_tt = pd.DataFrame(trades_test)
                 if not df_tt.empty:
                     exits = df_tt[df_tt['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
                     num_trades = len(exits)
-                    if num_trades > 5:
+                    sim_ado = num_trades / dias_analizados
+                    
+                    if num_trades > 3: # Filtro antiespejismos (Requiere mínimo 3 trades para considerarlo estrategia)
                         g_profit = exits[exits['Ganancia_$'] > 0]['Ganancia_$'].sum()
                         g_loss = abs(exits[exits['Ganancia_$'] < 0]['Ganancia_$'].sum())
-                        pf = g_profit / g_loss if g_loss > 0 else 1.0
+                        pf = g_profit / g_loss if g_loss > 0 else 0.5
                         net_profit = curva_test[-1] - capital_inicial
                         
                         peak_arr = pd.Series(curva_test).cummax()
                         dd_arr = ((pd.Series(curva_test) - peak_arr) / peak_arr) * 100
                         max_dd = abs(dd_arr.min())
                         
-                        fitness = (net_profit * pf) / (max_dd + 1.0)
+                        # El Peso del Ancla ADO
+                        ado_penalty = 1.0
+                        if st.session_state.ado_target > 0.0:
+                            # Disminuye el puntaje drásticamente si se aleja del ADO objetivo
+                            ado_penalty = 1.0 / (1.0 + abs(sim_ado - st.session_state.ado_target))
+                            
+                        # ECUACIÓN DE ROBUSTEZ INSTITUCIONAL
+                        fitness = ((net_profit * pf) / (max_dd + 1.0)) * ado_penalty
                         
                         if fitness > best_fitness and net_profit > 0:
                             best_fitness = fitness
@@ -254,9 +260,11 @@ if not df.empty and len(df) > 5:
                     st.session_state.whale_factor, st.session_state.radar_sens = float(best_params['whale']), float(best_params['radar'])
                 if "TRINITY" in estrategia_activa: 
                     st.session_state.reinvest_pct = float(best_params['reinvest'])
+                # Al optimizar, devolvemos el ancla ADO a 0 para mantener su esencia libre en el próximo click si el usuario no la mueve.
+                st.session_state.ado_target = 0.0
                 st.rerun()
             else:
-                st.sidebar.error("IA: El mercado carece de condiciones robustas en este Time Frame.")
+                st.sidebar.error("IA: El Ancla ADO solicitada o el Time Frame no ofrecen entornos matemáticamente seguros.")
 
     # EJECUCIÓN DEL CEREBRO EN FRONT-END
     df = generar_senales(df, estrategia_activa, st.session_state.whale_factor, st.session_state.radar_sens, use_macro_shield, use_atr_shield)
@@ -264,15 +272,14 @@ if not df.empty and len(df) > 5:
     df['Total_Portfolio'] = equity_curve
     df['Rentabilidad_Pct'] = ((df['Total_Portfolio'] - capital_inicial) / capital_inicial) * 100
 
-    # --- 7. MÉTRICAS Y ADO ---
+    # --- 7. MÉTRICAS Y DICTAMEN IA ---
     df_trades = pd.DataFrame(trades_log) if len(trades_log) > 0 else pd.DataFrame()
-    total_trades, wins, losses, win_rate, profit_factor, ado = 0, 0, 0, 0, 0, 0.0
+    total_trades, wins, losses, win_rate, profit_factor, ado_actual = 0, 0, 0, 0, 0, 0.0
     
     if not df_trades.empty:
         df_exits = df_trades[df_trades['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
         total_trades = len(df_exits)
-        dias_totales = max((df.index[-1] - df.index[0]).days, 1)
-        ado = total_trades / dias_totales
+        ado_actual = total_trades / dias_analizados
 
         if total_trades > 0:
             wins = len(df_exits[df_exits['Tipo'].isin(['TP', 'DYNAMIC_WIN'])])
@@ -295,11 +302,43 @@ if not df.empty and len(df) > 5:
     col3.metric("Win Rate", f"{win_rate:.1f}%")
     col4.metric("Profit Factor", f"{profit_factor:.2f}x")
     col5.metric("Max Drawdown", f"{max_drawdown:.2f}%", delta_color="inverse")
-    col6.metric("ADO (Trades/Día)", f"{ado:.2f} ⚡")
+    col6.metric("ADO Actual", f"{ado_actual:.2f} ⚡")
+
+    # DICTAMEN DE INTELIGENCIA ADAPTATIVA (FORECAST)
+    st.markdown("---")
+    
+    horizonte = "Desconocido"
+    vida_util = "No estimable"
+    riesgo = "N/A"
+    
+    if dias_analizados < 45:
+        horizonte = "Corto Plazo (Táctico)"
+        vida_util = "Recalibración requerida en 3 a 5 días."
+        riesgo = "⚠️ ALTO: Riesgo de sobreoptimización (Curve Fitting). Los parámetros están anclados al ruido de esta semana."
+    elif dias_analizados < 180:
+        horizonte = "Medio Plazo (Swing Dinámico)"
+        vida_util = "Recalibración recomendada en 2 a 4 semanas."
+        riesgo = "⚖️ MODERADO: El algoritmo captura el régimen de volatilidad estacional actual."
+    else:
+        horizonte = "Largo Plazo (Estructural)"
+        vida_util = "Sostenible de forma indefinida. Revisión trimestral."
+        riesgo = "🛡️ BAJO: El algoritmo ha sobrevivido a rotaciones de mercado reales (Bull/Bear)."
+        
+    perfil = "Silente"
+    if ado_actual > 4.0:
+        perfil = "Alta Frecuencia (Peligro de erosión por comisiones si la volatilidad cae)."
+    elif ado_actual >= 1.0:
+        perfil = "Saludable (Frecuencia óptima. Equilibrio entre exposición y confirmación de señales)."
+    elif ado_actual > 0.1:
+        perfil = "Francotirador Estructural (Filtra ruido extremo. Máxima supervivencia a largo plazo)."
+    else:
+        perfil = "Inconsistente (Prácticamente no opera. Riesgo de estancamiento de capital)."
+
+    st.info(f"**🧠 DICTAMEN IA DE SUPERVIVENCIA ALGORTÍMICA:**\n\n**Horizonte de Diseño Base:** {horizonte} ({dias_analizados} días analizados)\n\n**Esperanza de Vida Útil:** {vida_util}\n\n**Evaluación de Riesgo Técnico:** {riesgo}\n\n**Perfil del ADO:** {perfil}")
 
     # --- 8. GRÁFICAS ---
     st.markdown("---")
-    st.subheader(f"📈 Impacto en Tiempo Real ({id_exchange.upper()})")
+    st.subheader(f"📈 Mapa de Impacto en Tiempo Real ({id_exchange.upper()})")
     
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.65, 0.35], specs=[[{"secondary_y": False}], [{"secondary_y": True}]])
     hovertemp_clean = "Fecha: %{x}<br>Precio: $%{y:,.4f}<extra></extra>"
@@ -320,7 +359,7 @@ if not df.empty and len(df) > 5:
         colores_salida = ['#00FF00' if t in ['TP', 'DYNAMIC_WIN'] else '#FF0000' for t in salidas['Tipo']]
         fig.add_trace(go.Scatter(x=salidas['Fecha'], y=salidas['Precio'] * 1.02, mode='markers', name='Venta', marker=dict(symbol='triangle-down', color=colores_salida, size=14, line=dict(color='white', width=1)), text=salidas['Tipo'], hovertemplate="%{text} a $%{y:,.4f}<extra></extra>"), row=1, col=1)
 
-    fig.add_trace(go.Scatter(x=df.index, y=df['Total_Portfolio'], mode='lines', name='Equidad Neta ($)', line=dict(color='#00FF00', width=3), hovertemplate="Capital: $%{y:,.2f}<extra></extra>"), row=2, col=1, secondary_y=False)
+    fig.add_trace(go.Scatter(x=df.index, y=df['Total_Portfolio'], mode='lines', name='Equidad ($)', line=dict(color='#00FF00', width=3), hovertemplate="Capital: $%{y:,.2f}<extra></extra>"), row=2, col=1, secondary_y=False)
 
     fig.update_xaxes(showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="toaxis+across", spikethickness=1, spikedash="solid")
     fig.update_yaxes(showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="toaxis+across", spikethickness=1, spikedash="solid")
