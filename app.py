@@ -49,15 +49,14 @@ exchange_sel = st.sidebar.selectbox("🏦 Exchange", list(exchanges_soportados.k
 id_exchange = exchanges_soportados[exchange_sel]
 
 ticker = st.sidebar.text_input("Símbolo Exacto (Ej. HNT/USD)", value="HNT/USD")
-utc_offset = st.sidebar.number_input("🌍 Zona Horaria (UTC)", min_value=-12.0, max_value=14.0, value=-5.0, step=0.5, help="Ajuste la hora local del gráfico (Ej. Bogotá es -5.0).")
+utc_offset = st.sidebar.number_input("🌍 Zona Horaria (UTC)", min_value=-12.0, max_value=14.0, value=-5.0, step=0.5)
 
-# TEMPORALIDADES FORZADAS A SEMANAS
 intervalos = {
     "1 Minuto": ("1m", "1T"), "5 Minutos": ("5m", "5T"), 
     "7 Minutos": ("1m", "7T"), "13 Minutos": ("1m", "13T"), 
     "15 Minutos": ("15m", "15T"), "23 Minutos": ("1m", "23T"), 
     "30 Minutos": ("30m", "30T"), "1 Hora": ("1h", "1H"), 
-    "4 Horas": ("4h", "4H"), "1 Día": ("1d", "1D"), "1 Semana": ("1d", "1W")
+    "2 Horas": ("1h", "2H"), "4 Horas": ("4h", "4H"), "1 Día": ("1d", "1D"), "1 Semana": ("1d", "1W")
 }
 intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=4) 
 iv_download, iv_resample = intervalos[intervalo_sel]
@@ -71,7 +70,7 @@ st.sidebar.markdown("---")
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=13364.0, step=1000.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
-# --- 2. EXTRACCIÓN Y CÁLCULO DE ADN V357 ---
+# --- 2. EXTRACCIÓN Y RECONSTRUCCIÓN EXACTA DEL PINESCRIPT ---
 @st.cache_data(ttl=120)
 def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
     try:
@@ -92,16 +91,18 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
         
-        # 🌍 CORRECCIÓN ZONA HORARIA ANTES DEL RESAMPLE
         df.index = df.index + timedelta(hours=offset)
         df = df[~df.index.duplicated(keep='first')]
         
         if iv_down != iv_res: 
             df = df.resample(iv_res).agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
         
-        if len(df) > 5:
+        if len(df) > 300:
             df['EMA_200'] = ta.ema(df['Close'], length=200).fillna(df['Close'])
             df['Vol_MA'] = ta.sma(df['Volume'], length=20).fillna(df['Volume'])
+            df['Vol_MA_100'] = ta.sma(df['Volume'], length=100).fillna(df['Volume'])
+            df['RVol'] = df['Volume'] / df['Vol_MA_100']
+            
             df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14).fillna(df['High'] - df['Low']).replace(0, 0.001)
             df['RSI'] = ta.rsi(df['Close'], length=14).fillna(50.0)
             adx_df = ta.adx(df['High'], df['Low'], df['Close'], length=14)
@@ -123,8 +124,17 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
             df['Vela_Roja'] = df['Close'] < df['Open']
             df['Cuerpo_Vela'] = abs(df['Close'] - df['Open'])
             
-            df['Pivot_Low_30'] = df['Low'].rolling(window=30, center=False).min().fillna(df['Low'])
-            df['Pivot_High_30'] = df['High'].rolling(window=30, center=False).max().fillna(df['High'])
+            # MATRIZ DE PIVOTES INSTITUCIONAL (Copia exacta de PineScript)
+            df['PL30'] = df['Low'].rolling(30).min().fillna(df['Low'])
+            df['PH30'] = df['High'].rolling(30).max().fillna(df['High'])
+            df['PL100'] = df['Low'].rolling(100).min().fillna(df['Low'])
+            df['PH100'] = df['High'].rolling(100).max().fillna(df['High'])
+            df['PL300'] = df['Low'].rolling(300).min().fillna(df['Low'])
+            df['PH300'] = df['High'].rolling(300).max().fillna(df['High'])
+            
+            # Soporte y Resistencia inmediatos
+            df['Target_Lock_Sup'] = df[['PL30', 'PL100', 'PL300']].max(axis=1)
+            df['Target_Lock_Res'] = df[['PH30', 'PH100', 'PH300']].min(axis=1)
 
             # ADN TRINITY V357
             basis_sigma = df['Close'].rolling(20).mean()
@@ -148,15 +158,23 @@ ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
 df_global = cargar_y_preprocesar(id_exchange, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
 ph_holograma.empty() 
 
-# --- 3. MOTOR CUÁNTICO NUMPY ---
+# --- 3. MOTOR CUÁNTICO DE PRECISIÓN ---
 def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, def_sell):
+    # Lógica Ballena
     df_sim['Whale_Cond'] = df_sim['Cuerpo_Vela'] > (df_sim['ATR'] * 0.3)
-    df_sim['Vol_Anormal'] = (df_sim['Volume'] > (df_sim['Vol_MA'] * w_factor)) & df_sim['Whale_Cond']
+    df_sim['Flash_Vol'] = (df_sim['RVol'] > (w_factor * 0.8)) & df_sim['Whale_Cond']
     
-    dist_sup = (abs(df_sim['Close'] - df_sim['Pivot_Low_30']) / df_sim['Close']) * 100
-    dist_res = (abs(df_sim['Close'] - df_sim['Pivot_High_30']) / df_sim['Close']) * 100
-    df_sim['Radar_Activo'] = (dist_sup <= r_sens) | (dist_res <= r_sens)
+    # 🎯 TARGET LOCK EXACTO (Calculado con Tolerancia)
+    tol = df_sim['ATR'] * 0.5
+    df_sim['Lock_Bounce'] = (df_sim['Low'] <= (df_sim['Target_Lock_Sup'] + tol)) & (df_sim['Close'] > df_sim['Target_Lock_Sup']) & df_sim['Vela_Verde']
+    df_sim['Lock_Break'] = (df_sim['Close'] > df_sim['Target_Lock_Res']) & (df_sim['Open'] <= df_sim['Target_Lock_Res']) & df_sim['Flash_Vol'] & df_sim['Vela_Verde']
     
+    df_sim['Lock_Reject'] = (df_sim['High'] >= (df_sim['Target_Lock_Res'] - tol)) & (df_sim['Close'] < df_sim['Target_Lock_Res']) & df_sim['Vela_Roja']
+    df_sim['Lock_Breakd'] = (df_sim['Close'] < df_sim['Target_Lock_Sup']) & (df_sim['Open'] >= df_sim['Target_Lock_Sup']) & df_sim['Vela_Roja']
+    
+    df_sim['Radar_Activo'] = df_sim['Lock_Bounce'] | df_sim['Lock_Break']
+
+    # V320 Score
     buy_score = np.zeros(len(df_sim))
     buy_score = np.where(df_sim['Retro_Peak'] | df_sim['RSI_Cross_Up'], 30, buy_score)
     buy_score = np.where(df_sim['Retro_Peak'], 50, buy_score)
@@ -164,25 +182,28 @@ def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, 
     buy_score = np.where((buy_score > 0) & (df_sim['Z_Score'] < -2.0), buy_score + 15, buy_score)
     
     is_magenta = (buy_score >= 70) | df_sim['Retro_Peak']
-    is_whale_icon = df_sim['Vol_Anormal'] & df_sim['Vela_Verde'] & (~df_sim['Vol_Anormal'].shift(1).fillna(False))
+    is_whale_icon = df_sim['Flash_Vol'] & df_sim['Vela_Verde'] & (~df_sim['Flash_Vol'].shift(1).fillna(False))
     df_sim['Pink_Whale_Buy'] = is_magenta & is_whale_icon
     
+    # DEFCON & TERMÓMETRO
     df_sim['Neon_Up'] = df_sim['Squeeze_On'] & (df_sim['Close'] >= df_sim['BBU'] * 0.999) & df_sim['Vela_Verde']
     df_sim['Neon_Dn'] = df_sim['Squeeze_On'] & (df_sim['Close'] <= df_sim['BBL'] * 1.001) & df_sim['Vela_Roja']
     df_sim['Defcon_Buy'] = df_sim['Neon_Up'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['ADX'] > 20)
     df_sim['Defcon_Sell'] = df_sim['Neon_Dn'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['ADX'] > 20)
-    df_sim['Therm_Wall_Sell'] = (df_sim['RSI'] > 70) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Roja']
     
+    df_sim['Therm_Wall_Sell'] = (df_sim['RSI'] > 70) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Roja']
+    dist_res = (abs(df_sim['Close'] - df_sim['Target_Lock_Res']) / df_sim['Close']) * 100
     df_sim['Cielo_Libre'] = dist_res > (r_sens * 2) 
 
+    # CONSOLIDACIÓN ESTRATÉGICA
     if "TRINITY" in strat:
-        df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | ((df_sim['Radar_Activo'] | df_sim['Defcon_Buy']) & df_sim['Vela_Verde'])
-        df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell']
+        df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | df_sim['Lock_Bounce'] | df_sim['Lock_Break'] | df_sim['Defcon_Buy']
+        df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell'] | df_sim['Lock_Reject'] | df_sim['Lock_Breakd']
     elif "JUGGERNAUT" in strat:
         df_sim['Macro_Safe'] = df_sim['Close'] > df_sim['EMA_200'] if macro_sh else True
         df_sim['ATR_Safe'] = ~(df_sim['Cuerpo_Vela'].shift(1).fillna(0) > (df_sim['ATR'].shift(1).fillna(0.001) * 1.5)) if atr_sh else True
-        df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | ((df_sim['Radar_Activo'] | df_sim['Defcon_Buy']) & df_sim['Vela_Verde'] & df_sim['Macro_Safe'] & df_sim['ATR_Safe'])
-        df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell']
+        df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | ((df_sim['Lock_Bounce'] | df_sim['Lock_Break'] | df_sim['Defcon_Buy']) & df_sim['Macro_Safe'] & df_sim['ATR_Safe'])
+        df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell'] | df_sim['Lock_Reject'] | df_sim['Lock_Breakd']
     elif "DEFCON" in strat:
         df_sim['Signal_Buy'] = df_sim['Defcon_Buy'] if def_buy else False
         df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] if def_sell else False
@@ -224,6 +245,7 @@ def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
                     divs += (g_neta - reinv)
                     cap_activo += reinv
                 else: cap_activo += g_neta
+                # Grabamos el precio exacto (tp_price) donde se ejecutó en la vela actual
                 registro_trades.append({'Fecha': fechas_arr[i], 'Tipo': 'TP', 'Precio': tp_price, 'Ganancia_$': g_neta})
                 en_pos, trade_cerrado = False, True
             elif low_arr[i] <= sl_price:
@@ -243,9 +265,11 @@ def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
                     divs += (g_neta - reinv)
                     cap_activo += reinv
                 else: cap_activo += g_neta
+                # El cierre dinámico ocurre en el Close de la vela
                 registro_trades.append({'Fecha': fechas_arr[i], 'Tipo': 'DYNAMIC_WIN' if g_neta > 0 else 'DYNAMIC_LOSS', 'Precio': close_arr[i], 'Ganancia_$': g_neta})
                 en_pos, trade_cerrado = False, True
 
+        # SLIPPAGE INSTITUCIONAL: Entra en el Open de la vela siguiente a la señal
         if not en_pos and not trade_cerrado and sig_buy_arr[i] and i + 1 < n:
             precio_ent = open_arr[i+1] 
             fecha_ent = fechas_arr[i+1]
@@ -286,10 +310,10 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             if s_id == "TRINITY":
                 t_reinv = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state[f'reinvest_{s_id}']), step=5.0)
                 t_whale = c4.slider("🐋 Factor Ballena", 1.0, 5.0, value=float(st.session_state[f'whale_{s_id}']), step=0.1)
-                t_radar = st.slider("📡 Hitbox Radar (%)", 0.1, 5.0, value=float(st.session_state[f'radar_{s_id}']), step=0.1)
+                t_radar = st.slider("📡 Tolerancia Target Lock (%)", 0.1, 5.0, value=float(st.session_state[f'radar_{s_id}']), step=0.1)
             elif s_id == "JUGGERNAUT":
                 t_whale = c3.slider("🐋 Factor Ballena", 1.0, 5.0, value=float(st.session_state[f'whale_{s_id}']), step=0.1)
-                t_radar = c4.slider("📡 Hitbox Radar", 0.1, 5.0, value=float(st.session_state[f'radar_{s_id}']), step=0.1)
+                t_radar = c4.slider("📡 Tolerancia Target Lock", 0.1, 5.0, value=float(st.session_state[f'radar_{s_id}']), step=0.1)
                 mac_sh = st.checkbox("Bloqueo Macro (EMA)", value=True, key=f"mac_{s_id}")
                 atr_sh = st.checkbox("Bloqueo Crash (ATR)", value=True, key=f"atr_{s_id}")
             else:
@@ -402,12 +426,36 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         else:
             fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200', line=dict(color='orange', width=2), hovertemplate=ht_clean), row=1, col=1)
 
+        # 🎯 DIBUJO DE LÍNEAS DE TENSIÓN DE FRANCOTIRADOR (TENSION LINES)
         if not dftr.empty:
             ents = dftr[dftr['Tipo'] == 'ENTRY']
-            fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'] * 0.98, mode='markers', name='Compra', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=1))), row=1, col=1)
-            sals = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
-            cs = ['#00FF00' if t in ['TP', 'DYNAMIC_WIN'] else '#FF0000' for t in sals['Tipo']]
-            fig.add_trace(go.Scatter(x=sals['Fecha'], y=sals['Precio'] * 1.02, mode='markers', name='Venta', marker=dict(symbol='triangle-down', color=cs, size=14, line=dict(width=1)), text=sals['Tipo'], hovertemplate="%{text}: $%{y:,.4f}<extra></extra>"), row=1, col=1)
+            # Compra: El marcador baja un 4%, y la línea sube un 4% exacto hasta tocar el precio de la vela
+            fig.add_trace(go.Scatter(
+                x=ents['Fecha'], y=ents['Precio'] * 0.96, mode='markers', name='Compra (Vela Ejecución)', 
+                marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=1)),
+                error_y=dict(type='data', symmetric=False, array=ents['Precio']*0.04, arrayminus=[0]*len(ents), color='cyan', thickness=1, width=0),
+                hovertemp_clean=ht_clean
+            ), row=1, col=1)
+            
+            wins = dftr[dftr['Tipo'].isin(['TP', 'DYNAMIC_WIN'])]
+            if not wins.empty:
+                # Win: Marcador sube 4%, línea baja 4% hasta tocar precio
+                fig.add_trace(go.Scatter(
+                    x=wins['Fecha'], y=wins['Precio'] * 1.04, mode='markers', name='Win', 
+                    marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=1)), 
+                    error_y=dict(type='data', symmetric=False, array=[0]*len(wins), arrayminus=wins['Precio']*0.04, color='#00FF00', thickness=1, width=0),
+                    text=wins['Tipo'], hovertemplate="%{text}: $%{y:,.4f}<extra></extra>"
+                ), row=1, col=1)
+
+            losses = dftr[dftr['Tipo'].isin(['SL', 'DYNAMIC_LOSS'])]
+            if not losses.empty:
+                # Loss: Marcador sube 4%, línea baja 4% hasta tocar precio
+                fig.add_trace(go.Scatter(
+                    x=losses['Fecha'], y=losses['Precio'] * 1.04, mode='markers', name='Loss', 
+                    marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=1)), 
+                    error_y=dict(type='data', symmetric=False, array=[0]*len(losses), arrayminus=losses['Precio']*0.04, color='#FF0000', thickness=1, width=0),
+                    text=losses['Tipo'], hovertemplate="%{text}: $%{y:,.4f}<extra></extra>"
+                ), row=1, col=1)
 
         fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad ($)', line=dict(color='#00FF00', width=3), hovertemplate="Cap: $%{y:,.2f}<extra></extra>"), row=2, col=1)
 
