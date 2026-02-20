@@ -8,7 +8,7 @@ import numpy as np
 import random
 import os
 import glob
-import gc # Garbage Collector para evitar OOM (Out of Memory)
+import gc
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="ROCKET PROTOCOL | Lab Quant", layout="wide", initial_sidebar_state="expanded")
@@ -40,7 +40,7 @@ else: st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROC
 
 if st.sidebar.button("🔄 Sincronización Live", use_container_width=True): 
     st.cache_data.clear()
-    gc.collect() # Limpiar RAM forzosamente
+    gc.collect()
 
 st.sidebar.markdown("---")
 st.sidebar.header("📡 Enlace de Mercado")
@@ -49,20 +49,21 @@ exchange_sel = st.sidebar.selectbox("🏦 Exchange", list(exchanges_soportados.k
 id_exchange = exchanges_soportados[exchange_sel]
 
 ticker = st.sidebar.text_input("Símbolo Exacto (Ej. HNT/USD)", value="HNT/USD")
+utc_offset = st.sidebar.number_input("🌍 Zona Horaria (UTC)", min_value=-12.0, max_value=14.0, value=-5.0, step=0.5, help="Ajuste la hora local del gráfico (Ej. Bogotá es -5.0).")
 
+# TEMPORALIDADES FORZADAS A SEMANAS
 intervalos = {
     "1 Minuto": ("1m", "1T"), "5 Minutos": ("5m", "5T"), 
     "7 Minutos": ("1m", "7T"), "13 Minutos": ("1m", "13T"), 
     "15 Minutos": ("15m", "15T"), "23 Minutos": ("1m", "23T"), 
     "30 Minutos": ("30m", "30T"), "1 Hora": ("1h", "1H"), 
-    "4 Horas": ("4h", "4H"), "1 Día": ("1d", "1D")
+    "4 Horas": ("4h", "4H"), "1 Día": ("1d", "1D"), "1 Semana": ("1d", "1W")
 }
 intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=4) 
 iv_download, iv_resample = intervalos[intervalo_sel]
 
 hoy = datetime.today().date()
-# REDUCCIÓN DE LÍMITES PARA EVITAR OOM EN LA NUBE GRATUITA
-limite_dias = 7 if iv_download == "1m" else 90 if iv_download in ["5m", "15m", "30m"] else 730
+limite_dias = 7 if iv_download == "1m" else 90 if iv_download in ["5m", "15m", "30m"] else 1800
 start_date, end_date = st.sidebar.slider("📅 Time Frame Global", min_value=hoy - timedelta(days=limite_dias), max_value=hoy, value=(hoy - timedelta(days=30 if limite_dias>30 else 7), hoy), format="YYYY-MM-DD")
 dias_analizados = max((end_date - start_date).days, 1)
 
@@ -72,7 +73,7 @@ comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) /
 
 # --- 2. EXTRACCIÓN Y CÁLCULO DE ADN V357 ---
 @st.cache_data(ttl=120)
-def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res):
+def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
         start_ts = int(datetime.combine(start, datetime.min.time()).timestamp() * 1000)
@@ -84,17 +85,21 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res):
             if not ohlcv: break
             all_ohlcv.extend(ohlcv)
             current_ts = ohlcv[-1][0] + 1
-            if len(all_ohlcv) > 50000: break # LÍMITE ANTI-OOM (50,000 velas máximo)
+            if len(all_ohlcv) > 50000: break
             
         if not all_ohlcv: return pd.DataFrame()
         df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
+        
+        # 🌍 CORRECCIÓN ZONA HORARIA ANTES DEL RESAMPLE
+        df.index = df.index + timedelta(hours=offset)
         df = df[~df.index.duplicated(keep='first')]
-        if iv_down != iv_res: df = df.resample(iv_res).agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+        
+        if iv_down != iv_res: 
+            df = df.resample(iv_res).agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
         
         if len(df) > 5:
-            # INDICADORES BASE
             df['EMA_200'] = ta.ema(df['Close'], length=200).fillna(df['Close'])
             df['Vol_MA'] = ta.sma(df['Volume'], length=20).fillna(df['Volume'])
             df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14).fillna(df['High'] - df['Low']).replace(0, 0.001)
@@ -118,11 +123,10 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res):
             df['Vela_Roja'] = df['Close'] < df['Open']
             df['Cuerpo_Vela'] = abs(df['Close'] - df['Open'])
             
-            # PIVOTES
             df['Pivot_Low_30'] = df['Low'].rolling(window=30, center=False).min().fillna(df['Low'])
             df['Pivot_High_30'] = df['High'].rolling(window=30, center=False).max().fillna(df['High'])
 
-            # 🧬 INYECCIÓN DE ADN TRINITY V357 (SISTEMA DE PUNTUACIÓN)
+            # ADN TRINITY V357
             basis_sigma = df['Close'].rolling(20).mean()
             dev_sigma = df['Close'].rolling(20).std().replace(0, 1)
             df['Z_Score'] = (df['Close'] - basis_sigma) / dev_sigma
@@ -131,10 +135,8 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res):
             rsi_ma = df['RSI'].rolling(14).mean()
             df['RSI_Cross_Up'] = (df['RSI'] > rsi_ma) & (df['RSI'].shift(1) <= rsi_ma.shift(1))
             df['RSI_Cross_Dn'] = (df['RSI'] < rsi_ma) & (df['RSI'].shift(1) >= rsi_ma.shift(1))
-            
             df['Retro_Peak'] = (df['RSI'] < 30) & (df['Close'] < df['BBL'])
             
-            # Limpieza de memoria
             del basis_sigma, dev_sigma, rsi_ma
             gc.collect()
 
@@ -143,21 +145,18 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res):
         return pd.DataFrame()
 
 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
-df_global = cargar_y_preprocesar(id_exchange, ticker, start_date, end_date, iv_download, iv_resample)
+df_global = cargar_y_preprocesar(id_exchange, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
 ph_holograma.empty() 
 
-# --- 3. MOTOR CUÁNTICO NUMPY (CON LÓGICA V357 EXACTA) ---
+# --- 3. MOTOR CUÁNTICO NUMPY ---
 def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, def_sell):
-    # 🐋 BALLENA ROSA V320 SCORE
     df_sim['Whale_Cond'] = df_sim['Cuerpo_Vela'] > (df_sim['ATR'] * 0.3)
     df_sim['Vol_Anormal'] = (df_sim['Volume'] > (df_sim['Vol_MA'] * w_factor)) & df_sim['Whale_Cond']
     
-    # Target Lock
     dist_sup = (abs(df_sim['Close'] - df_sim['Pivot_Low_30']) / df_sim['Close']) * 100
     dist_res = (abs(df_sim['Close'] - df_sim['Pivot_High_30']) / df_sim['Close']) * 100
     df_sim['Radar_Activo'] = (dist_sup <= r_sens) | (dist_res <= r_sens)
     
-    # Calculo V320 Score Dinámico para la Ballena
     buy_score = np.zeros(len(df_sim))
     buy_score = np.where(df_sim['Retro_Peak'] | df_sim['RSI_Cross_Up'], 30, buy_score)
     buy_score = np.where(df_sim['Retro_Peak'], 50, buy_score)
@@ -168,14 +167,12 @@ def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, 
     is_whale_icon = df_sim['Vol_Anormal'] & df_sim['Vela_Verde'] & (~df_sim['Vol_Anormal'].shift(1).fillna(False))
     df_sim['Pink_Whale_Buy'] = is_magenta & is_whale_icon
     
-    # DEFCON Y THERM
     df_sim['Neon_Up'] = df_sim['Squeeze_On'] & (df_sim['Close'] >= df_sim['BBU'] * 0.999) & df_sim['Vela_Verde']
     df_sim['Neon_Dn'] = df_sim['Squeeze_On'] & (df_sim['Close'] <= df_sim['BBL'] * 1.001) & df_sim['Vela_Roja']
     df_sim['Defcon_Buy'] = df_sim['Neon_Up'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['ADX'] > 20)
     df_sim['Defcon_Sell'] = df_sim['Neon_Dn'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['ADX'] > 20)
     df_sim['Therm_Wall_Sell'] = (df_sim['RSI'] > 70) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Roja']
     
-    # Cielo Libre (Para el TP Dinámico 1.5x)
     df_sim['Cielo_Libre'] = dist_res > (r_sens * 2) 
 
     if "TRINITY" in strat:
@@ -209,12 +206,11 @@ def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
     
     en_pos, precio_ent, cap_activo, divs = False, 0.0, cap_ini, 0.0
     is_trinity = "TRINITY" in strat
-    tp_dinamico_activo = False # Para el 1.5x
+    tp_dinamico_activo = False 
     
     for i in range(n):
         trade_cerrado = False
         if en_pos:
-            # 🎯 ADN V357: TAKE PROFIT DINÁMICO (x1.5 si compró ballena o cielo libre)
             tp_efectivo = tp * 1.5 if tp_dinamico_activo else tp
             tp_price = precio_ent * (1 + (tp_efectivo / 100))
             sl_price = precio_ent * (1 - (sl / 100))
@@ -251,12 +247,12 @@ def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
                 en_pos, trade_cerrado = False, True
 
         if not en_pos and not trade_cerrado and sig_buy_arr[i] and i + 1 < n:
-            precio_ent = open_arr[i+1] # SLIPPAGE EN OPEN
+            precio_ent = open_arr[i+1] 
             fecha_ent = fechas_arr[i+1]
             costo_ent = (cap_activo if is_trinity else cap_ini) * com_pct
             cap_activo -= costo_ent
             en_pos = True
-            tp_dinamico_activo = whale_arr[i] or cielo_arr[i] # Guarda la condición para el TP x1.5
+            tp_dinamico_activo = whale_arr[i] or cielo_arr[i] 
             registro_trades.append({'Fecha': fecha_ent, 'Tipo': 'ENTRY', 'Precio': precio_ent, 'Ganancia_$': -costo_ent})
 
         if en_pos:
@@ -314,7 +310,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
             best_fit = -999999
             bp = {}
-            for _ in range(80): # Reducido a 80 para evitar cortes de conexión en la nube gratis
+            for _ in range(80): 
                 rtp = round(random.uniform(1.2, 8.0), 1)
                 rsl = round(random.uniform(0.5, 3.5), 1)
                 rrv = round(random.uniform(20, 100), -1) if s_id == "TRINITY" else 0.0
@@ -353,7 +349,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 st.session_state[f'ado_{s_id}'] = 0.0
                 gc.collect()
                 st.rerun()
-            else: st.error("IA: Mercado demasiado hostil.")
+            else: st.error("IA: Mercado demasiado hostil para esta estrategia.")
 
         df_strat = generar_senales(df_base.copy(), strat_name, st.session_state[f'whale_{s_id}'], st.session_state[f'radar_{s_id}'], mac_sh, atr_sh, d_buy, d_sell)
         eq_curve, divs, cap_act, t_log, pos_ab = ejecutar_simulacion(df_strat, strat_name, st.session_state[f'tp_{s_id}'], st.session_state[f'sl_{s_id}'], capital_inicial, st.session_state[f'reinvest_{s_id}'], comision_pct)
