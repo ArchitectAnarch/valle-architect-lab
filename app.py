@@ -150,14 +150,15 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
             df['WT_Oversold'] = wt1 < -60
             df['WT_Overbought'] = wt1 > 60
             
+            # 🔥 CORRECCIÓN: MACRO BULL EXPORTADO CORRECTAMENTE
+            df['Macro_Bull'] = df['Close'] >= df['EMA_200']
+            
             # --- 4 CUADRANTES DE LA MATRIZ ---
             # 1: Bull Trend | 2: Bull Chop | 3: Bear Trend | 4: Bear Chop
-            is_bull = df['Close'] >= df['EMA_200']
             is_trend = df['ADX'] >= 25
-            
-            df['Regime'] = np.where(is_bull & is_trend, 1,
-                           np.where(is_bull & ~is_trend, 2,
-                           np.where(~is_bull & is_trend, 3, 4)))
+            df['Regime'] = np.where(df['Macro_Bull'] & is_trend, 1,
+                           np.where(df['Macro_Bull'] & ~is_trend, 2,
+                           np.where(~df['Macro_Bull'] & is_trend, 3, 4)))
             gc.collect()
 
         return df
@@ -523,8 +524,10 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 elif s_id == "JUGGERNAUT":
                     st.session_state[f'sld_wh_{s_id}'] = c3.slider("🐋 Factor", 1.0, 5.0, value=float(st.session_state.get(f'sld_wh_{s_id}', 2.5)), step=0.1)
                     mac_sh = st.checkbox("Bloqueo Macro (EMA)", value=True)
+                    atr_sh = st.checkbox("Bloqueo Crash (ATR)", value=True)
                 else:
                     d_buy = st.checkbox("Squeeze Up", value=True)
+                    d_sell = st.checkbox("Squeeze Dn", value=True)
                     
                 if st.form_submit_button("⚡ Aplicar"): st.rerun()
 
@@ -542,7 +545,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     b_cond = df_precalc['Pink_Whale_Buy'] | df_precalc['Lock_Bounce'] | df_precalc['Defcon_Buy']
                     s_cond = df_precalc['Defcon_Sell'] | df_precalc['Therm_Wall_Sell']
                 elif s_id == "JUGGERNAUT":
-                    b_cond = df_precalc['Pink_Whale_Buy'] | (df_precalc['Lock_Bounce'] & df_precalc['Macro_Bull'])
+                    b_cond = df_precalc['Pink_Whale_Buy'] | ((df_precalc['Lock_Bounce'] | df_precalc['Defcon_Buy']) & df_precalc['Macro_Bull'])
                     s_cond = df_precalc['Defcon_Sell'] | df_precalc['Therm_Wall_Sell']
                 else:
                     b_cond, s_cond = df_precalc['Defcon_Buy'], df_precalc['Defcon_Sell']
@@ -552,8 +555,8 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 
                 # 1000 iteraciones para las demás estrategias
                 for _ in range(1000): 
-                    rtp = round(random.uniform(1.2, 8.0), 1)
-                    rsl = round(random.uniform(0.5, 3.5), 1)
+                    rtp = round(random.uniform(1.2, 12.0), 1)
+                    rsl = round(random.uniform(0.5, 4.0), 1)
                     rrv = round(random.uniform(20, 100), -1) if s_id == "TRINITY" else 0.0
                     rwh = round(random.uniform(1.5, 3.5), 1) if s_id != "DEFCON" else 2.5
                     rrd = round(random.uniform(0.5, 3.0), 1) if s_id != "DEFCON" else 1.5
@@ -584,11 +587,15 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 df_strat['Signal_Sell'] = df_strat['Defcon_Sell'] | df_strat['Therm_Wall_Sell']
                 df_strat['Active_TP'], df_strat['Active_SL'] = st.session_state[f'sld_tp_{s_id}'], st.session_state[f'sld_sl_{s_id}']
             elif s_id == "JUGGERNAUT":
-                df_strat['Signal_Buy'] = df_strat['Pink_Whale_Buy'] | (df_strat['Lock_Bounce'] & df_strat['Macro_Bull'])
+                # Juggernaut Safe Logic
+                macro_safe = df_strat['Macro_Bull'] if mac_sh else True
+                atr_safe = ~(df_strat['Cuerpo_Vela'].shift(1).fillna(0) > (df_strat['ATR'].shift(1).fillna(0.001) * 1.5)) if atr_sh else True
+                df_strat['Signal_Buy'] = df_strat['Pink_Whale_Buy'] | ((df_strat['Lock_Bounce'] | df_strat['Defcon_Buy']) & macro_safe & atr_safe)
                 df_strat['Signal_Sell'] = df_strat['Defcon_Sell'] | df_strat['Therm_Wall_Sell']
                 df_strat['Active_TP'], df_strat['Active_SL'] = st.session_state[f'sld_tp_{s_id}'], st.session_state[f'sld_sl_{s_id}']
             else:
-                df_strat['Signal_Buy'], df_strat['Signal_Sell'] = df_strat['Defcon_Buy'], df_strat['Defcon_Sell']
+                df_strat['Signal_Buy'] = df_strat['Defcon_Buy'] if d_buy else False
+                df_strat['Signal_Sell'] = df_strat['Defcon_Sell'] if d_sell else False
                 df_strat['Active_TP'], df_strat['Active_SL'] = st.session_state[f'sld_tp_{s_id}'], st.session_state[f'sld_sl_{s_id}']
                 
             eq_curve, divs, cap_act, t_log, pos_ab = simular_visual(df_strat, capital_inicial, st.session_state.get(f'sld_reinv_{s_id}', 0.0), comision_pct)
@@ -627,11 +634,11 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 
         if not dftr.empty:
             ents = dftr[dftr['Tipo'] == 'ENTRY']
-            fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'] * 0.96, mode='markers', marker=dict(symbol='triangle-up', color='cyan', size=14)), row=1, col=1)
+            fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white')), hovertemplate="COMPRA<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
             wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
-            fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'] * 1.04, mode='markers', marker=dict(symbol='triangle-down', color='#00FF00', size=14)), row=1, col=1)
+            fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white')), text=wins['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
             loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
-            fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'] * 1.04, mode='markers', marker=dict(symbol='triangle-down', color='#FF0000', size=14)), row=1, col=1)
+            fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white')), text=loss['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
 
         fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
 
