@@ -24,31 +24,29 @@ for s in estrategias:
     if f'reinvest_{s}' not in st.session_state: st.session_state[f'reinvest_{s}'] = 50.0
     if f'ado_{s}' not in st.session_state: st.session_state[f'ado_{s}'] = 0.0
 
-# --- MEMORIA GÉNESIS ADAPTATIVA (BULL VS BEAR) ---
+# --- MEMORIA GÉNESIS (LLAVES FÍSICAS DE LA INTERFAZ) ---
 buy_rules = ['Pink_Whale_Buy', 'Lock_Bounce', 'Lock_Break', 'Defcon_Buy', 'Neon_Up', 'Therm_Bounce', 'Therm_Vacuum', 'Nuclear_Buy', 'Early_Buy', 'Rebound_Buy']
 sell_rules = ['Defcon_Sell', 'Neon_Dn', 'Therm_Wall_Sell', 'Therm_Panic_Sell', 'Lock_Reject', 'Lock_Breakd', 'Nuclear_Sell', 'Early_Sell']
 
-# DUAL STATE (Fase Bull y Fase Bear)
-if 'bull_tp' not in st.session_state: st.session_state['bull_tp'] = 5.0
-if 'bull_sl' not in st.session_state: st.session_state['bull_sl'] = 2.0
-if 'bear_tp' not in st.session_state: st.session_state['bear_tp'] = 3.0
-if 'bear_sl' not in st.session_state: st.session_state['bear_sl'] = 1.5
-if 'gen_ado' not in st.session_state: st.session_state['gen_ado'] = 0.0
+# Sincronización Estricta de Keys
+if 'key_bull_tp' not in st.session_state: st.session_state['key_bull_tp'] = 5.0
+if 'key_bull_sl' not in st.session_state: st.session_state['key_bull_sl'] = 2.0
+if 'key_bear_tp' not in st.session_state: st.session_state['key_bear_tp'] = 3.0
+if 'key_bear_sl' not in st.session_state: st.session_state['key_bear_sl'] = 1.5
 if 'winning_dna' not in st.session_state: st.session_state['winning_dna'] = ""
 
 for r in buy_rules:
-    if f'bull_b_{r}' not in st.session_state: st.session_state[f'bull_b_{r}'] = False
-    if f'bear_b_{r}' not in st.session_state: st.session_state[f'bear_b_{r}'] = False
+    if f'key_bull_b_{r}' not in st.session_state: st.session_state[f'key_bull_b_{r}'] = False
+    if f'key_bear_b_{r}' not in st.session_state: st.session_state[f'key_bear_b_{r}'] = False
 for r in sell_rules:
-    if f'bull_s_{r}' not in st.session_state: st.session_state[f'bull_s_{r}'] = False
-    if f'bear_s_{r}' not in st.session_state: st.session_state[f'bear_s_{r}'] = False
+    if f'key_bull_s_{r}' not in st.session_state: st.session_state[f'key_bull_s_{r}'] = False
+    if f'key_bear_s_{r}' not in st.session_state: st.session_state[f'key_bear_s_{r}'] = False
 
-if not any([st.session_state.get(f'bull_b_{r}') for r in buy_rules]): 
-    st.session_state['bull_b_Nuclear_Buy'] = True
-    st.session_state['bear_b_Pink_Whale_Buy'] = True
-if not any([st.session_state.get(f'bull_s_{r}') for r in sell_rules]): 
-    st.session_state['bull_s_Nuclear_Sell'] = True
-    st.session_state['bear_s_Therm_Panic_Sell'] = True
+# Fuerza inicial
+if not any([st.session_state[f'key_bull_b_{r}'] for r in buy_rules]): st.session_state['key_bull_b_Nuclear_Buy'] = True
+if not any([st.session_state[f'key_bear_b_{r}'] for r in buy_rules]): st.session_state['key_bear_b_Pink_Whale_Buy'] = True
+if not any([st.session_state[f'key_bull_s_{r}'] for r in sell_rules]): st.session_state['key_bull_s_Nuclear_Sell'] = True
+if not any([st.session_state[f'key_bear_s_{r}'] for r in sell_rules]): st.session_state['key_bear_s_Therm_Panic_Sell'] = True
 
 # --- 1. PANEL LATERAL ---
 css_spinner = """
@@ -78,8 +76,14 @@ id_exchange = exchanges_soportados[exchange_sel]
 ticker = st.sidebar.text_input("Símbolo Exacto (Ej. HNT/USD)", value="HNT/USD", key="txt_tick")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria (UTC)", min_value=-12.0, max_value=14.0, value=-5.0, step=0.5, key="num_utc")
 
-intervalos = {"1 Minuto": ("1m", "1min"), "5 Minutos": ("5m", "5min"), "15 Minutos": ("15m", "15min"), "30 Minutos": ("30m", "30min"), "1 Hora": ("1h", "1h"), "4 Horas": ("4h", "4h"), "1 Día": ("1d", "1D")}
-intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=2, key="sel_tf") 
+intervalos = {
+    "1 Minuto": ("1m", "1min"), "5 Minutos": ("5m", "5min"), 
+    "7 Minutos": ("1m", "7min"), "13 Minutos": ("1m", "13min"), 
+    "15 Minutos": ("15m", "15min"), "23 Minutos": ("1m", "23min"), 
+    "30 Minutos": ("30m", "30min"), "1 Hora": ("1h", "1h"), 
+    "4 Horas": ("4h", "4h"), "1 Día": ("1d", "1D"), "1 Semana": ("1d", "1W")
+}
+intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=4, key="sel_tf") 
 iv_download, iv_resample = intervalos[intervalo_sel]
 
 hoy = datetime.today().date()
@@ -113,7 +117,9 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
         df.set_index('timestamp', inplace=True)
         df.index = df.index + timedelta(hours=offset)
         df = df[~df.index.duplicated(keep='first')]
-        if iv_down != iv_res: df = df.resample(iv_res).agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+        
+        if iv_down != iv_res: 
+            df = df.resample(iv_res).agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
         
         if len(df) > 50:
             df['EMA_200'] = ta.ema(df['Close'], length=200).fillna(df['Close'])
@@ -166,7 +172,6 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
             df['WT_Oversold'] = wt1 < -60
             df['WT_Overbought'] = wt1 > 60
             
-            # --- CONSCIENCIA DE RÉGIMEN ---
             df['Macro_Bull'] = df['Close'] >= df['EMA_200']
             
             del basis_sigma, dev_sigma, rsi_ma, ap, esa, d_wt, ci, wt1, wt2
@@ -257,18 +262,18 @@ def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy=T
         
         if strat == "GENESIS":
             for r in buy_rules:
-                if st.session_state.get(f'bull_b_{r}', False): bull_b_cond |= df_sim[r].values
-                if st.session_state.get(f'bear_b_{r}', False): bear_b_cond |= df_sim[r].values
+                if st.session_state[f'key_bull_b_{r}']: bull_b_cond |= df_sim[r].values
+                if st.session_state[f'key_bear_b_{r}']: bear_b_cond |= df_sim[r].values
             for r in sell_rules:
-                if st.session_state.get(f'bull_s_{r}', False): bull_s_cond |= df_sim[r].values
-                if st.session_state.get(f'bear_s_{r}', False): bear_s_cond |= df_sim[r].values
+                if st.session_state[f'key_bull_s_{r}']: bull_s_cond |= df_sim[r].values
+                if st.session_state[f'key_bear_s_{r}']: bear_s_cond |= df_sim[r].values
                 
         is_bull = df_sim['Macro_Bull'].values
         df_sim['Signal_Buy'] = np.where(is_bull, bull_b_cond, bear_b_cond)
         df_sim['Signal_Sell'] = np.where(is_bull, bull_s_cond, bear_s_cond)
         
-        df_sim['Active_TP'] = np.where(is_bull, st.session_state['bull_tp'], st.session_state['bear_tp'])
-        df_sim['Active_SL'] = np.where(is_bull, st.session_state['bull_sl'], st.session_state['bear_sl'])
+        df_sim['Active_TP'] = np.where(is_bull, st.session_state.get('key_bull_tp', 5.0), st.session_state.get('key_bear_tp', 3.0))
+        df_sim['Active_SL'] = np.where(is_bull, st.session_state.get('key_bull_sl', 2.0), st.session_state.get('key_bear_sl', 1.5))
     else:
         df_sim['Signal_Buy'] = False
         df_sim['Signal_Sell'] = False
@@ -277,7 +282,7 @@ def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy=T
         
     return df_sim
 
-# NÚCLEO FÍSICO C++ ADAPTATIVO
+# --- NÚCLEO FÍSICO C++ ADAPTATIVO (PARA LA IA) ---
 def ejecutar_simulacion_fast_adaptive(high_arr, low_arr, close_arr, open_arr, sig_buy_arr, sig_sell_arr, tp_arr, sl_arr, cap_ini, com_pct):
     n = len(high_arr)
     cap_activo = cap_ini
@@ -292,6 +297,7 @@ def ejecutar_simulacion_fast_adaptive(high_arr, low_arr, close_arr, open_arr, si
     peak = cap_ini
     max_dd = 0.0
     
+    # LA IA BUSCA CRECIMIENTO EXPONENCIAL 100% REINVERSIÓN EN SUS PRUEBAS
     for i in range(n):
         if en_pos:
             tp_price = precio_ent * (1 + tp_active/100)
@@ -341,7 +347,7 @@ def ejecutar_simulacion_fast_adaptive(high_arr, low_arr, close_arr, open_arr, si
     net_val = cap_activo - cap_ini
     return net_val, pf, num_trades, max_dd
 
-# NÚCLEO VISUAL ADAPTATIVO
+# --- NÚCLEO VISUAL ADAPTATIVO (PARA EL GRÁFICO) ---
 def ejecutar_simulacion_visual(df_sim, strat, cap_ini, reinvest, com_pct):
     registro_trades = []
     n = len(df_sim)
@@ -363,8 +369,8 @@ def ejecutar_simulacion_visual(df_sim, strat, cap_ini, reinvest, com_pct):
     sl_active = 0.0
     cap_activo = cap_ini
     divs = 0.0
-    is_trinity = "TRINITY" in strat
     
+    # En Génesis, asumimos interés compuesto para igualar a la IA
     for i in range(n):
         trade_cerrado = False
         if en_pos:
@@ -372,19 +378,19 @@ def ejecutar_simulacion_visual(df_sim, strat, cap_ini, reinvest, com_pct):
             sl_price = precio_ent * (1 - (sl_active / 100))
             
             if high_arr[i] >= tp_price:
-                g_bruta = (cap_activo if is_trinity else cap_ini) * (tp_active / 100)
-                costo = ((cap_activo if is_trinity else cap_ini) + g_bruta) * com_pct
+                g_bruta = (cap_activo * (tp_active / 100))
+                costo = (cap_activo + g_bruta) * com_pct
                 g_neta = g_bruta - costo
-                if is_trinity:
-                    reinv = g_neta * (reinvest / 100.0)
-                    divs += (g_neta - reinv)
-                    cap_activo += reinv
-                else: cap_activo += g_neta
+                
+                reinv_amt = g_neta * (reinvest / 100.0)
+                divs += (g_neta - reinv_amt)
+                cap_activo += reinv_amt
+                
                 registro_trades.append({'Fecha': fechas_arr[i], 'Tipo': 'TP', 'Precio': tp_price, 'Ganancia_$': g_neta})
                 en_pos, trade_cerrado = False, True
             elif low_arr[i] <= sl_price:
-                p_bruta = (cap_activo if is_trinity else cap_ini) * (sl_active / 100)
-                costo = ((cap_activo if is_trinity else cap_ini) - p_bruta) * com_pct
+                p_bruta = (cap_activo * (sl_active / 100))
+                costo = (cap_activo - p_bruta) * com_pct
                 p_neta = p_bruta + costo
                 cap_activo -= p_neta
                 if cap_activo <= 0: cap_activo = 0.0
@@ -392,14 +398,16 @@ def ejecutar_simulacion_visual(df_sim, strat, cap_ini, reinvest, com_pct):
                 en_pos, trade_cerrado = False, True
             elif sig_sell_arr[i]:
                 ret_pct = (close_arr[i] - precio_ent) / precio_ent
-                g_bruta = (cap_activo if is_trinity else cap_ini) * ret_pct
-                costo = ((cap_activo if is_trinity else cap_ini) + g_bruta) * com_pct
+                g_bruta = (cap_activo * ret_pct)
+                costo = (cap_activo + g_bruta) * com_pct
                 g_neta = g_bruta - costo
-                if is_trinity and g_neta > 0:
-                    reinv = g_neta * (reinvest / 100.0)
-                    divs += (g_neta - reinv)
-                    cap_activo += reinv
-                else: cap_activo += g_neta
+                if g_neta > 0:
+                    reinv_amt = g_neta * (reinvest / 100.0)
+                    divs += (g_neta - reinv_amt)
+                    cap_activo += reinv_amt
+                else:
+                    cap_activo += g_neta
+                    
                 if cap_activo <= 0: cap_activo = 0.0
                 registro_trades.append({'Fecha': fechas_arr[i], 'Tipo': 'DYNAMIC_WIN' if g_neta > 0 else 'DYNAMIC_LOSS', 'Precio': close_arr[i], 'Ganancia_$': g_neta})
                 en_pos, trade_cerrado = False, True
@@ -407,7 +415,7 @@ def ejecutar_simulacion_visual(df_sim, strat, cap_ini, reinvest, com_pct):
         if not en_pos and not trade_cerrado and sig_buy_arr[i] and i + 1 < n and cap_activo > 0:
             precio_ent = open_arr[i+1] 
             fecha_ent = fechas_arr[i+1]
-            costo_ent = (cap_activo if is_trinity else cap_ini) * com_pct
+            costo_ent = cap_activo * com_pct
             cap_activo -= costo_ent
             en_pos = True
             tp_active = tp_arr[i]
@@ -416,16 +424,16 @@ def ejecutar_simulacion_visual(df_sim, strat, cap_ini, reinvest, com_pct):
 
         if en_pos and cap_activo > 0:
             ret_flot = (close_arr[i] - precio_ent) / precio_ent
-            pnl_flot = (cap_activo if is_trinity else cap_ini) * ret_flot
-            curva_capital[i] = (cap_activo + pnl_flot + divs) if is_trinity else (cap_activo + pnl_flot)
+            pnl_flot = cap_activo * ret_flot
+            curva_capital[i] = cap_activo + pnl_flot + divs
         else:
-            curva_capital[i] = (cap_activo + divs) if is_trinity else cap_activo
+            curva_capital[i] = cap_activo + divs
             
     return curva_capital.tolist(), divs, cap_activo, registro_trades, en_pos
 
 # --- 4. RENDERIZADO DE PESTAÑAS BLINDADAS ---
 st.title("🛡️ Terminal Táctico Multipestaña")
-tab_tri, tab_jug, tab_def, tab_gen = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329", "🧬 GÉNESIS V320 (ADAPTATIVO)"])
+tab_tri, tab_jug, tab_def, tab_gen = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329", "🧬 GÉNESIS V320 (APEX)"])
 
 def renderizar_estrategia(strat_name, tab_obj, df_base):
     with tab_obj:
@@ -435,41 +443,35 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 
         s_id = strat_name.split()[0]
         
-        # --- MÓDULO GÉNESIS (ALGORITMO DE ALGORITMOS) ---
+        # --- MÓDULO GÉNESIS (SIN FORMULARIO PARA EVITAR DESCONEXIÓN DE UI) ---
         if s_id == "GENESIS":
-            st.markdown("### 🧬 El Algoritmo de Algoritmos (Deep Adaptive)")
-            st.info("La IA no busca 1 regla. Busca qué reglas usar cuando el mercado SUBE y qué reglas usar cuando el mercado CAE.")
+            st.markdown("### 🧬 El Algoritmo de Algoritmos (The Apex Predator)")
+            st.info("La IA aplicará Interés Compuesto Agresivo y encenderá las palancas reales de su pantalla al encontrar rentabilidad masiva.")
             
-            with st.form("form_genesis"):
-                c_bull, c_bear = st.columns(2)
-                
-                c_bull.markdown("### 🟢 PROTOCOLO BULL (EMA 200+)")
-                c_bull.markdown("**Compras Activas**")
-                for r in buy_rules:
-                    st.session_state[f'bull_b_{r}'] = c_bull.checkbox(r.replace('_', ' '), value=st.session_state[f'bull_b_{r}'], key=f"key_bull_b_{r}")
-                c_bull.markdown("**Ventas Activas**")
-                for r in sell_rules:
-                    st.session_state[f'bull_s_{r}'] = c_bull.checkbox(r.replace('_', ' '), value=st.session_state[f'bull_s_{r}'], key=f"key_bull_s_{r}")
-                st.session_state['bull_tp'] = c_bull.slider("Bull Take Profit (%)", 0.5, 20.0, value=float(st.session_state['bull_tp']), step=0.5, key="key_bull_tp")
-                st.session_state['bull_sl'] = c_bull.slider("Bull Stop Loss (%)", 0.5, 15.0, value=float(st.session_state['bull_sl']), step=0.5, key="key_bull_sl")
-
-                c_bear.markdown("### 🔴 PROTOCOLO BEAR (EMA 200-)")
-                c_bear.markdown("**Compras Activas**")
-                for r in buy_rules:
-                    st.session_state[f'bear_b_{r}'] = c_bear.checkbox(r.replace('_', ' '), value=st.session_state[f'bear_b_{r}'], key=f"key_bear_b_{r}")
-                c_bear.markdown("**Ventas Activas**")
-                for r in sell_rules:
-                    st.session_state[f'bear_s_{r}'] = c_bear.checkbox(r.replace('_', ' '), value=st.session_state[f'bear_s_{r}'], key=f"key_bear_s_{r}")
-                st.session_state['bear_tp'] = c_bear.slider("Bear Take Profit (%)", 0.5, 20.0, value=float(st.session_state['bear_tp']), step=0.5, key="key_bear_tp")
-                st.session_state['bear_sl'] = c_bear.slider("Bear Stop Loss (%)", 0.5, 15.0, value=float(st.session_state['bear_sl']), step=0.5, key="key_bear_sl")
-
-                if st.form_submit_button("🧪 Aplicar Selección Manual"): st.rerun()
-
-            c_ia1, c_ia2 = st.columns([1, 3])
-            st.session_state['gen_ado'] = c_ia1.slider("🎯 Target ADO (Opcional)", 0.0, 10.0, value=float(st.session_state['gen_ado']), step=0.1, key="f_sld_ado")
+            c_bull, c_bear = st.columns(2)
             
-            # --- THE APEX EVOLUTION ENGINE ---
-            if c_ia2.button("🚀 INICIAR EVOLUCIÓN GENÉTICA (El Sobreviviente Absoluto)", type="primary", key="btn_ia_gen"):
+            c_bull.markdown("### 🟢 PROTOCOLO BULL (EMA 200+)")
+            c_bull.markdown("**Compras Activas**")
+            for r in buy_rules:
+                st.session_state[f'key_bull_b_{r}'] = c_bull.checkbox(r.replace('_', ' '), value=st.session_state[f'key_bull_b_{r}'], key=f"ui_bull_b_{r}")
+            c_bull.markdown("**Ventas Activas**")
+            for r in sell_rules:
+                st.session_state[f'key_bull_s_{r}'] = c_bull.checkbox(r.replace('_', ' '), value=st.session_state[f'key_bull_s_{r}'], key=f"ui_bull_s_{r}")
+            st.session_state['key_bull_tp'] = c_bull.slider("Bull Take Profit (%)", 0.5, 20.0, value=float(st.session_state['key_bull_tp']), step=0.5, key="ui_bull_tp")
+            st.session_state['key_bull_sl'] = c_bull.slider("Bull Stop Loss (%)", 0.5, 15.0, value=float(st.session_state['key_bull_sl']), step=0.5, key="ui_bull_sl")
+
+            c_bear.markdown("### 🔴 PROTOCOLO BEAR (EMA 200-)")
+            c_bear.markdown("**Compras Activas**")
+            for r in buy_rules:
+                st.session_state[f'key_bear_b_{r}'] = c_bear.checkbox(r.replace('_', ' '), value=st.session_state[f'key_bear_b_{r}'], key=f"ui_bear_b_{r}")
+            c_bear.markdown("**Ventas Activas**")
+            for r in sell_rules:
+                st.session_state[f'key_bear_s_{r}'] = c_bear.checkbox(r.replace('_', ' '), value=st.session_state[f'key_bear_s_{r}'], key=f"ui_bear_s_{r}")
+            st.session_state['key_bear_tp'] = c_bear.slider("Bear Take Profit (%)", 0.5, 20.0, value=float(st.session_state['key_bear_tp']), step=0.5, key="ui_bear_tp")
+            st.session_state['key_bear_sl'] = c_bear.slider("Bear Stop Loss (%)", 0.5, 15.0, value=float(st.session_state['key_bear_sl']), step=0.5, key="ui_bear_sl")
+
+            st.markdown("---")
+            if st.button("🚀 INICIAR EVOLUCIÓN GENÉTICA (Crecimiento Exponencial)", type="primary", key="btn_ia_gen"):
                 
                 txt_prog = st.empty()
                 progress_bar = st.progress(0.0)
@@ -486,7 +488,6 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 s_mat = {r: df_precalc[r].values for r in sell_rules}
                 
                 def eval_fitness(dna):
-                    # Reconstruye el ADN en la matriz
                     bull_b_cond = np.zeros(len(df_precalc), dtype=bool)
                     bear_b_cond = np.zeros(len(df_precalc), dtype=bool)
                     for i, r in enumerate(buy_rules):
@@ -506,12 +507,11 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                         
                     net, pf, nt, mdd = ejecutar_simulacion_fast_adaptive(h_arr, l_arr, c_arr, o_arr, final_buy, final_sell, final_tp, final_sl, capital_inicial, comision_pct)
                     
-                    # Criterio de Selección Natural: LA IA SIEMPRE DEVUELVE AL MEJOR
-                    ado_pen = 1.0
-                    if st.session_state['gen_ado'] > 0.0 and nt > 0:
-                        ado_pen = 1.0 / (1.0 + abs((nt/dias_analizados) - st.session_state['gen_ado']))
-                        
-                    fitness = ((net * pf) / (mdd + 1.0)) * ado_pen
+                    # LA IA PREMIA CRECIMIENTO MASIVO
+                    if nt > 0:
+                        fitness = (net * pf * np.sqrt(nt)) / ((mdd / 100.0) + 0.1)
+                    else:
+                        fitness = -999999
                     return fitness, net, pf
 
                 pop_size = 50
@@ -533,7 +533,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     population.append(dna)
                     
                 best_dna_overall = None
-                best_fit_overall = -999999
+                best_fit_overall = -9999999
 
                 for gen in range(generations):
                     txt_prog.markdown(f"### 🧬 IA Mutando Universos: Generación {gen+1}/{generations} ...")
@@ -562,12 +562,11 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                             'bear_tp': (p1['bear_tp'] + p2['bear_tp']) / 2.0, 'bear_sl': (p1['bear_sl'] + p2['bear_sl']) / 2.0
                         }
                         
-                        # Muta
                         if random.random() < 0.2: child['bull_b'][random.randint(0, len(buy_rules)-1)] ^= True
                         if random.random() < 0.2: child['bear_b'][random.randint(0, len(buy_rules)-1)] ^= True
                         if random.random() < 0.2: child['bull_s'][random.randint(0, len(sell_rules)-1)] ^= True
                         if random.random() < 0.2: child['bear_s'][random.randint(0, len(sell_rules)-1)] ^= True
-                            
+                        
                         if not any(child['bull_b']): child['bull_b'][random.randint(0, len(buy_rules)-1)] = True
                         if not any(child['bear_b']): child['bear_b'][random.randint(0, len(buy_rules)-1)] = True
                         if not any(child['bull_s']): child['bull_s'][random.randint(0, len(sell_rules)-1)] = True
@@ -579,36 +578,37 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 txt_prog.empty()
                 progress_bar.empty()
                 
-                # --- APLICACIÓN INCONDICIONAL (LA IA SIEMPRE DA SU MEJOR ESFUERZO) ---
+                # --- ACTUALIZACIÓN DE INTERFAZ FÍSICA ---
                 if best_dna_overall:
+                    # Sobrescribir State (Actualiza Checkboxes)
                     for i, r in enumerate(buy_rules): 
-                        st.session_state[f'bull_b_{r}'] = best_dna_overall['bull_b'][i]
-                        st.session_state[f'bear_b_{r}'] = best_dna_overall['bear_b'][i]
+                        st.session_state[f'key_bull_b_{r}'] = best_dna_overall['bull_b'][i]
+                        st.session_state[f'key_bear_b_{r}'] = best_dna_overall['bear_b'][i]
                     for i, r in enumerate(sell_rules): 
-                        st.session_state[f'bull_s_{r}'] = best_dna_overall['bull_s'][i]
-                        st.session_state[f'bear_s_{r}'] = best_dna_overall['bear_s'][i]
+                        st.session_state[f'key_bull_s_{r}'] = best_dna_overall['bull_s'][i]
+                        st.session_state[f'key_bear_s_{r}'] = best_dna_overall['bear_s'][i]
                         
-                    st.session_state['bull_tp'] = round(best_dna_overall['bull_tp'], 1)
-                    st.session_state['bull_sl'] = round(best_dna_overall['bull_sl'], 1)
-                    st.session_state['bear_tp'] = round(best_dna_overall['bear_tp'], 1)
-                    st.session_state['bear_sl'] = round(best_dna_overall['bear_sl'], 1)
-                    st.session_state['gen_ado'] = 0.0
+                    st.session_state['key_bull_tp'] = round(best_dna_overall['bull_tp'], 1)
+                    st.session_state['key_bull_sl'] = round(best_dna_overall['bull_sl'], 1)
+                    st.session_state['key_bear_tp'] = round(best_dna_overall['bear_tp'], 1)
+                    st.session_state['key_bear_sl'] = round(best_dna_overall['bear_sl'], 1)
                     
                     b_bull_str = ", ".join([buy_rules[i] for i in range(len(buy_rules)) if best_dna_overall['bull_b'][i]])
                     s_bull_str = ", ".join([sell_rules[i] for i in range(len(sell_rules)) if best_dna_overall['bull_s'][i]])
                     b_bear_str = ", ".join([buy_rules[i] for i in range(len(buy_rules)) if best_dna_overall['bear_b'][i]])
                     s_bear_str = ", ".join([sell_rules[i] for i in range(len(sell_rules)) if best_dna_overall['bear_s'][i]])
                     
-                    dna_str = f"🧬 APEX ADAPTATIVE PROTOCOL (V320.X)\n\n🟢 FASE BULL (Tendencia Alcista):\nCOMPRAS: [ {b_bull_str} ]\nCIERRES: [ {s_bull_str} ]\nTP: {st.session_state['bull_tp']}% | SL: {st.session_state['bull_sl']}%\n\n🔴 FASE BEAR (Tendencia Bajista):\nCOMPRAS: [ {b_bear_str} ]\nCIERRES: [ {s_bear_str} ]\nTP: {st.session_state['bear_tp']}% | SL: {st.session_state['bear_sl']}%"
+                    dna_str = f"🧬 APEX PREDATOR (V320.X)\n\n🟢 FASE BULL (EMA 200+):\nCOMPRAS = [ {b_bull_str} ]\nCIERRES = [ {s_bull_str} ]\nTP: {st.session_state['key_bull_tp']}% | SL: {st.session_state['key_bull_sl']}%\n\n🔴 FASE BEAR (EMA 200-):\nCOMPRAS = [ {b_bear_str} ]\nCIERRES = [ {s_bear_str} ]\nTP: {st.session_state['key_bear_tp']}% | SL: {st.session_state['key_bear_sl']}%"
                     st.session_state['winning_dna'] = dna_str
-                    st.rerun()
+                    st.rerun() 
 
             if st.session_state['winning_dna'] != "":
-                st.success("¡Evolución Completada! Este es el mejor ADN Adaptativo posible. Cópielo y envíemelo:")
+                st.success("¡Evolución Genética Completada! Copie el ADN y envíemelo para generar su PineScript Bot:")
                 st.code(st.session_state['winning_dna'], language="text")
 
             df_strat = generar_senales(df_base.copy(), "GENESIS", 2.5, 1.5, False, False)
-            eq_curve, divs, cap_act, t_log, pos_ab = ejecutar_simulacion_visual(df_strat, "GENESIS", capital_inicial, 0.0, comision_pct)
+            # Simulación visual fuerza reinversión del 100% para mostrar el crecimiento exponencial
+            eq_curve, divs, cap_act, t_log, pos_ab = ejecutar_simulacion_visual(df_strat, "GENESIS", capital_inicial, 100.0, comision_pct)
             
         # --- BLOQUE TRINITY / JUGGERNAUT / DEFCON ---
         else:
