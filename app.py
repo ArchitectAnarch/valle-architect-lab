@@ -13,31 +13,35 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="ROCKET PROTOCOL | Apex Quant", layout="wide", initial_sidebar_state="expanded")
 
-# --- MEMORIA IA INSTITUCIONAL (ANTI-BLOQUEO) ---
+# --- MEMORIA IA INSTITUCIONAL (PATRÓN STATE-ONLY PARA STREAMLIT) ---
 buy_rules = ['Pink_Whale_Buy', 'Lock_Bounce', 'Lock_Break', 'Defcon_Buy', 'Neon_Up', 'Therm_Bounce', 'Therm_Vacuum', 'Nuclear_Buy', 'Early_Buy', 'Rebound_Buy']
 sell_rules = ['Defcon_Sell', 'Neon_Dn', 'Therm_Wall_Sell', 'Therm_Panic_Sell', 'Lock_Reject', 'Lock_Breakd', 'Nuclear_Sell', 'Early_Sell']
 
-# INYECCIÓN DIRECTA DE ESTADOS PARA FORZAR LA UI
-if 'ui_bull_tp' not in st.session_state: st.session_state['ui_bull_tp'] = 5.0
-if 'ui_bull_sl' not in st.session_state: st.session_state['ui_bull_sl'] = 2.0
-if 'ui_bear_tp' not in st.session_state: st.session_state['ui_bear_tp'] = 3.0
-if 'ui_bear_sl' not in st.session_state: st.session_state['ui_bear_sl'] = 1.5
+# Variables Base Globales
 if 'winning_dna' not in st.session_state: st.session_state['winning_dna'] = ""
 
-for r in buy_rules:
-    if f'ui_bull_b_{r}' not in st.session_state: st.session_state[f'ui_bull_b_{r}'] = False
-    if f'ui_bear_b_{r}' not in st.session_state: st.session_state[f'ui_bear_b_{r}'] = False
-for r in sell_rules:
-    if f'ui_bull_s_{r}' not in st.session_state: st.session_state[f'ui_bull_s_{r}'] = False
-    if f'ui_bear_s_{r}' not in st.session_state: st.session_state[f'ui_bear_s_{r}'] = False
+# Inicialización de Sliders Génesis
+if 'gen_bull_tp' not in st.session_state: st.session_state['gen_bull_tp'] = 5.0
+if 'gen_bull_sl' not in st.session_state: st.session_state['gen_bull_sl'] = 2.0
+if 'gen_bear_tp' not in st.session_state: st.session_state['gen_bear_tp'] = 3.0
+if 'gen_bear_sl' not in st.session_state: st.session_state['gen_bear_sl'] = 1.5
+if 'gen_ado' not in st.session_state: st.session_state['gen_ado'] = 0.0
 
-# Fuerza G Inicial
-if not any([st.session_state.get(f'ui_bull_b_{r}') for r in buy_rules]): 
-    st.session_state['ui_bull_b_Nuclear_Buy'] = True
-    st.session_state['ui_bear_b_Pink_Whale_Buy'] = True
-if not any([st.session_state.get(f'ui_bull_s_{r}') for r in sell_rules]): 
-    st.session_state['ui_bull_s_Nuclear_Sell'] = True
-    st.session_state['ui_bear_s_Therm_Panic_Sell'] = True
+# Inicialización de Checkboxes Génesis
+for r in buy_rules:
+    if f'gen_bull_b_{r}' not in st.session_state: st.session_state[f'gen_bull_b_{r}'] = False
+    if f'gen_bear_b_{r}' not in st.session_state: st.session_state[f'gen_bear_b_{r}'] = False
+for r in sell_rules:
+    if f'gen_bull_s_{r}' not in st.session_state: st.session_state[f'gen_bull_s_{r}'] = False
+    if f'gen_bear_s_{r}' not in st.session_state: st.session_state[f'gen_bear_s_{r}'] = False
+
+# Gatillos iniciales por defecto (para que no esté vacío)
+if not any([st.session_state[f'gen_bull_b_{r}'] for r in buy_rules]): 
+    st.session_state['gen_bull_b_Nuclear_Buy'] = True
+    st.session_state['gen_bear_b_Pink_Whale_Buy'] = True
+if not any([st.session_state[f'gen_bull_s_{r}'] for r in sell_rules]): 
+    st.session_state['gen_bull_s_Nuclear_Sell'] = True
+    st.session_state['gen_bear_s_Therm_Panic_Sell'] = True
 
 for s in ["TRINITY", "JUGGERNAUT", "DEFCON"]:
     if f'sld_tp_{s}' not in st.session_state: st.session_state[f'sld_tp_{s}'] = 3.0
@@ -63,9 +67,8 @@ if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=Tr
     gc.collect()
 
 st.sidebar.markdown("---")
-exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["coinbase", "binance", "kraken", "kucoin"], index=1)
-# CORRECCIÓN DE SUMINISTRO: BTC/USDT POR DEFECTO
-ticker = st.sidebar.text_input("Símbolo Exacto", value="BTC/USDT")
+exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["coinbase", "binance", "kraken", "kucoin"], index=0)
+ticker = st.sidebar.text_input("Símbolo Exacto", value="BTC/USD")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
 
 intervalos = {"1 Minuto": "1min", "5 Minutos": "5min", "15 Minutos": "15min", "30 Minutos": "30min", "1 Hora": "1h", "4 Horas": "4h", "1 Día": "1D", "1 Semana": "1W"}
@@ -165,10 +168,8 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
         return pd.DataFrame()
 
 df_global = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
-
-# SISTEMA DE ALERTA DE SUMINISTRO API
 if df_global.empty:
-    st.error(f"🚨 ERROR DE SUMINISTRO API: El Exchange ({exchange_sel.upper()}) no encontró el par '{ticker}' o no hay datos en estas fechas. Recuerde: Binance usa USDT (Ej: BTC/USDT), Coinbase usa USD (Ej: BTC/USD).")
+    st.error(f"🚨 ERROR API: No hay datos para {ticker} en {exchange_sel.upper()}. Verifique el par (Ej: BTC/USD para Coinbase, BTC/USDT para Binance).")
 
 # --- 3. MOTOR PRE-CÁLCULO TOPOLÓGICO ---
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
@@ -225,7 +226,7 @@ def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     df_sim['Rebound_Buy'] = df_sim['RSI_Cross_Up'] & ~is_magenta
     return df_sim
 
-# --- NÚCLEO FÍSICO C++ CÁLCULO DE INTERÉS COMPUESTO ---
+# --- NÚCLEO FÍSICO C++ CÁLCULO DE INTERÉS COMPUESTO (EXTREMO) ---
 def simular_crecimiento_exponencial(high_arr, low_arr, close_arr, open_arr, sig_buy_arr, sig_sell_arr, tp_arr, sl_arr, cap_ini, com_pct):
     n = len(high_arr)
     cap_activo = cap_ini
@@ -356,28 +357,33 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         
         # --- MÓDULO GÉNESIS: ALGORITMO CUÁNTICO ---
         if s_id == "GENESIS":
-            st.markdown("### 🌌 Singularidad Genética (V320)")
-            st.info("Atención: Los botones a continuación NO están bloqueados. Si usted inicia la evolución, la IA moverá estos botones físicamente en su pantalla al terminar.")
+            st.markdown("### 🌌 Singularidad Genética (Panel HFT)")
+            st.info("Los checkboxes ahora obedecen el patrón STATE-ONLY de Streamlit. La IA moverá físicamente estas palancas.")
             
             c_bull, c_bear = st.columns(2)
-            c_bull.markdown("#### 🟢 PROTOCOLO ALCISTA (EMA+)")
-            for r in buy_rules:
-                st.checkbox(r.replace('_', ' '), key=f"ui_bull_b_{r}")
-            for r in sell_rules:
-                st.checkbox(r.replace('_', ' '), key=f"ui_bull_s_{r}")
-            st.slider("TP Alcista (%)", 0.5, 20.0, step=0.5, key="ui_bull_tp")
-            st.slider("SL Alcista (%)", 0.5, 15.0, step=0.5, key="ui_bull_sl")
+            c_bull.markdown("""
+            <div style='background-color:rgba(0, 255, 0, 0.1); padding:10px; border-radius:10px; border-left: 5px solid lime;'>
+            <h4 style='color:lime; margin-top:0;'>🟢 PROTOCOLO ALCISTA (EMA 200+)</h4>
+            </div>""", unsafe_allow_html=True)
+            
+            # STATE-ONLY WIDGETS (Sin parámetro value= para evitar el API Exception)
+            for r in buy_rules: c_bull.checkbox(f"COMPRA: {r.replace('_', ' ')}", key=f"gen_bull_b_{r}")
+            for r in sell_rules: c_bull.checkbox(f"CIERRE: {r.replace('_', ' ')}", key=f"gen_bull_s_{r}")
+            c_bull.slider("🎯 TP Alcista (%)", 0.5, 20.0, step=0.5, key="gen_bull_tp")
+            c_bull.slider("🛑 SL Alcista (%)", 0.5, 15.0, step=0.5, key="gen_bull_sl")
 
-            c_bear.markdown("#### 🔴 PROTOCOLO BAJISTA (EMA-)")
-            for r in buy_rules:
-                st.checkbox(r.replace('_', ' '), key=f"ui_bear_b_{r}")
-            for r in sell_rules:
-                st.checkbox(r.replace('_', ' '), key=f"ui_bear_s_{r}")
-            st.slider("TP Bajista (%)", 0.5, 20.0, step=0.5, key="ui_bear_tp")
-            st.slider("SL Bajista (%)", 0.5, 15.0, step=0.5, key="ui_bear_sl")
+            c_bear.markdown("""
+            <div style='background-color:rgba(255, 0, 0, 0.1); padding:10px; border-radius:10px; border-left: 5px solid red; margin-top:20px;'>
+            <h4 style='color:red; margin-top:0;'>🔴 PROTOCOLO BAJISTA (EMA 200-)</h4>
+            </div>""", unsafe_allow_html=True)
+            
+            for r in buy_rules: c_bear.checkbox(f"COMPRA: {r.replace('_', ' ')}", key=f"gen_bear_b_{r}")
+            for r in sell_rules: c_bear.checkbox(f"CIERRE: {r.replace('_', ' ')}", key=f"gen_bear_s_{r}")
+            c_bear.slider("🎯 TP Bajista (%)", 0.5, 20.0, step=0.5, key="gen_bear_tp")
+            c_bear.slider("🛑 SL Bajista (%)", 0.5, 15.0, step=0.5, key="gen_bear_sl")
 
             st.markdown("---")
-            if st.button("🌌 INICIAR RECOCIDO CUÁNTICO (Destruir al Mercado)", type="primary"):
+            if st.button("🌌 INICIAR RECOCIDO CUÁNTICO (Evolución HFT)", type="primary"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
                 
                 df_p = inyectar_adn(df_base.copy(), 1.5, 2.5)
@@ -390,12 +396,13 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 best_fit = -float('inf')
                 bp = None
                 
-                # Simulación Ciega: 2000 universos de mutación cruzada
-                for i in range(2000): 
-                    b_bull = random.sample(buy_rules, random.randint(1, 3))
-                    b_bear = random.sample(buy_rules, random.randint(1, 3))
-                    s_bull = random.sample(sell_rules, random.randint(1, 3))
-                    s_bear = random.sample(sell_rules, random.randint(1, 3))
+                # Simularemos 3000 universos de mutación cruzada para forzar el descubrimiento
+                for i in range(3000): 
+                    # El algoritmo ahora PUEDE elegir hasta 5 gatillos combinados
+                    b_bull = random.sample(buy_rules, random.randint(1, 5))
+                    b_bear = random.sample(buy_rules, random.randint(1, 5))
+                    s_bull = random.sample(sell_rules, random.randint(1, 5))
+                    s_bear = random.sample(sell_rules, random.randint(1, 5))
                     
                     b_cond_bull, b_cond_bear = np.zeros(len(df_p), dtype=bool), np.zeros(len(df_p), dtype=bool)
                     s_cond_bull, s_cond_bear = np.zeros(len(df_p), dtype=bool), np.zeros(len(df_p), dtype=bool)
@@ -416,65 +423,60 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     
                     net, pf, nt, mdd = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, f_buy, f_sell, f_tp, f_sl, capital_inicial, comision_pct)
                     
-                    # LA ECUACIÓN DEL DEPREDADOR (Fitness Exponencial)
-                    if nt > 0:
+                    # ECUACIÓN DEL DEPREDADOR HFT (Alta frecuencia, alto profit)
+                    # Si no hace operaciones, muere. Si el PF es menor a 1.05, muere.
+                    if nt > 2 and pf > 1.05:
                         fit = (net * pf * np.sqrt(nt)) / (mdd + 1.0)
-                    else:
-                        fit = -9999999
-                        
-                    if fit > best_fit:
-                        best_fit = fit
-                        bp = {
-                            'b_bull': b_bull, 'b_bear': b_bear, 's_bull': s_bull, 's_bear': s_bear,
-                            'tp_bull': tp_bull, 'sl_bull': sl_bull, 'tp_bear': tp_bear, 'sl_bear': sl_bear,
-                            'net': net, 'pf': pf
-                        }
+                        if fit > best_fit:
+                            best_fit = fit
+                            bp = {
+                                'b_bull': b_bull, 'b_bear': b_bear, 's_bull': s_bull, 's_bear': s_bear,
+                                'tp_bull': tp_bull, 'sl_bull': sl_bull, 'tp_bear': tp_bear, 'sl_bear': sl_bear,
+                                'net': net, 'pf': pf, 'nt': nt
+                            }
                 
                 ph_holograma.empty()
                 if bp and bp['net'] > 0: 
-                    # 🔥 SOBREESCRIBIR LAS LLAVES DE LA INTERFAZ FÍSICA 🔥
+                    # 🔥 REESCRITURA DIRECTA DE LOS WIDGETS 🔥
                     for r in buy_rules:
-                        st.session_state[f'ui_bull_b_{r}'] = (r in bp['b_bull'])
-                        st.session_state[f'ui_bear_b_{r}'] = (r in bp['b_bear'])
+                        st.session_state[f'gen_bull_b_{r}'] = (r in bp['b_bull'])
+                        st.session_state[f'gen_bear_b_{r}'] = (r in bp['b_bear'])
                     for r in sell_rules:
-                        st.session_state[f'ui_bull_s_{r}'] = (r in bp['s_bull'])
-                        st.session_state[f'ui_bear_s_{r}'] = (r in bp['s_bear'])
+                        st.session_state[f'gen_bull_s_{r}'] = (r in bp['s_bull'])
+                        st.session_state[f'gen_bear_s_{r}'] = (r in bp['s_bear'])
                         
-                    st.session_state['ui_bull_tp'] = round(bp['tp_bull'], 1)
-                    st.session_state['ui_bull_sl'] = round(bp['sl_bull'], 1)
-                    st.session_state['ui_bear_tp'] = round(bp['tp_bear'], 1)
-                    st.session_state['ui_bear_sl'] = round(bp['sl_bear'], 1)
+                    st.session_state['gen_bull_tp'] = float(round(bp['tp_bull'], 1))
+                    st.session_state['gen_bull_sl'] = float(round(bp['sl_bull'], 1))
+                    st.session_state['gen_bear_tp'] = float(round(bp['tp_bear'], 1))
+                    st.session_state['gen_bear_sl'] = float(round(bp['sl_bear'], 1))
                     
-                    dna_str = f"🌌 QUANTUM DNA: Profit {bp['pf']:.2f}x | Net +${bp['net']:,.2f}\nBULL BUY: {bp['b_bull']}\nBULL SELL: {bp['s_bull']}\nBULL TP/SL: {st.session_state['ui_bull_tp']}% / {st.session_state['ui_bull_sl']}%\n---\nBEAR BUY: {bp['b_bear']}\nBEAR SELL: {bp['s_bear']}\nBEAR TP/SL: {st.session_state['ui_bear_tp']}% / {st.session_state['ui_bear_sl']}%"
+                    dna_str = f"🌌 THE QUANTUM SINGULARITY\nProfit {bp['pf']:.2f}x | Net +${bp['net']:,.2f} | Trades: {bp['nt']}\n\n🟢 BULL BUY: {bp['b_bull']}\n🟢 BULL SELL: {bp['s_bull']}\n🎯 BULL TP/SL: {st.session_state['gen_bull_tp']}% / {st.session_state['gen_bull_sl']}%\n\n🔴 BEAR BUY: {bp['b_bear']}\n🔴 BEAR SELL: {bp['s_bear']}\n🎯 BEAR TP/SL: {st.session_state['gen_bear_tp']}% / {st.session_state['gen_bear_sl']}%"
                     st.session_state['winning_dna'] = dna_str
-                    st.rerun() 
+                    st.rerun() # Esto dispara los checkboxes físicos
                 else:
-                    st.error("❌ El mercado está destruido. 2000 universos calculados y ninguno superó la comisión del Exchange. Cambie de moneda o temporalidad.")
+                    st.error("❌ 3000 universos simulados. Ninguno logró vencer al mercado y a las comisiones con consistencia. El mercado actual carece de volumen fractal operable.")
 
             if st.session_state.get('winning_dna') != "":
-                st.success("¡Singularidad Alcanzada! Copie esto para el PineScript:")
+                st.success("¡ADN Extraído Exitosamente! Copie este bloque para el código PineScript:")
                 st.code(st.session_state['winning_dna'], language="text")
 
-            # RECONSTRUIR LÓGICA BASADA EN LA UI FÍSICA PARA DIBUJARLA
+            # --- RENDERIZADO VISUAL DEL RESULTADO ACTUAL ---
             df_strat = inyectar_adn(df_base.copy(), 1.5, 2.5)
-            bull_b_cond = np.zeros(len(df_strat), dtype=bool)
-            bear_b_cond = np.zeros(len(df_strat), dtype=bool)
-            bull_s_cond = np.zeros(len(df_strat), dtype=bool)
-            bear_s_cond = np.zeros(len(df_strat), dtype=bool)
+            bull_b_cond, bear_b_cond = np.zeros(len(df_strat), dtype=bool), np.zeros(len(df_strat), dtype=bool)
+            bull_s_cond, bear_s_cond = np.zeros(len(df_strat), dtype=bool), np.zeros(len(df_strat), dtype=bool)
             
             for r in buy_rules:
-                if st.session_state.get(f'ui_bull_b_{r}'): bull_b_cond |= df_strat[r].values
-                if st.session_state.get(f'ui_bear_b_{r}'): bear_b_cond |= df_strat[r].values
+                if st.session_state.get(f'gen_bull_b_{r}'): bull_b_cond |= df_strat[r].values
+                if st.session_state.get(f'gen_bear_b_{r}'): bear_b_cond |= df_strat[r].values
             for r in sell_rules:
-                if st.session_state.get(f'ui_bull_s_{r}'): bull_s_cond |= df_strat[r].values
-                if st.session_state.get(f'ui_bear_s_{r}'): bear_s_cond |= df_strat[r].values
+                if st.session_state.get(f'gen_bull_s_{r}'): bull_s_cond |= df_strat[r].values
+                if st.session_state.get(f'gen_bear_s_{r}'): bear_s_cond |= df_strat[r].values
                 
             df_strat['Signal_Buy'] = np.where(df_strat['Macro_Bull'], bull_b_cond, bear_b_cond)
             df_strat['Signal_Sell'] = np.where(df_strat['Macro_Bull'], bull_s_cond, bear_s_cond)
-            df_strat['Active_TP'] = np.where(df_strat['Macro_Bull'], st.session_state['ui_bull_tp'], st.session_state['ui_bear_tp'])
-            df_strat['Active_SL'] = np.where(df_strat['Macro_Bull'], st.session_state['ui_bull_sl'], st.session_state['ui_bear_sl'])
+            df_strat['Active_TP'] = np.where(df_strat['Macro_Bull'], st.session_state.get('gen_bull_tp', 5.0), st.session_state.get('gen_bear_tp', 3.0))
+            df_strat['Active_SL'] = np.where(df_strat['Macro_Bull'], st.session_state.get('gen_bull_sl', 2.0), st.session_state.get('gen_bear_sl', 1.5))
             
-            # En Génesis, asumimos el 100% de reinversión para mostrar el potencial cuántico
             eq_curve, divs, cap_act, t_log, pos_ab = simular_visual(df_strat, capital_inicial, 100.0, comision_pct)
 
         # --- BLOQUES NORMALES (TRINITY/JUGG/DEFCON) ---
@@ -533,7 +535,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         st.markdown(f"### 📊 Auditoría: {s_id}")
         c1, c2, c3, c4, c5, c6 = st.columns(6)
         c1.metric("Portafolio Neto", f"${eq_curve[-1]:,.2f}", f"{ret_pct:.2f}%")
-        c2.metric("Flujo Neta", f"${divs:,.2f}")
+        c2.metric("Flujo Neto", f"${divs:,.2f}")
         c3.metric("Win Rate", f"{wr:.1f}%")
         c4.metric("Profit Factor", f"{pf_val:.2f}x")
         c5.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
