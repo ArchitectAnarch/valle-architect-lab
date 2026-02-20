@@ -31,10 +31,9 @@ css_spinner = """
 </style>
 <div class="loader-container"><div class="rocket">🚀</div></div>
 """
-ph_holograma = st.empty() # Placeholder global para el holograma
+ph_holograma = st.empty()
 
 # --- 1. PANEL LATERAL GLOBAL Y LOGO ---
-# Búsqueda dinámica del logo sin importar la extensión
 logo_files = glob.glob("logo.*")
 if logo_files:
     st.sidebar.image(logo_files[0], use_container_width=True)
@@ -51,20 +50,26 @@ id_exchange = exchanges_soportados[exchange_sel]
 
 ticker = st.sidebar.text_input("Símbolo Exacto (Ej. HNT/USD)", value="HNT/USD")
 
-intervalos = {"1 Minuto": ("1m", "1T"), "5 Minutos": ("5m", "5T"), "15 Minutos": ("15m", "15T"), "30 Minutos": ("30m", "30T"), "1 Hora": ("1h", "1H"), "4 Horas": ("4h", "4H"), "1 Día": ("1d", "1D")}
-intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=2)
+intervalos = {
+    "1 Minuto": ("1m", "1T"), "5 Minutos": ("5m", "5T"), 
+    "7 Minutos": ("1m", "7T"), "13 Minutos": ("1m", "13T"), 
+    "15 Minutos": ("15m", "15T"), "23 Minutos": ("1m", "23T"), 
+    "30 Minutos": ("30m", "30T"), "1 Hora": ("1h", "1H"), 
+    "2 Horas": ("1h", "2H"), "4 Horas": ("4h", "4H"), "1 Día": ("1d", "1D")
+}
+intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=4) # Default 15m
 iv_download, iv_resample = intervalos[intervalo_sel]
 
 hoy = datetime.today().date()
 limite_dias = 30 if iv_download == "1m" else 730 if iv_download in ["5m", "15m", "30m"] else 1800
-start_date, end_date = st.sidebar.slider("📅 Time Frame", min_value=hoy - timedelta(days=limite_dias), max_value=hoy, value=(hoy - timedelta(days=30), hoy), format="YYYY-MM-DD")
+start_date, end_date = st.sidebar.slider("📅 Time Frame Global", min_value=hoy - timedelta(days=limite_dias), max_value=hoy, value=(hoy - timedelta(days=30), hoy), format="YYYY-MM-DD")
 dias_analizados = max((end_date - start_date).days, 1)
 
 st.sidebar.markdown("---")
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=13364.0, step=1000.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
-# --- 2. EXTRACCIÓN Y PRE-CÁLCULO MATEMÁTICO GLOBAL ---
+# --- 2. EXTRACCIÓN Y PRE-CÁLCULO MATEMÁTICO ---
 @st.cache_data(ttl=60)
 def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res):
     try:
@@ -115,12 +120,11 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res):
         return df
     except Exception: return pd.DataFrame()
 
-# Mostrar holograma mientras carga datos
 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
 df_global = cargar_y_preprocesar(id_exchange, ticker, start_date, end_date, iv_download, iv_resample)
-ph_holograma.empty() # Borrar holograma al terminar
+ph_holograma.empty() 
 
-# --- 3. MOTORES CUÁNTICOS ---
+# --- 3. MOTORES CUÁNTICOS (AUDITADOS) ---
 def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, def_sell):
     df_sim['Whale_Cond'] = df_sim['Cuerpo_Vela'] > (df_sim['ATR'] * 0.3)
     df_sim['Vol_Anormal'] = (df_sim['Volume'] > (df_sim['Vol_MA'] * w_factor)) & df_sim['Whale_Cond']
@@ -187,7 +191,7 @@ def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
                 en_pos, trade_cerrado = False, True
 
         if not en_pos and not trade_cerrado and row.get('Signal_Buy', False) and i + 1 < len(df_sim):
-            precio_ent, fecha_ent = df_sim['Open'].iloc[i+1], df_sim.index[i+1]
+            precio_ent, fecha_ent = df_sim['Open'].iloc[i+1], df_sim.index[i+1] # SLIPPAGE EXACTO
             costo_ent = (cap_activo if "TRINITY" in strat else cap_ini) * com_pct
             cap_activo -= costo_ent
             en_pos = True
@@ -202,7 +206,7 @@ def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
             
     return curva_capital, divs, cap_activo, registro_trades, en_pos
 
-# --- 4. RENDERIZADO DE PESTAÑAS Y VENTANA DINÁMICA ---
+# --- 4. RENDERIZADO DE PESTAÑAS ---
 st.title("🛡️ Terminal Táctico Multipestaña")
 tab_tri, tab_jug, tab_def = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329"])
 
@@ -214,7 +218,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 
         s_id = strat_name.split()[0]
         
-        # CONTROLES SUPERIORES
+        # CONTROLES Y FORMULARIO
         with st.form(f"form_{s_id}"):
             c1, c2, c3, c4 = st.columns(4)
             t_tp = c1.slider(f"🎯 TP (%)", 0.5, 15.0, value=float(st.session_state[f'tp_{s_id}']), step=0.1)
@@ -229,7 +233,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             elif s_id == "JUGGERNAUT":
                 t_whale = c3.slider("🐋 Factor Ballena", 1.0, 5.0, value=float(st.session_state[f'whale_{s_id}']), step=0.1)
                 t_radar = c4.slider("📡 Hitbox Radar", 0.1, 5.0, value=float(st.session_state[f'radar_{s_id}']), step=0.1)
-                mac_sh = st.checkbox("Bloqueo Macro (EMA 200)", value=True, key=f"mac_{s_id}")
+                mac_sh = st.checkbox("Bloqueo Macro (EMA)", value=True, key=f"mac_{s_id}")
                 atr_sh = st.checkbox("Bloqueo Crash (ATR)", value=True, key=f"atr_{s_id}")
             else:
                 d_buy = c3.checkbox("Entrada Squeeze Up", value=True, key=f"db_{s_id}")
@@ -243,14 +247,13 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 if s_id != "DEFCON": st.session_state[f'whale_{s_id}'], st.session_state[f'radar_{s_id}'] = t_whale, t_radar
                 st.rerun()
 
-        # MOTOR DE IA Y DICTAMEN
+        # MOTOR IA CON ADO TARGET
         col_ia1, col_ia2 = st.columns([1, 3])
         t_ado = col_ia1.slider(f"🎯 ADO Target ({s_id})", 0.0, 10.0, value=float(st.session_state[f'ado_{s_id}']), step=0.1)
         st.session_state[f'ado_{s_id}'] = t_ado
         
         if col_ia2.button(f"🚀 Ejecutar IA Cuántica ({s_id})", use_container_width=True):
             ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
-            
             best_fit = -999999
             bp = {}
             for _ in range(120):
@@ -298,20 +301,48 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         df_strat = generar_senales(df_base.copy(), strat_name, st.session_state[f'whale_{s_id}'], st.session_state[f'radar_{s_id}'], mac_sh, atr_sh, d_buy, d_sell)
         eq_curve, divs, cap_act, t_log, pos_ab = ejecutar_simulacion(df_strat, strat_name, st.session_state[f'tp_{s_id}'], st.session_state[f'sl_{s_id}'], capital_inicial, st.session_state[f'reinvest_{s_id}'], comision_pct)
         df_strat['Total_Portfolio'] = eq_curve
+        ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
 
-        # DICTAMEN DE SUPERVIVENCIA
-        st.markdown("---")
+        # MÉTRICAS PRINCIPALES
         dftr = pd.DataFrame(t_log)
-        tt_global = len(dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]) if not dftr.empty else 0
-        ado_global = tt_global / dias_analizados if dias_analizados > 0 else 0
-
-        horizonte, vida_util = "Corto Plazo", "Recalibración en 3-5 días."
-        if dias_analizados >= 180: horizonte, vida_util = "Largo Plazo", "Sostenible indefinidamente."
-        elif dias_analizados >= 45: horizonte, vida_util = "Medio Plazo", "Recalibración en 2-4 semanas."
+        tt, wr, pf_val, ado_act = 0, 0.0, 0.0, 0.0
+        if not dftr.empty:
+            exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
+            tt = len(exs)
+            ado_act = tt / dias_analizados if dias_analizados > 0 else 0
+            if tt > 0:
+                ws = len(exs[exs['Tipo'].isin(['TP', 'DYNAMIC_WIN'])])
+                wr = (ws / tt) * 100
+                gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum()
+                gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
+                pf_val = gpp / gll if gll > 0 else float('inf')
         
-        st.info(f"**🧠 DICTAMEN IA:** Horizonte: **{horizonte}** | Vida Útil: **{vida_util}** | ADO Base: **{ado_global:.2f}**")
+        mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
 
-        # GRÁFICA (PAN VS ZOOM CORREGIDO)
+        st.markdown(f"### 📊 Auditoría: {s_id}")
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        c1.metric("Portafolio Neto", f"${eq_curve[-1]:,.2f} {'🟢' if pos_ab else ''}", f"{ret_pct:.2f}%")
+        c2.metric("Flujo/Capital", f"${divs if s_id=='TRINITY' else cap_act:,.2f}")
+        c3.metric("Win Rate", f"{wr:.1f}%")
+        c4.metric("Profit Factor", f"{pf_val:.2f}x")
+        c5.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
+        
+        # EL ADO A LA DERECHA ABSOLUTA EN RECUADRO
+        c6.markdown(f"""
+        <div style="background-color:rgba(0,255,255,0.1); border:1px solid cyan; border-radius:5px; padding:10px; text-align:center;">
+            <h4 style="margin:0; color:cyan;">ADO ⚡</h4>
+            <h3 style="margin:0; color:white;">{ado_act:.2f}</h3>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # DICTAMEN IA DE SUPERVIVENCIA
+        st.markdown("---")
+        horizonte, vida_util, riesgo = "Corto Plazo", "Recalibración en 3-5 días.", "⚠️ ALTO: Riesgo de Sobreoptimización."
+        if dias_analizados >= 180: horizonte, vida_util, riesgo = "Largo Plazo", "Sostenible indefinidamente.", "🛡️ BAJO: Estructura blindada."
+        elif dias_analizados >= 45: horizonte, vida_util, riesgo = "Medio Plazo", "Recalibración en 2-4 semanas.", "⚖️ MODERADO: Adaptado al ciclo actual."
+        st.info(f"**🧠 DICTAMEN IA:** Horizonte: **{horizonte}** | Esperanza de Vida: **{vida_util}** | Nivel de Riesgo: **{riesgo}**")
+
+        # GRÁFICA (ZOOM vs PAN CORREGIDO Y EJES ELÁSTICOS)
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
         ht_clean = "F: %{x}<br>P: $%{y:,.4f}<extra></extra>"
 
@@ -331,21 +362,23 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 
         fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad ($)', line=dict(color='#00FF00', width=3), hovertemplate="Cap: $%{y:,.2f}<extra></extra>"), row=2, col=1)
 
-        fig.update_yaxes(side="right", row=1, col=1)
-        fig.update_yaxes(side="right", row=2, col=1)
-        fig.update_xaxes(showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="toaxis+across", spikethickness=1, spikedash="solid")
+        # DESBLOQUEO DE EJES (ELONGACIÓN MANUAL Y PRECIOS A LA DERECHA)
+        fig.update_yaxes(side="right", fixedrange=False, row=1, col=1)
+        fig.update_yaxes(side="right", fixedrange=False, row=2, col=1)
+        fig.update_xaxes(fixedrange=False, showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="toaxis+across", spikethickness=1, spikedash="solid")
         fig.update_yaxes(showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="toaxis+across", spikethickness=1, spikedash="solid")
 
-        # dragmode='pan' por defecto. El usuario usa el menú superior para cambiar a Zoom (Box).
-        fig.update_layout(template='plotly_dark', height=650, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
+        # dragmode='pan' por defecto. scrollZoom=True permite usar la rueda del ratón libremente.
+        fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
         
-        # displayModeBar en True para permitir cambiar entre Mover (Pan) y Acercar (Zoom)
-        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': True, 'modeBarButtonsToRemove': ['lasso2d', 'select2d']})
+        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True, 'modeBarButtonsToRemove': ['lasso2d', 'select2d']})
 
-        # --- MÓDULO DE VENTANA DINÁMICA (SUB-RANGO) ---
+        # --- MÓDULO DE VENTANA DINÁMICA (SUB-RANGO FINANCIERO) ---
         st.markdown("### 🔎 Análisis Financiero por Ventana Dinámica")
+        st.info("Utilice el siguiente control para calcular la rentabilidad y precisión de los trades que ocurrieron ÚNICAMENTE dentro de las fechas seleccionadas.")
+        
         fecha_min, fecha_max = df_strat.index[0].date(), df_strat.index[-1].date()
-        v_start, v_end = st.slider(f"Seleccione Sub-Rango de Evaluación ({s_id})", min_value=fecha_min, max_value=fecha_max, value=(fecha_min, fecha_max), format="YYYY-MM-DD", key=f"win_{s_id}")
+        v_start, v_end = st.slider(f"Recortar Rango de Evaluación ({s_id})", min_value=fecha_min, max_value=fecha_max, value=(fecha_min, fecha_max), format="YYYY-MM-DD", key=f"win_{s_id}")
         
         mask = (df_strat.index >= pd.to_datetime(v_start)) & (df_strat.index <= pd.to_datetime(v_end) + timedelta(days=1))
         df_sub = df_strat.loc[mask]
@@ -370,10 +403,10 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     pf_sub = gp_sub / gl_sub if gl_sub > 0 else float('inf')
 
             mc1, mc2, mc3, mc4 = st.columns(4)
-            mc1.metric("Inicio Ventana", f"${cap_ini_sub:,.2f}")
-            mc2.metric("Fin Ventana (Efectividad)", f"${cap_fin_sub:,.2f}", f"{ret_sub:.2f}% Neto")
-            mc3.metric("Trades en Ventana", f"{tt_sub}")
-            mc4.metric("Win Rate Ventana", f"{wr_sub:.1f}%")
+            mc1.metric("Inicio de Ventana", f"${cap_ini_sub:,.2f}")
+            mc2.metric("Fin de Ventana", f"${cap_fin_sub:,.2f}", f"{ret_sub:.2f}% Crecimiento en Rango")
+            mc3.metric("Trades dentro de Ventana", f"{tt_sub}")
+            mc4.metric("Win Rate de Ventana", f"{wr_sub:.1f}%")
 
 # RENDERIZAR PESTAÑAS
 renderizar_estrategia("TRINITY V357", tab_tri, df_global)
