@@ -70,7 +70,7 @@ st.sidebar.markdown("---")
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=13364.0, step=1000.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
-# --- 2. EXTRACCIÓN Y RECONSTRUCCIÓN EXACTA ---
+# --- 2. EXTRACCIÓN Y PRE-CÁLCULO ---
 @st.cache_data(ttl=120)
 def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
     try:
@@ -131,9 +131,6 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
             df['PL300'] = df['Low'].rolling(300).min().fillna(df['Low'])
             df['PH300'] = df['High'].rolling(300).max().fillna(df['High'])
             
-            df['Target_Lock_Sup'] = df[['PL30', 'PL100', 'PL300']].max(axis=1)
-            df['Target_Lock_Res'] = df[['PH30', 'PH100', 'PH300']].min(axis=1)
-
             basis_sigma = df['Close'].rolling(20).mean()
             dev_sigma = df['Close'].rolling(20).std().replace(0, 1)
             df['Z_Score'] = (df['Close'] - basis_sigma) / dev_sigma
@@ -155,47 +152,78 @@ ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
 df_global = cargar_y_preprocesar(id_exchange, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
 ph_holograma.empty() 
 
-# --- 3. MOTOR CUÁNTICO DE PRECISIÓN ---
+# --- 3. MOTOR CUÁNTICO DE PRECISIÓN ABSOLUTA ---
 def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, def_sell):
+    # 🐋 RE-ENLACE: FACTOR BALLENA
     df_sim['Whale_Cond'] = df_sim['Cuerpo_Vela'] > (df_sim['ATR'] * 0.3)
     df_sim['Flash_Vol'] = (df_sim['RVol'] > (w_factor * 0.8)) & df_sim['Whale_Cond']
     
-    tol = df_sim['ATR'] * 0.5
-    df_sim['Lock_Bounce'] = (df_sim['Low'] <= (df_sim['Target_Lock_Sup'] + tol)) & (df_sim['Close'] > df_sim['Target_Lock_Sup']) & df_sim['Vela_Verde']
-    df_sim['Lock_Break'] = (df_sim['Close'] > df_sim['Target_Lock_Res']) & (df_sim['Open'] <= df_sim['Target_Lock_Res']) & df_sim['Flash_Vol'] & df_sim['Vela_Verde']
+    # ⚖️ RE-ENLACE: PESOS DEL TERMÓMETRO (Exacto a PineScript)
+    scan_range = df_sim['ATR'] * 2.0
+    ceil_w = np.zeros(len(df_sim))
+    floor_w = np.zeros(len(df_sim))
     
-    df_sim['Lock_Reject'] = (df_sim['High'] >= (df_sim['Target_Lock_Res'] - tol)) & (df_sim['Close'] < df_sim['Target_Lock_Res']) & df_sim['Vela_Roja']
-    df_sim['Lock_Breakd'] = (df_sim['Close'] < df_sim['Target_Lock_Sup']) & (df_sim['Open'] >= df_sim['Target_Lock_Sup']) & df_sim['Vela_Roja']
-    
-    df_sim['Radar_Activo'] = df_sim['Lock_Bounce'] | df_sim['Lock_Break']
+    for p_col, w in [('PL30', 1), ('PH30', 1), ('PL100', 3), ('PH100', 3), ('PL300', 5), ('PH300', 5)]:
+        p_val = df_sim[p_col].values
+        c_val = df_sim['Close'].values
+        ceil_w += np.where((p_val > c_val) & (p_val <= c_val + scan_range), w, 0)
+        floor_w += np.where((p_val < c_val) & (p_val >= c_val - scan_range), w, 0)
+        
+    df_sim['Is_Abyss'] = floor_w == 0
+    df_sim['Is_Hard_Wall'] = ceil_w >= 4
 
+    # 🎯 RE-ENLACE: RADARES Y ZONA DE GRAVEDAD (Usa el Slider r_sens)
+    dist_pl100 = (abs(df_sim['Close'] - df_sim['PL100']) / df_sim['Close']) * 100
+    dist_ph100 = (abs(df_sim['Close'] - df_sim['PH100']) / df_sim['Close']) * 100
+    dist_pl300 = (abs(df_sim['Close'] - df_sim['PL300']) / df_sim['Close']) * 100
+    dist_ph300 = (abs(df_sim['Close'] - df_sim['PH300']) / df_sim['Close']) * 100
+    
+    df_sim['Is_Gravity_Zone'] = (dist_pl100 <= r_sens) | (dist_ph100 <= r_sens) | (dist_pl300 <= r_sens) | (dist_ph300 <= r_sens)
+    
+    tol = df_sim['ATR'] * 0.5
+    df_sim['Target_Lock_Sup'] = df_sim[['PL100', 'PL300']].max(axis=1)
+    df_sim['Target_Lock_Res'] = df_sim[['PH100', 'PH300']].min(axis=1)
+    
+    df_sim['Lock_Bounce'] = df_sim['Is_Gravity_Zone'] & (df_sim['Low'] <= (df_sim['Target_Lock_Sup'] + tol)) & (df_sim['Close'] > df_sim['Target_Lock_Sup']) & df_sim['Vela_Verde']
+    df_sim['Lock_Break'] = df_sim['Is_Gravity_Zone'] & (df_sim['Close'] > df_sim['Target_Lock_Res']) & (df_sim['Open'] <= df_sim['Target_Lock_Res']) & df_sim['Flash_Vol'] & df_sim['Vela_Verde']
+    df_sim['Lock_Reject'] = df_sim['Is_Gravity_Zone'] & (df_sim['High'] >= (df_sim['Target_Lock_Res'] - tol)) & (df_sim['Close'] < df_sim['Target_Lock_Res']) & df_sim['Vela_Roja']
+    df_sim['Lock_Breakd'] = df_sim['Is_Gravity_Zone'] & (df_sim['Close'] < df_sim['Target_Lock_Sup']) & (df_sim['Open'] >= df_sim['Target_Lock_Sup']) & df_sim['Vela_Roja']
+
+    # 🧬 RE-ENLACE: V320 SCORE (Ballena Perfecta)
     buy_score = np.zeros(len(df_sim))
     buy_score = np.where(df_sim['Retro_Peak'] | df_sim['RSI_Cross_Up'], 30, buy_score)
     buy_score = np.where(df_sim['Retro_Peak'], 50, buy_score)
-    buy_score = np.where((buy_score > 0) & df_sim['Radar_Activo'], buy_score + 25, buy_score)
+    buy_score = np.where((buy_score > 0) & df_sim['Is_Gravity_Zone'], buy_score + 25, buy_score)
+    whale_mem = df_sim['Flash_Vol'] | df_sim['Flash_Vol'].shift(1).fillna(False) | df_sim['Flash_Vol'].shift(2).fillna(False)
+    buy_score = np.where((buy_score > 0) & whale_mem, buy_score + 20, buy_score)
     buy_score = np.where((buy_score > 0) & (df_sim['Z_Score'] < -2.0), buy_score + 15, buy_score)
     
     is_magenta = (buy_score >= 70) | df_sim['Retro_Peak']
     is_whale_icon = df_sim['Flash_Vol'] & df_sim['Vela_Verde'] & (~df_sim['Flash_Vol'].shift(1).fillna(False))
     df_sim['Pink_Whale_Buy'] = is_magenta & is_whale_icon
-    
+
+    # 🌡️ TERMÓMETRO DINÁMICO
     df_sim['Neon_Up'] = df_sim['Squeeze_On'] & (df_sim['Close'] >= df_sim['BBU'] * 0.999) & df_sim['Vela_Verde']
     df_sim['Neon_Dn'] = df_sim['Squeeze_On'] & (df_sim['Close'] <= df_sim['BBL'] * 1.001) & df_sim['Vela_Roja']
     df_sim['Defcon_Buy'] = df_sim['Neon_Up'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['ADX'] > 20)
     df_sim['Defcon_Sell'] = df_sim['Neon_Dn'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['ADX'] > 20)
     
-    df_sim['Therm_Wall_Sell'] = (df_sim['RSI'] > 70) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Roja']
-    dist_res = (abs(df_sim['Close'] - df_sim['Target_Lock_Res']) / df_sim['Close']) * 100
-    df_sim['Cielo_Libre'] = dist_res > (r_sens * 2) 
+    df_sim['Therm_Bounce'] = (floor_w >= 4) & df_sim['RSI_Cross_Up'] & ~df_sim['Is_Hard_Wall']
+    df_sim['Therm_Vacuum'] = (ceil_w <= 3) & df_sim['Neon_Up'] & ~df_sim['Is_Abyss']
+    df_sim['Therm_Wall_Sell'] = (ceil_w >= 4) & df_sim['RSI_Cross_Dn']
+    df_sim['Therm_Panic_Sell'] = df_sim['Is_Abyss'] & df_sim['Vela_Roja']
+    
+    df_sim['Cielo_Libre'] = ceil_w <= 3
 
+    # CONSOLIDACIÓN ESTRATÉGICA
     if "TRINITY" in strat:
-        df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | df_sim['Lock_Bounce'] | df_sim['Lock_Break'] | df_sim['Defcon_Buy']
-        df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell'] | df_sim['Lock_Reject'] | df_sim['Lock_Breakd']
+        df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | df_sim['Lock_Bounce'] | df_sim['Lock_Break'] | df_sim['Defcon_Buy'] | df_sim['Therm_Bounce'] | df_sim['Therm_Vacuum']
+        df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell'] | df_sim['Therm_Panic_Sell'] | df_sim['Lock_Reject'] | df_sim['Lock_Breakd']
     elif "JUGGERNAUT" in strat:
         df_sim['Macro_Safe'] = df_sim['Close'] > df_sim['EMA_200'] if macro_sh else True
         df_sim['ATR_Safe'] = ~(df_sim['Cuerpo_Vela'].shift(1).fillna(0) > (df_sim['ATR'].shift(1).fillna(0.001) * 1.5)) if atr_sh else True
-        df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | ((df_sim['Lock_Bounce'] | df_sim['Lock_Break'] | df_sim['Defcon_Buy']) & df_sim['Macro_Safe'] & df_sim['ATR_Safe'])
-        df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell'] | df_sim['Lock_Reject'] | df_sim['Lock_Breakd']
+        df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | ((df_sim['Lock_Bounce'] | df_sim['Lock_Break'] | df_sim['Defcon_Buy'] | df_sim['Therm_Bounce'] | df_sim['Therm_Vacuum']) & df_sim['Macro_Safe'] & df_sim['ATR_Safe'])
+        df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell'] | df_sim['Therm_Panic_Sell'] | df_sim['Lock_Reject'] | df_sim['Lock_Breakd']
     elif "DEFCON" in strat:
         df_sim['Signal_Buy'] = df_sim['Defcon_Buy'] if def_buy else False
         df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] if def_sell else False
@@ -294,7 +322,13 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             t_tp = c1.slider(f"🎯 TP Base (%)", 0.5, 15.0, value=float(st.session_state[f'tp_{s_id}']), step=0.1)
             t_sl = c2.slider(f"🛑 SL (%)", 0.5, 10.0, value=float(st.session_state[f'sl_{s_id}']), step=0.1)
             
-            t_reinv, t_whale, t_radar, mac_sh, atr_sh, d_buy, d_sell = 0.0, 2.5, 1.5, True, True, True, True
+            # Leemos los checkboxes actuales del estado o asignamos por defecto
+            mac_sh = st.session_state.get(f"mac_{s_id}", True)
+            atr_sh = st.session_state.get(f"atr_{s_id}", True)
+            d_buy = st.session_state.get(f"db_{s_id}", True)
+            d_sell = st.session_state.get(f"ds_{s_id}", True)
+            
+            t_reinv, t_whale, t_radar = 0.0, 2.5, 1.5
             
             if s_id == "TRINITY":
                 t_reinv = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state[f'reinvest_{s_id}']), step=5.0)
@@ -303,17 +337,26 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             elif s_id == "JUGGERNAUT":
                 t_whale = c3.slider("🐋 Factor Ballena", 1.0, 5.0, value=float(st.session_state[f'whale_{s_id}']), step=0.1)
                 t_radar = c4.slider("📡 Tolerancia Target Lock", 0.1, 5.0, value=float(st.session_state[f'radar_{s_id}']), step=0.1)
-                mac_sh = st.checkbox("Bloqueo Macro (EMA)", value=True, key=f"mac_{s_id}")
-                atr_sh = st.checkbox("Bloqueo Crash (ATR)", value=True, key=f"atr_{s_id}")
+                st.checkbox("Bloqueo Macro (EMA)", value=mac_sh, key=f"mac_{s_id}")
+                st.checkbox("Bloqueo Crash (ATR)", value=atr_sh, key=f"atr_{s_id}")
             else:
-                d_buy = c3.checkbox("Entrada Squeeze Up", value=True, key=f"db_{s_id}")
-                d_sell = c4.checkbox("Salida Squeeze Dn", value=True, key=f"ds_{s_id}")
+                st.checkbox("Entrada Squeeze Up", value=d_buy, key=f"db_{s_id}")
+                st.checkbox("Salida Squeeze Dn", value=d_sell, key=f"ds_{s_id}")
 
             if st.form_submit_button("⚡ Aplicar Configuraciones"):
-                st.session_state[f'tp_{s_id}'], st.session_state[f'sl_{s_id}'] = t_tp, t_sl
+                st.session_state[f'tp_{s_id}'] = t_tp
+                st.session_state[f'sl_{s_id}'] = t_sl
                 if s_id == "TRINITY": st.session_state[f'reinvest_{s_id}'] = t_reinv
-                if s_id != "DEFCON": st.session_state[f'whale_{s_id}'], st.session_state[f'radar_{s_id}'] = t_whale, t_radar
+                if s_id != "DEFCON": 
+                    st.session_state[f'whale_{s_id}'] = t_whale
+                    st.session_state[f'radar_{s_id}'] = t_radar
                 st.rerun()
+
+        # Leemos nuevamente en caso de haber reruneado
+        mac_sh = st.session_state.get(f"mac_{s_id}", True)
+        atr_sh = st.session_state.get(f"atr_{s_id}", True)
+        d_buy = st.session_state.get(f"db_{s_id}", True)
+        d_sell = st.session_state.get(f"ds_{s_id}", True)
 
         col_ia1, col_ia2 = st.columns([1, 3])
         t_ado = col_ia1.slider(f"🎯 ADO Target ({s_id})", 0.0, 10.0, value=float(st.session_state[f'ado_{s_id}']), step=0.1)
@@ -358,7 +401,9 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             if bp:
                 st.session_state[f'tp_{s_id}'], st.session_state[f'sl_{s_id}'] = float(bp['tp']), float(bp['sl'])
                 if s_id == "TRINITY": st.session_state[f'reinvest_{s_id}'] = float(bp['reinv'])
-                if s_id != "DEFCON": st.session_state[f'whale_{s_id}'], st.session_state[f'radar_{s_id}'] = float(bp['whale']), float(bp['radar'])
+                if s_id != "DEFCON": 
+                    st.session_state[f'whale_{s_id}'] = float(bp['whale'])
+                    st.session_state[f'radar_{s_id}'] = float(bp['radar'])
                 st.session_state[f'ado_{s_id}'] = 0.0
                 gc.collect()
                 st.rerun()
@@ -415,7 +460,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         else:
             fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200', line=dict(color='orange', width=2), hovertemplate=ht_clean), row=1, col=1)
 
-        # 🎯 CORRECCIÓN: HOVERTEMPLATE EN LUGAR DE HOVERTEMP_CLEAN
+        # LÍNEAS DE TENSIÓN CORREGIDAS
         if not dftr.empty:
             ents = dftr[dftr['Tipo'] == 'ENTRY']
             fig.add_trace(go.Scatter(
