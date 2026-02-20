@@ -18,7 +18,7 @@ if 'radar_sens' not in st.session_state: st.session_state.radar_sens = 1.5
 if 'reinvest_pct' not in st.session_state: st.session_state.reinvest_pct = 50.0
 
 st.title("⚙️ ROCKET PROTOCOL LAB - Gemelo Digital Quant")
-st.markdown("Sincronización Matemática Estricta con PineScript. Cero Sesgo de Simulación.")
+st.markdown("Auditoría Paramétrica Absoluta, Blindaje Anti-Crash y Módulo Predictivo ADO.")
 
 # --- 1. PANEL DE CONTROL ---
 st.sidebar.markdown("### 🚀 ROCKET PROTOCOL LAB")
@@ -79,7 +79,7 @@ with st.sidebar.form("calibracion_form"):
         
     submit_calibracion = st.form_submit_button("⚡ Aplicar Algoritmo")
 
-# --- REPOSITORIO DE SCRIPTS ---
+# --- REPOSITORIO ---
 st.sidebar.markdown("---")
 with st.sidebar.expander("📂 Repositorio de Scripts (PineScript)"):
     st.markdown("**TRINITY V357**")
@@ -120,20 +120,34 @@ def cargar_datos_ccxt(exchange_id, sym, start, end, iv_down, iv_res):
     except Exception as e:
         return pd.DataFrame()
 
-with st.spinner(f'Descargando matriz de {exchange_sel}...'):
+with st.spinner(f'Extrayendo matrices seguras de {exchange_sel}...'):
     df = cargar_datos_ccxt(id_exchange, ticker, start_date, end_date, iv_download, iv_resample)
 
-# --- 4. GEMELO DIGITAL: CÁLCULOS MATEMÁTICOS ESTRICTOS ---
-if not df.empty and len(df) > 30:
-    df['EMA_200'] = ta.ema(df['Close'], length=200).fillna(df['Close'])
-    df['Vol_MA'] = ta.sma(df['Volume'], length=20).fillna(df['Volume'])
-    df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14).fillna(0.001)
-    df['RSI'] = ta.rsi(df['Close'], length=14).fillna(50.0)
-    adx_df = ta.adx(df['High'], df['Low'], df['Close'], length=14)
-    df['ADX'] = adx_df.iloc[:, 0].fillna(0.0) if adx_df is not None else 0.0
+# --- 4. GEMELO DIGITAL: CÁLCULOS MATEMÁTICOS BLINDADOS ---
+if not df.empty and len(df) > 5:
+    # BLINDAJE ANTI-NaN PARA INDICADORES (Evita crasheos al hacer Zoom en 1 Día)
+    ema200 = ta.ema(df['Close'], length=200)
+    df['EMA_200'] = ema200 if ema200 is not None else df['Close']
+    df['EMA_200'] = df['EMA_200'].fillna(df['Close'])
 
-    df['KC_Upper'] = ta.ema(df['Close'], length=20) + (df['ATR'] * 1.5)
-    df['KC_Lower'] = ta.ema(df['Close'], length=20) - (df['ATR'] * 1.5)
+    vol_ma = ta.sma(df['Volume'], length=20)
+    df['Vol_MA'] = vol_ma if vol_ma is not None else df['Volume']
+    df['Vol_MA'] = df['Vol_MA'].fillna(df['Volume'])
+
+    atr14 = ta.atr(df['High'], df['Low'], df['Close'], length=14)
+    df['ATR'] = atr14 if atr14 is not None else (df['High'] - df['Low'])
+    df['ATR'] = df['ATR'].fillna(df['High'] - df['Low']).replace(0, 0.001)
+
+    rsi14 = ta.rsi(df['Close'], length=14)
+    df['RSI'] = rsi14 if rsi14 is not None else pd.Series(50.0, index=df.index)
+    df['RSI'] = df['RSI'].fillna(50.0)
+
+    adx_df = ta.adx(df['High'], df['Low'], df['Close'], length=14)
+    df['ADX'] = adx_df.iloc[:, 0] if adx_df is not None else pd.Series(0.0, index=df.index)
+    df['ADX'] = df['ADX'].fillna(0.0)
+
+    df['KC_Upper'] = df['EMA_200'] + (df['ATR'] * 1.5)
+    df['KC_Lower'] = df['EMA_200'] - (df['ATR'] * 1.5)
     
     bb = ta.bbands(df['Close'], length=20, std=2.0)
     if bb is not None:
@@ -141,6 +155,9 @@ if not df.empty and len(df) > 30:
         df.rename(columns={bb.columns[0]: 'BBL', bb.columns[1]: 'BBM', bb.columns[2]: 'BBU'}, inplace=True)
     else:
         df['BBU'], df['BBL'] = df['Close'], df['Close']
+
+    df['BBU'] = df['BBU'].fillna(df['Close'])
+    df['BBL'] = df['BBL'].fillna(df['Close'])
 
     df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
     df['BB_Delta'] = (df['BBU'] - df['BBL']).diff().fillna(0)
@@ -150,17 +167,14 @@ if not df.empty and len(df) > 30:
     df['Vela_Roja'] = df['Close'] < df['Open']
     df['Cuerpo_Vela'] = abs(df['Close'] - df['Open'])
 
-    # 🛠️ CORRECCIÓN 1: PIVOT MATRIX (TARGET LOCK REAL)
-    df['Pivot_Low_30'] = df['Low'].rolling(window=30, center=False).min()
-    df['Pivot_High_30'] = df['High'].rolling(window=30, center=False).max()
+    df['Pivot_Low_30'] = df['Low'].rolling(window=30, center=False).min().fillna(df['Low'])
+    df['Pivot_High_30'] = df['High'].rolling(window=30, center=False).max().fillna(df['High'])
     
     # --- 5. SIMULACIÓN ESTRICTA ---
     def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh):
-        # 🛠️ CORRECCIÓN 2: ANATOMÍA DE LA BALLENA ROSA (Volumen + Cuerpo > 0.3 ATR)
         df_sim['Whale_Cond'] = df_sim['Cuerpo_Vela'] > (df_sim['ATR'] * 0.3)
         df_sim['Vol_Anormal'] = (df_sim['Volume'] > (df_sim['Vol_MA'] * w_factor)) & df_sim['Whale_Cond']
         
-        # 🛠️ CORRECCIÓN 1 CONTINUACIÓN: DISTANCIA A PIVOTES (No a EMA)
         dist_pivot_low = (abs(df_sim['Close'] - df_sim['Pivot_Low_30']) / df_sim['Close']) * 100
         dist_pivot_high = (abs(df_sim['Close'] - df_sim['Pivot_High_30']) / df_sim['Close']) * 100
         df_sim['Radar_Activo'] = (dist_pivot_low <= r_sens) | (dist_pivot_high <= r_sens)
@@ -200,18 +214,15 @@ if not df.empty and len(df) > 30:
                 tp_price = precio_ent * (1 + (tp / 100))
                 sl_price = precio_ent * (1 - (sl / 100))
                 
-                # EJECUCIÓN (Verificamos High y Low reales del día)
                 if row['High'] >= tp_price:
                     ganancia_bruta = cap_activo * (tp / 100) if "TRINITY" in strat else cap_ini * (tp / 100)
                     costo_salida = (cap_activo + ganancia_bruta) * com_pct if "TRINITY" in strat else (cap_ini + ganancia_bruta) * com_pct
                     ganancia_neta = ganancia_bruta - costo_salida
-                    
                     if "TRINITY" in strat:
                         reinv = ganancia_neta * (reinvest / 100.0)
                         divs += (ganancia_neta - reinv)
                         cap_activo += reinv
                     else: cap_activo += ganancia_neta
-                    
                     registro_trades.append({'Fecha': fecha, 'Tipo': 'TP', 'Precio': tp_price, 'Ganancia_$': ganancia_neta})
                     en_pos = False
                     
@@ -233,16 +244,13 @@ if not df.empty and len(df) > 30:
                         divs += (ganancia_neta - reinv)
                         cap_activo += reinv
                     else: cap_activo += ganancia_neta
-                    
                     tipo = 'DYNAMIC_WIN' if ganancia_neta > 0 else 'DYNAMIC_LOSS'
                     registro_trades.append({'Fecha': fecha, 'Tipo': tipo, 'Precio': row['Close'], 'Ganancia_$': ganancia_neta})
                     en_pos = False
 
-            # 🛠️ CORRECCIÓN 3: EJECUCIÓN CON DESFASE REAL (NEXT OPEN)
             if not en_pos and row.get('Signal_Buy', False):
-                # Validamos que exista una vela siguiente para ejecutar
                 if i + 1 < len(df_sim):
-                    precio_ent = df_sim['Open'].iloc[i+1] # Compra en la apertura de la siguiente vela
+                    precio_ent = df_sim['Open'].iloc[i+1] # SLIPPAGE: Compra en Open vela siguiente
                     fecha_ent = df_sim.index[i+1]
                     costo_entrada = cap_activo * com_pct if "TRINITY" in strat else cap_ini * com_pct
                     cap_activo -= costo_entrada
@@ -286,13 +294,20 @@ if not df.empty and len(df) > 30:
     df['Total_Portfolio'] = equity_curve
     df['Rentabilidad_Pct'] = ((df['Total_Portfolio'] - capital_inicial) / capital_inicial) * 100
 
-    # --- 7. MÉTRICAS ---
+    # --- 7. MÉTRICAS Y CÁLCULO ADO (AVERAGE DAILY OPERATIONS) ---
     df_trades = pd.DataFrame(trades_log) if len(trades_log) > 0 else pd.DataFrame()
     total_trades, wins, losses, win_rate, profit_factor = 0, 0, 0, 0, 0
+    ado = 0.0
     
     if not df_trades.empty:
         df_exits = df_trades[df_trades['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
         total_trades = len(df_exits)
+        
+        # Cálculo ADO: Días totales analizados
+        dias_totales = (df.index[-1] - df.index[0]).days
+        dias_totales = dias_totales if dias_totales > 0 else 1
+        ado = total_trades / dias_totales
+
         if total_trades > 0:
             wins = len(df_exits[df_exits['Tipo'].isin(['TP', 'DYNAMIC_WIN'])])
             losses = len(df_exits[df_exits['Tipo'].isin(['SL', 'DYNAMIC_LOSS'])])
@@ -306,8 +321,9 @@ if not df.empty and len(df) > 30:
     max_drawdown = drawdown.min()
 
     st.markdown(f"### 📊 Auditoría Definitiva: {estrategia_activa.split(' ')[0]}")
-    col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Portafolio Final Neto", f"${df['Total_Portfolio'].iloc[-1]:,.2f}", f"{df['Rentabilidad_Pct'].iloc[-1]:,.2f}% Retorno")
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    
+    col1.metric("Portafolio Final", f"${df['Total_Portfolio'].iloc[-1]:,.2f}", f"{df['Rentabilidad_Pct'].iloc[-1]:,.2f}% Ret.")
     
     if "TRINITY" in estrategia_activa: col2.metric("Dividendos Extraídos", f"${safe_dividends:,.2f}")
     elif "JUGGERNAUT" in estrategia_activa: col2.metric("Capital Operativo", f"${active_capital:,.2f}")
@@ -316,6 +332,9 @@ if not df.empty and len(df) > 30:
     col3.metric("Win Rate Real", f"{win_rate:.1f}%")
     col4.metric("Profit Factor", f"{profit_factor:.2f}x")
     col5.metric("Max Drawdown", f"{max_drawdown:.2f}%", delta_color="inverse")
+    
+    # 🎯 NUEVO INDICADOR TÁCTICO: ADO
+    col6.metric("ADO (Operaciones/Día)", f"{ado:.2f} ⚡")
 
     # --- 8. MOTOR GRÁFICO (CROSSHAIR INTACTO) ---
     st.markdown("---")
@@ -334,7 +353,7 @@ if not df.empty and len(df) > 30:
 
     if not df_trades.empty:
         entradas = df_trades[df_trades['Tipo'] == 'ENTRY']
-        fig.add_trace(go.Scatter(x=entradas['Fecha'], y=entradas['Precio'] * 0.98, mode='markers', name='Compra (Siguiente Open)', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(color='white', width=1)), hovertemplate=hovertemp_clean), row=1, col=1)
+        fig.add_trace(go.Scatter(x=entradas['Fecha'], y=entradas['Precio'] * 0.98, mode='markers', name='Compra (Open)', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(color='white', width=1)), hovertemplate=hovertemp_clean), row=1, col=1)
         
         salidas = df_trades[df_trades['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
         colores_salida = ['#00FF00' if t in ['TP', 'DYNAMIC_WIN'] else '#FF0000' for t in salidas['Tipo']]
