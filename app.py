@@ -1,63 +1,64 @@
 import streamlit as st
-import yfinance as yf
+import ccxt
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas_ta as ta
 import pandas as pd
 import numpy as np
-import itertools
+import random
+import time
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="ROCKET PROTOCOL | Lab Quant AI", layout="wide", initial_sidebar_state="expanded")
 
-st.title("⚙️ ROCKET PROTOCOL LAB - Centro de Inteligencia Quant")
-st.markdown("Simulación Multi-Arquitectura con Detección de Impacto Exacto y Optimización IA.")
+# --- MEMORIA IA ---
+if 'tp_pct' not in st.session_state: st.session_state.tp_pct = 3.0
+if 'sl_pct' not in st.session_state: st.session_state.sl_pct = 1.5
+if 'whale_factor' not in st.session_state: st.session_state.whale_factor = 2.5
+if 'radar_sens' not in st.session_state: st.session_state.radar_sens = 1.5
+if 'reinvest_pct' not in st.session_state: st.session_state.reinvest_pct = 50.0
 
-# --- 1. PANEL DE CONTROL: MERCADO Y TIEMPO ---
+st.title("⚙️ ROCKET PROTOCOL LAB - Conexión Directa a Exchanges")
+st.markdown("Extracción CCXT Institucional, Comisiones Reales (0.25%) y Optimización IA.")
+
+# --- 1. PANEL DE CONTROL: EXCHANGES Y MERCADO ---
 st.sidebar.markdown("### 🚀 ROCKET PROTOCOL LAB")
-ticker = st.sidebar.text_input("Símbolo (Ej. HNT-USD, BTC-USD)", value="HNT-USD")
+
+exchanges_soportados = {
+    "Coinbase (Pro)": "coinbase",
+    "Binance": "binance",
+    "Kraken": "kraken",
+    "KuCoin": "kucoin",
+    "Bybit": "bybit"
+}
+exchange_sel = st.sidebar.selectbox("🏦 Proveedor de Liquidez (Exchange)", list(exchanges_soportados.keys()))
+id_exchange = exchanges_soportados[exchange_sel]
+
+# Formato CCXT requiere barra (Ej: HNT/USD o BTC/USDT)
+ticker = st.sidebar.text_input("Símbolo Exacto (Ej. HNT/USD, BTC/USDT)", value="HNT/USD")
 
 intervalos = {
-    "1 Minuto (Historial: 7 días max)": ("1m", "1T"),
-    "5 Minutos (Historial: 60 días max)": ("5m", "5T"),
-    "7 Minutos (Historial: 7 días max)": ("1m", "7T"),
-    "13 Minutos (Historial: 7 días max)": ("1m", "13T"),
-    "15 Minutos (Historial: 60 días max)": ("15m", "15T"),
-    "23 Minutos (Historial: 7 días max)": ("1m", "23T"),
-    "30 Minutos (Historial: 60 días max)": ("30m", "30T"),
-    "1 Hora (Historial: 730 días max)": ("1h", "1H"),
-    "2 Horas (Historial: 730 días max)": ("1h", "2H"),
-    "4 Horas (Historial: 730 días max)": ("1h", "4H"),
-    "1 Día (Años)": ("1d", "1D"),
-    "1 Semana (Años)": ("1wk", "1W"),
-    "1 Mes (Años)": ("1mo", "1M")
+    "1 Minuto": ("1m", "1T"), "5 Minutos": ("5m", "5T"), 
+    "7 Minutos": ("1m", "7T"), "13 Minutos": ("1m", "13T"), 
+    "15 Minutos": ("15m", "15T"), "23 Minutos": ("1m", "23T"), 
+    "30 Minutos": ("30m", "30T"), "1 Hora": ("1h", "1H"), 
+    "2 Horas": ("1h", "2H"), "4 Horas": ("4h", "4H"), 
+    "1 Día": ("1d", "1D"), "1 Semana": ("1w", "1W")
 }
-intervalo_sel = st.sidebar.selectbox("Resolución Espacial (Temporalidad)", list(intervalos.keys()), index=4)
+intervalo_sel = st.sidebar.selectbox("Resolución Espacial", list(intervalos.keys()), index=4)
 iv_download, iv_resample = intervalos[intervalo_sel]
 
-col_date1, col_date2 = st.sidebar.columns(2)
-dias_defecto = 6 if iv_download == "1m" else 59 if iv_download in ["5m", "15m", "30m"] else 365
-default_start = datetime.today() - timedelta(days=dias_defecto)
-
-start_date = col_date1.date_input("Fecha Inicio", value=default_start)
-end_date = col_date2.date_input("Fecha Fin", value=datetime.today())
-
-capital_inicial = st.sidebar.number_input("Capital Inicial Base (USD)", value=13364.0, step=1000.0)
-
-# Motor de Auto-Corrección Temporal
-dias_pedidos = (end_date - start_date).days
+# Slider temporal
 hoy = datetime.today().date()
-if iv_download == "1m" and dias_pedidos > 6:
-    st.sidebar.warning("⚠️ Temporalidad basada en minutos ajustada al límite de la bolsa (7 días).")
-    start_date = hoy - timedelta(days=6)
-elif iv_download in ["5m", "15m", "30m"] and dias_pedidos > 59:
-    st.sidebar.warning("⚠️ Temporalidad intradía ajustada al límite de la bolsa (60 días).")
-    start_date = hoy - timedelta(days=59)
-elif iv_download == "1h" and dias_pedidos > 729:
-    st.sidebar.warning("⚠️ Temporalidad horaria ajustada al límite de la bolsa (730 días).")
-    start_date = hoy - timedelta(days=729)
+limite_dias = 10 if iv_download == "1m" else 90 if iv_download in ["5m", "15m", "30m"] else 730
+fecha_minima = hoy - timedelta(days=limite_dias)
+start_date, end_date = st.sidebar.slider("📅 Rango de Extracción", min_value=fecha_minima, max_value=hoy, value=(fecha_minima, hoy), format="YYYY-MM-DD")
 
-# --- 2. SELECCIÓN DE ARQUITECTURA (DNA AISLADO) ---
+st.sidebar.markdown("---")
+capital_inicial = st.sidebar.number_input("Capital Inicial Base (USD)", value=13364.0, step=1000.0)
+comision_pct = st.sidebar.number_input("Comisión por Trade (%)", value=0.25, step=0.05) / 100.0
+
+# --- 2. SELECCIÓN DE ARQUITECTURA ---
 st.sidebar.header("🧠 Selección de Arquitectura")
 estrategia_activa = st.sidebar.radio("Motor de Ejecución:", [
     "TRINITY V357 (Dividendos + Compuesto)", 
@@ -66,51 +67,62 @@ estrategia_activa = st.sidebar.radio("Motor de Ejecución:", [
 ])
 
 st.sidebar.header(f"🎯 Calibración: {estrategia_activa.split(' ')[0]}")
-tp_pct = st.sidebar.slider("🎯 Take Profit (%)", 0.5, 15.0, 3.0, 0.1)
-sl_pct = st.sidebar.slider("🛑 Stop Loss (%)", 0.5, 10.0, 1.5, 0.1)
+tp_pct = st.sidebar.slider("🎯 Take Profit (%)", 0.5, 15.0, key='tp_pct', step=0.1)
+sl_pct = st.sidebar.slider("🛑 Stop Loss (%)", 0.5, 10.0, key='sl_pct', step=0.1)
 
-reinvest_pct = 50.0
-use_macro_shield = False
-use_atr_shield = False
-bot_defcon_buy = True
-bot_defcon_sell = True
-radar_sens = 1.5
-whale_factor = 2.5
+use_macro_shield, use_atr_shield, bot_defcon_buy, bot_defcon_sell = False, False, True, True
 
 if "TRINITY" in estrategia_activa:
-    reinvest_pct = st.sidebar.slider("💵 Reinversión de Capital (%)", 0.0, 100.0, 50.0, 5.0)
-    whale_factor = st.sidebar.slider("🐋 Multiplicador Volumen (xVol)", 1.0, 5.0, 2.5, 0.1)
-    radar_sens = st.sidebar.slider("📡 Sensibilidad Impacto (%)", 0.1, 5.0, 1.5, 0.1)
+    reinvest_pct = st.sidebar.slider("💵 Reinversión (%)", 0.0, 100.0, key='reinvest_pct', step=5.0)
+    whale_factor = st.sidebar.slider("🐋 Factor Ballena (xVol)", 1.0, 5.0, key='whale_factor', step=0.1)
+    radar_sens = st.sidebar.slider("📡 Sensibilidad Radar (%)", 0.1, 5.0, key='radar_sens', step=0.1)
 elif "JUGGERNAUT" in estrategia_activa:
     use_macro_shield = st.sidebar.checkbox("Bloqueo Macroeconómico (EMA 200)", value=True)
     use_atr_shield = st.sidebar.checkbox("Bloqueo Volatilidad Extrema (>1.5 ATR)", value=True)
-    whale_factor = st.sidebar.slider("🐋 Multiplicador Volumen (xVol)", 1.0, 5.0, 2.5, 0.1)
-    radar_sens = st.sidebar.slider("📡 Sensibilidad Impacto (%)", 0.1, 5.0, 1.5, 0.1)
+    whale_factor = st.sidebar.slider("🐋 Factor Ballena (xVol)", 1.0, 5.0, key='whale_factor', step=0.1)
+    radar_sens = st.sidebar.slider("📡 Sensibilidad Radar (%)", 0.1, 5.0, key='radar_sens', step=0.1)
 elif "DEFCON" in estrategia_activa:
-    bot_defcon_buy = st.sidebar.checkbox("Entrada: Ruptura Alcista (DEFCON 1/2)", value=True)
+    bot_defcon_buy = st.sidebar.checkbox("Entrada: Ruptura Alcista", value=True)
     bot_defcon_sell = st.sidebar.checkbox("Salida Dinámica: Ruptura Bajista", value=True)
 
-# --- 3. EXTRACCIÓN Y RESAMPLING DE DATOS ---
-@st.cache_data(ttl=60)
-def cargar_datos(sym, start, end, iv_down, iv_res):
+# --- 3. EXTRACCIÓN CCXT DE GRADO INSTITUCIONAL ---
+@st.cache_data(ttl=300)
+def cargar_datos_ccxt(exchange_id, sym, start, end, iv_down, iv_res):
     try:
-        start_dt = datetime.combine(start, datetime.min.time())
-        end_dt = datetime.combine(end, datetime.min.time()) + timedelta(days=1)
-        df = yf.download(sym, start=start_dt, end=end_dt, interval=iv_down, progress=False)
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.droplevel(1)
-        if not df.empty and df.index.tz is not None:
-            df.index = df.index.tz_localize(None)
-        if iv_down != iv_res and not df.empty:
+        ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
+        start_ts = int(datetime.combine(start, datetime.min.time()).timestamp() * 1000)
+        end_ts = int((datetime.combine(end, datetime.min.time()) + timedelta(days=1)).timestamp() * 1000)
+        
+        all_ohlcv = []
+        current_ts = start_ts
+        
+        # Bucle de extracción para superar límites de API
+        while current_ts < end_ts:
+            ohlcv = ex_class.fetch_ohlcv(sym, iv_down, since=current_ts, limit=1000)
+            if not ohlcv: break
+            all_ohlcv.extend(ohlcv)
+            current_ts = ohlcv[-1][0] + 1
+            if len(all_ohlcv) > 50000: break # Seguro de memoria
+            
+        if not all_ohlcv: return pd.DataFrame()
+            
+        df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+        df.set_index('timestamp', inplace=True)
+        
+        # Eliminar duplicados si los hay
+        df = df[~df.index.duplicated(keep='first')]
+        
+        if iv_down != iv_res:
             df = df.resample(iv_res).agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
         return df
     except Exception as e:
         return pd.DataFrame()
 
-with st.spinner('Descargando matrices de Wall Street...'):
-    df = cargar_datos(ticker, start_date, end_date, iv_download, iv_resample)
+with st.spinner(f'Conectando a servidores de {exchange_sel}...'):
+    df = cargar_datos_ccxt(id_exchange, ticker, start_date, end_date, iv_download, iv_resample)
 
-# --- 4. PRE-CÁLCULO MATEMÁTICO (INDICADORES) ---
+# --- 4. PRE-CÁLCULO MATEMÁTICO ---
 if not df.empty and len(df) > 20:
     df['EMA_200'] = ta.ema(df['Close'], length=200)
     df['Vol_MA'] = ta.sma(df['Volume'], length=20)
@@ -131,47 +143,39 @@ if not df.empty and len(df) > 20:
     df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
     df['BB_Delta'] = (df['BBU'] - df['BBL']).diff()
     df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10).mean()
-
-    # Condiciones Base
     df['Vela_Verde'] = df['Close'] > df['Open']
     df['Vela_Roja'] = df['Close'] < df['Open']
-    df['Vol_Anormal'] = df['Volume'] > (df['Vol_MA'] * whale_factor)
-    df['Radar_Activo'] = (abs(df['Close'] - df['EMA_200']) / df['Close']) * 100 <= radar_sens
 
-    # DEFCON Logic
-    df['Neon_Up'] = df['Squeeze_On'] & (df['Close'] >= df['BBU'] * 0.999) & df['Vela_Verde']
-    df['Neon_Dn'] = df['Squeeze_On'] & (df['Close'] <= df['BBL'] * 1.001) & df['Vela_Roja']
-    df['Defcon_Buy'] = df['Neon_Up'] & (df['BB_Delta'] > df['BB_Delta_Avg']) & (df['ADX'] > 20)
-    df['Defcon_Sell'] = df['Neon_Dn'] & (df['BB_Delta'] > df['BB_Delta_Avg']) & (df['ADX'] > 20)
-    
-    # Lógica de Cierre Dinámico (Thermometer Wall proxy)
-    df['Therm_Wall_Sell'] = (df['RSI'] > 70) & (df['Close'] > df['BBU']) & df['Vela_Roja']
+    # --- 5. MOTOR DE SIMULACIÓN Y COMISIONES EXACTAS ---
+    def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh):
+        df_sim['Vol_Anormal'] = df_sim['Volume'] > (df_sim['Vol_MA'] * w_factor)
+        df_sim['Radar_Activo'] = (abs(df_sim['Close'] - df_sim['EMA_200']) / df_sim['Close']) * 100 <= r_sens
+        df_sim['Neon_Up'] = df_sim['Squeeze_On'] & (df_sim['Close'] >= df_sim['BBU'] * 0.999) & df_sim['Vela_Verde']
+        df_sim['Neon_Dn'] = df_sim['Squeeze_On'] & (df_sim['Close'] <= df_sim['BBL'] * 1.001) & df_sim['Vela_Roja']
+        df_sim['Defcon_Buy'] = df_sim['Neon_Up'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['ADX'] > 20)
+        df_sim['Defcon_Sell'] = df_sim['Neon_Dn'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['ADX'] > 20)
+        df_sim['Therm_Wall_Sell'] = (df_sim['RSI'] > 70) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Roja']
 
-    # --- 5. ASIGNACIÓN DE SEÑALES POR ADN ---
-    df['Signal_Buy'] = False
-    df['Signal_Sell'] = False
-    
-    if "TRINITY" in estrategia_activa:
-        df['Signal_Buy'] = (df['Vol_Anormal'] & df['Vela_Verde']) | ((df['Radar_Activo'] | df['Defcon_Buy']) & df['Vela_Verde'])
-        df['Signal_Sell'] = df['Defcon_Sell'] | df['Therm_Wall_Sell']
-    elif "JUGGERNAUT" in estrategia_activa:
-        df['Macro_Safe'] = df['Close'] > df['EMA_200'] if use_macro_shield else True
-        cuerpo_previo = df['Open'].shift(1) - df['Close'].shift(1)
-        atr_previo = df['ATR'].shift(1)
-        df['ATR_Safe'] = ~(cuerpo_previo > (atr_previo * 1.5)) if use_atr_shield else True
-        df['Signal_Buy'] = (df['Vol_Anormal'] & df['Vela_Verde']) | ((df['Radar_Activo'] | df['Defcon_Buy']) & df['Vela_Verde'] & df['Macro_Safe'] & df['ATR_Safe'])
-        df['Signal_Sell'] = df['Defcon_Sell'] | df['Therm_Wall_Sell']
-    elif "DEFCON" in estrategia_activa:
-        df['Signal_Buy'] = df['Defcon_Buy'] if bot_defcon_buy else False
-        df['Signal_Sell'] = df['Defcon_Sell'] if bot_defcon_sell else False
+        if "TRINITY" in strat:
+            df_sim['Signal_Buy'] = (df_sim['Vol_Anormal'] & df_sim['Vela_Verde']) | ((df_sim['Radar_Activo'] | df_sim['Defcon_Buy']) & df_sim['Vela_Verde'])
+            df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell']
+        elif "JUGGERNAUT" in strat:
+            df_sim['Macro_Safe'] = df_sim['Close'] > df_sim['EMA_200'] if macro_sh else True
+            cuerpo_previo = df_sim['Open'].shift(1) - df_sim['Close'].shift(1)
+            atr_previo = df_sim['ATR'].shift(1)
+            df_sim['ATR_Safe'] = ~(cuerpo_previo > (atr_previo * 1.5)) if atr_sh else True
+            df_sim['Signal_Buy'] = (df_sim['Vol_Anormal'] & df_sim['Vela_Verde']) | ((df_sim['Radar_Activo'] | df_sim['Defcon_Buy']) & df_sim['Vela_Verde'] & df_sim['Macro_Safe'] & df_sim['ATR_Safe'])
+            df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell']
+        elif "DEFCON" in strat:
+            df_sim['Signal_Buy'] = df_sim['Defcon_Buy'] if bot_defcon_buy else False
+            df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] if bot_defcon_sell else False
+        return df_sim
 
-    # --- 6. MOTOR DE BACKTESTING DE PRECISIÓN (Guarda Puntos de Impacto) ---
-    def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest):
+    def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
         registro_trades = []
         curva_capital = []
         en_pos = False
         precio_ent = 0.0
-        fecha_ent = None
         cap_activo = cap_ini
         divs = 0.0
         
@@ -183,81 +187,101 @@ if not df.empty and len(df) > 20:
                 tp_price = precio_ent * (1 + (tp / 100))
                 sl_price = precio_ent * (1 - (sl / 100))
                 
-                # 1. Chequeo de TP
+                # EJECUCIÓN TP
                 if row['High'] >= tp_price:
-                    ganancia = cap_activo * (tp / 100) if "TRINITY" in strat else cap_ini * (tp / 100)
+                    ganancia_bruta = cap_activo * (tp / 100) if "TRINITY" in strat else cap_ini * (tp / 100)
+                    costo_salida = (cap_activo + ganancia_bruta) * com_pct if "TRINITY" in strat else (cap_ini + ganancia_bruta) * com_pct
+                    ganancia_neta = ganancia_bruta - costo_salida
+                    
                     if "TRINITY" in strat:
-                        reinv = ganancia * (reinvest / 100.0)
-                        divs += (ganancia - reinv)
+                        reinv = ganancia_neta * (reinvest / 100.0)
+                        divs += (ganancia_neta - reinv)
                         cap_activo += reinv
-                    else: cap_activo += ganancia
-                    
-                    registro_trades.append({'Fecha': fecha, 'Tipo': 'TP', 'Precio': tp_price, 'Ganancia_$': ganancia})
+                    else: cap_activo += ganancia_neta
+                    registro_trades.append({'Fecha': fecha, 'Tipo': 'TP', 'Precio': tp_price, 'Ganancia_$': ganancia_neta})
                     en_pos = False
                     
-                # 2. Chequeo de SL
+                # EJECUCIÓN SL
                 elif row['Low'] <= sl_price:
-                    perdida = cap_activo * (sl / 100) if "TRINITY" in strat else cap_ini * (sl / 100)
-                    cap_activo -= perdida
-                    registro_trades.append({'Fecha': fecha, 'Tipo': 'SL', 'Precio': sl_price, 'Ganancia_$': -perdida})
+                    perdida_bruta = cap_activo * (sl / 100) if "TRINITY" in strat else cap_ini * (sl / 100)
+                    costo_salida = (cap_activo - perdida_bruta) * com_pct if "TRINITY" in strat else (cap_ini - perdida_bruta) * com_pct
+                    perdida_neta = perdida_bruta + costo_salida
+                    
+                    cap_activo -= perdida_neta
+                    registro_trades.append({'Fecha': fecha, 'Tipo': 'SL', 'Precio': sl_price, 'Ganancia_$': -perdida_neta})
                     en_pos = False
                     
-                # 3. Chequeo de Cierre Dinámico (Venta Algorítmica Anticipada)
+                # CIERRE DINÁMICO
                 elif row['Signal_Sell']:
                     retorno_pct = (row['Close'] - precio_ent) / precio_ent
-                    ganancia = cap_activo * retorno_pct if "TRINITY" in strat else cap_ini * retorno_pct
+                    ganancia_bruta = cap_activo * retorno_pct if "TRINITY" in strat else cap_ini * retorno_pct
+                    costo_salida = (cap_activo + ganancia_bruta) * com_pct if "TRINITY" in strat else (cap_ini + ganancia_bruta) * com_pct
+                    ganancia_neta = ganancia_bruta - costo_salida
                     
-                    if "TRINITY" in strat and ganancia > 0:
-                        reinv = ganancia * (reinvest / 100.0)
-                        divs += (ganancia - reinv)
+                    if "TRINITY" in strat and ganancia_neta > 0:
+                        reinv = ganancia_neta * (reinvest / 100.0)
+                        divs += (ganancia_neta - reinv)
                         cap_activo += reinv
-                    else: cap_activo += ganancia
+                    else: cap_activo += ganancia_neta
                     
-                    tipo_cierre = 'DYNAMIC_WIN' if ganancia > 0 else 'DYNAMIC_LOSS'
-                    registro_trades.append({'Fecha': fecha, 'Tipo': tipo_cierre, 'Precio': row['Close'], 'Ganancia_$': ganancia})
+                    tipo = 'DYNAMIC_WIN' if ganancia_neta > 0 else 'DYNAMIC_LOSS'
+                    registro_trades.append({'Fecha': fecha, 'Tipo': tipo, 'Precio': row['Close'], 'Ganancia_$': ganancia_neta})
                     en_pos = False
 
-            # Evaluar Entrada si no hay posición
+            # ENTRADA
             if not en_pos and row['Signal_Buy']:
                 precio_ent = row['Close']
-                fecha_ent = fecha
+                # Descontar comisión de entrada
+                costo_entrada = cap_activo * com_pct if "TRINITY" in strat else cap_ini * com_pct
+                cap_activo -= costo_entrada
+                
                 en_pos = True
-                registro_trades.append({'Fecha': fecha, 'Tipo': 'ENTRY', 'Precio': precio_ent, 'Ganancia_$': 0})
+                registro_trades.append({'Fecha': fecha, 'Tipo': 'ENTRY', 'Precio': precio_ent, 'Ganancia_$': -costo_entrada})
 
             valor_actual = (cap_activo + divs) if "TRINITY" in strat else cap_activo
             curva_capital.append(valor_actual)
             
         return curva_capital, divs, cap_activo, registro_trades
 
-    # Ejecución de la simulación actual
-    equity_curve, safe_dividends, active_capital, trades_log = ejecutar_simulacion(df, estrategia_activa, tp_pct, sl_pct, capital_inicial, reinvest_pct)
+    # --- 6. OPTIMIZADOR IA ESTOCÁSTICO ---
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🧠 Central de Inteligencia")
+    if st.sidebar.button("🤖 Optimizar Parámetros (Auto-Ajustar)", type="primary"):
+        with st.spinner('IA Mapeando Matrices de Liquidez y Comisiones...'):
+            best_profit = -999999
+            best_params = {}
+            for _ in range(150): # Mayor cantidad de iteraciones para precisión
+                t_tp = round(random.uniform(1.0, 10.0), 1)
+                t_sl = round(random.uniform(0.5, 4.0), 1)
+                t_whale = round(random.uniform(1.5, 4.0), 1)
+                t_radar = round(random.uniform(0.5, 3.5), 1)
+                t_reinvest = round(random.uniform(10, 100), -1)
+                
+                df_test = generar_senales(df.copy(), estrategia_activa, t_whale, t_radar, use_macro_shield, use_atr_shield)
+                curva_test, _, _, _ = ejecutar_simulacion(df_test, estrategia_activa, t_tp, t_sl, capital_inicial, t_reinvest, comision_pct)
+                
+                if curva_test[-1] > best_profit:
+                    best_profit = curva_test[-1]
+                    best_params = {'tp': t_tp, 'sl': t_sl, 'whale': t_whale, 'radar': t_radar, 'reinvest': t_reinvest}
+            
+            st.session_state.tp_pct = best_params['tp']
+            st.session_state.sl_pct = best_params['sl']
+            st.session_state.whale_factor = best_params['whale']
+            st.session_state.radar_sens = best_params['radar']
+            if "TRINITY" in estrategia_activa:
+                st.session_state.reinvest_pct = float(best_params['reinvest'])
+            st.rerun()
+
+    # EJECUCIÓN PRINCIPAL
+    df = generar_senales(df, estrategia_activa, st.session_state.whale_factor, st.session_state.radar_sens, use_macro_shield, use_atr_shield)
+    equity_curve, safe_dividends, active_capital, trades_log = ejecutar_simulacion(df, estrategia_activa, st.session_state.tp_pct, st.session_state.sl_pct, capital_inicial, st.session_state.reinvest_pct, comision_pct)
+    
     df['Total_Portfolio'] = equity_curve
     df['Rentabilidad_Pct'] = ((df['Total_Portfolio'] - capital_inicial) / capital_inicial) * 100
 
-    # --- 7. OPTIMIZADOR IA CON PROPUESTAS ---
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🧠 Central de Inteligencia")
-    if st.sidebar.button("Ejecutar Optimización IA", type="primary"):
-        with st.spinner('IA escaneando matrices operativas...'):
-            best_tp, best_sl, best_profit = tp_pct, sl_pct, df['Total_Portfolio'].iloc[-1]
-            tp_range = np.arange(1.0, 8.1, 0.5)
-            sl_range = np.arange(0.5, 4.1, 0.5)
-            
-            for tp_test, sl_test in itertools.product(tp_range, sl_range):
-                curva_test, _, _, _ = ejecutar_simulacion(df, estrategia_activa, tp_test, sl_test, capital_inicial, reinvest_pct)
-                if curva_test[-1] > best_profit:
-                    best_profit, best_tp, best_sl = curva_test[-1], tp_test, sl_test
-            
-            volatilidad_media = df['ATR'].mean() / df['Close'].mean() * 100
-            st.sidebar.success(f"**Detección IA Completada**")
-            st.sidebar.write(f"⚙️ **ÓPTIMO ENCONTRADO:** TP={best_tp}% | SL={best_sl}%")
-            st.sidebar.info(f"**Fundamento IA:** La volatilidad promedio (ATR) del activo es de {volatilidad_media:.2f}%. Se propone un Stop Loss del {best_sl}% para evitar cacería de liquidez, y un TP asimétrico para maximizar el ratio R:R adaptado al régimen de tendencia actual.")
-
-    # --- 8. MÉTRICAS FRONT-END ---
+    # --- 7. MÉTRICAS FRONT-END ---
     df_trades = pd.DataFrame(trades_log) if len(trades_log) > 0 else pd.DataFrame()
-    
-    total_trades = 0
-    wins, losses, win_rate, profit_factor, ratio_wl = 0, 0, 0, 0, 0
+    total_trades, wins, losses, win_rate, profit_factor = 0, 0, 0, 0, 0
     
     if not df_trades.empty:
         df_exits = df_trades[df_trades['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
@@ -276,60 +300,43 @@ if not df.empty and len(df) > 20:
 
     st.markdown(f"### 📊 Auditoría Estricta: {estrategia_activa.split(' ')[0]}")
     col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Portafolio Final", f"${df['Total_Portfolio'].iloc[-1]:,.2f}", f"{df['Rentabilidad_Pct'].iloc[-1]:,.2f}% Retorno")
+    col1.metric("Portafolio Final (Neto)", f"${df['Total_Portfolio'].iloc[-1]:,.2f}", f"{df['Rentabilidad_Pct'].iloc[-1]:,.2f}% Retorno")
     
-    if "TRINITY" in estrategia_activa: col2.metric("Dividendos Seguros", f"${safe_dividends:,.2f}")
-    elif "JUGGERNAUT" in estrategia_activa: col2.metric("Capital Actual", f"${active_capital:,.2f}")
+    if "TRINITY" in estrategia_activa: col2.metric("Dividendos Extraídos", f"${safe_dividends:,.2f}")
+    elif "JUGGERNAUT" in estrategia_activa: col2.metric("Capital Operativo", f"${active_capital:,.2f}")
     else: col2.metric("Modo de Combate", "SQUEEZE PURO")
         
     col3.metric("Win Rate Absoluto", f"{win_rate:.1f}%")
     col4.metric("Profit Factor", f"{profit_factor:.2f}x")
     col5.metric("Máximo Drawdown", f"{max_drawdown:.2f}%", delta_color="inverse")
 
-    # --- 9. MOTOR GRÁFICO AVANZADO (Puntos de Impacto Reales) ---
+    # --- 8. MOTOR GRÁFICO AVANZADO ---
     st.markdown("---")
-    st.subheader("📈 Mapa de Impacto Algorítmico")
+    st.subheader(f"📈 Mapa de Impacto Algorítmico ({id_exchange.upper()})")
     
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.65, 0.35], specs=[[{"secondary_y": False}], [{"secondary_y": True}]])
 
-    # Velas
     fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Mercado"), row=1, col=1)
     
-    # Indicadores
     if "DEFCON" in estrategia_activa and 'BBU' in df.columns:
         fig.add_trace(go.Scatter(x=df.index, y=df['BBU'], mode='lines', line=dict(color='rgba(0,255,255,0.3)', width=1), name='Bollinger Top'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df.index, y=df['BBL'], mode='lines', line=dict(color='rgba(0,255,255,0.3)', width=1), name='Bollinger Bot'), row=1, col=1)
     elif 'EMA_200' in df.columns:
         fig.add_trace(go.Scatter(x=df.index, y=df['EMA_200'], mode='lines', name='Filtro EMA 200', line=dict(color='orange', width=2)), row=1, col=1)
 
-    # 🎯 MARCADORES DE IMPACTO EXACTOS (Compras y Ventas)
     if not df_trades.empty:
-        # Extraer Entradas
         entradas = df_trades[df_trades['Tipo'] == 'ENTRY']
-        fig.add_trace(go.Scatter(
-            x=entradas['Fecha'], y=entradas['Precio'] * 0.98, mode='markers', name='Ejecución de Compra',
-            marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(color='white', width=1))
-        ), row=1, col=1)
+        fig.add_trace(go.Scatter(x=entradas['Fecha'], y=entradas['Precio'] * 0.98, mode='markers', name='Fuego de Compra', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(color='white', width=1))), row=1, col=1)
         
-        # Extraer Salidas (TP, SL, y Ventas Dinámicas)
         salidas = df_trades[df_trades['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
         colores_salida = ['#00FF00' if t in ['TP', 'DYNAMIC_WIN'] else '#FF0000' for t in salidas['Tipo']]
-        
-        fig.add_trace(go.Scatter(
-            x=salidas['Fecha'], y=salidas['Precio'] * 1.02, mode='markers', name='Ejecución de Cierre',
-            marker=dict(symbol='triangle-down', color=colores_salida, size=14, line=dict(color='white', width=1)),
-            text=salidas['Tipo'], hovertemplate="Cierre: %{text} a $%{y}<extra></extra>"
-        ), row=1, col=1)
+        fig.add_trace(go.Scatter(x=salidas['Fecha'], y=salidas['Precio'] * 1.02, mode='markers', name='Cierre Táctico', marker=dict(symbol='triangle-down', color=colores_salida, size=14, line=dict(color='white', width=1)), text=salidas['Tipo'], hovertemplate="Cierre: %{text} a $%{y}<extra></extra>"), row=1, col=1)
 
-    # Curvas de Capital
-    fig.add_trace(go.Scatter(x=df.index, y=df['Total_Portfolio'], mode='lines', name='Crecimiento ($)', line=dict(color='#00FF00', width=3)), row=2, col=1, secondary_y=False)
-    fig.add_trace(go.Scatter(x=df.index, y=df['Rentabilidad_Pct'], mode='lines', name='Rentabilidad Neta (%)', line=dict(color='rgba(0,0,0,0)')), row=2, col=1, secondary_y=True)
+    fig.add_trace(go.Scatter(x=df.index, y=df['Total_Portfolio'], mode='lines', name='Equidad Neta ($)', line=dict(color='#00FF00', width=3)), row=2, col=1, secondary_y=False)
+    fig.add_trace(go.Scatter(x=df.index, y=df['Rentabilidad_Pct'], mode='lines', name='Rentabilidad (%)', line=dict(color='rgba(0,0,0,0)')), row=2, col=1, secondary_y=True)
 
     fig.update_layout(template='plotly_dark', height=850, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-    fig.update_yaxes(title_text="Capital Total (USD)", row=2, col=1, secondary_y=False)
-    fig.update_yaxes(title_text="Rentabilidad (%)", row=2, col=1, secondary_y=True, ticksuffix="%")
-
     st.plotly_chart(fig, use_container_width=True)
 
 else:
-    st.error("⚠️ Operación abortada: No hay datos suficientes de la API para construir las matrices de impacto.")
+    st.error("⚠️ El Exchange no arrojó datos para este Símbolo o Temporalidad. Asegúrese de usar el formato correcto (Ej: HNT/USD para Coinbase, o HNT/USDT para Binance).")
