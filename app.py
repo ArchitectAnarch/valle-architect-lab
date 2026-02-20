@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="ROCKET PROTOCOL | Lab Quant", layout="wide", initial_sidebar_state="expanded")
 
-# --- MEMORIA IA INDEPENDIENTE (ANTI-CLONES) ---
+# --- MEMORIA IA INDEPENDIENTE ---
 estrategias = ["TRINITY", "JUGGERNAUT", "DEFCON"]
 for s in estrategias:
     if f'tp_{s}' not in st.session_state: st.session_state[f'tp_{s}'] = 3.0
@@ -23,7 +23,7 @@ for s in estrategias:
     if f'reinvest_{s}' not in st.session_state: st.session_state[f'reinvest_{s}'] = 50.0
     if f'ado_{s}' not in st.session_state: st.session_state[f'ado_{s}'] = 0.0
 
-# Memoria de Laboratorio Génesis (Columnas Exactas)
+# --- MEMORIA GÉNESIS (COMBINATORIA) ---
 if 'gen_tp' not in st.session_state: st.session_state.gen_tp = 3.0
 if 'gen_sl' not in st.session_state: st.session_state.gen_sl = 1.5
 if 'gen_ado' not in st.session_state: st.session_state.gen_ado = 0.0
@@ -67,7 +67,6 @@ id_exchange = exchanges_soportados[exchange_sel]
 ticker = st.sidebar.text_input("Símbolo Exacto (Ej. HNT/USD)", value="HNT/USD", key="txt_tick")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria (UTC)", min_value=-12.0, max_value=14.0, value=-5.0, step=0.5, key="num_utc")
 
-# CORRECCIÓN PANDAS WARNING (usando 'min' en lugar de 'T')
 intervalos = {
     "1 Minuto": ("1m", "1min"), "5 Minutos": ("5m", "5min"), 
     "7 Minutos": ("1m", "7min"), "13 Minutos": ("1m", "13min"), 
@@ -195,7 +194,6 @@ def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, 
     df_sim['Lock_Reject'] = (df_sim['High'] >= (df_sim['Target_Lock_Res'] - tol)) & (df_sim['Close'] < df_sim['Target_Lock_Res']) & df_sim['Vela_Roja']
     df_sim['Lock_Breakd'] = (df_sim['Close'] < df_sim['Target_Lock_Sup']) & (df_sim['Open'] >= df_sim['Target_Lock_Sup']) & df_sim['Vela_Roja']
     
-    # CORRECCIÓN: KeyError: 'Pivot_Low_30' eliminado. Ahora usa PL30 y PH30
     dist_sup = (abs(df_sim['Close'] - df_sim['PL30']) / df_sim['Close']) * 100
     dist_res = (abs(df_sim['Close'] - df_sim['PH30']) / df_sim['Close']) * 100
     df_sim['Radar_Activo'] = (dist_sup <= r_sens) | (dist_res <= r_sens)
@@ -215,7 +213,6 @@ def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, 
     df_sim['Defcon_Buy'] = df_sim['Neon_Up'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['ADX'] > 20)
     df_sim['Defcon_Sell'] = df_sim['Neon_Dn'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['ADX'] > 20)
     
-    # 🌡️ TERMÓMETRO GÉNESIS
     scan_range = df_sim['ATR'] * 2.0
     ceil_w = np.zeros(len(df_sim))
     floor_w = np.zeros(len(df_sim))
@@ -230,7 +227,6 @@ def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, 
     df_sim['Therm_Vacuum'] = (ceil_w <= 3) & df_sim['Neon_Up'] & ~(floor_w == 0)
     df_sim['Therm_Wall_Sell'] = (ceil_w >= 4) & df_sim['RSI_Cross_Dn']
     df_sim['Therm_Panic_Sell'] = (floor_w == 0) & df_sim['Vela_Roja']
-    
     df_sim['Cielo_Libre'] = dist_res > (r_sens * 2) 
 
     # --- LÓGICAS PURAS GÉNESIS ---
@@ -252,6 +248,7 @@ def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, 
         df_sim['Signal_Buy'] = df_sim['Defcon_Buy'] if def_buy else False
         df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] if def_sell else False
     elif "GENESIS" in strat:
+        # Sumatoria de todas las variables activadas en UI para crear Gatillos Compuestos
         buy_cond = pd.Series(False, index=df_sim.index)
         for r in buy_rules:
             if st.session_state.get(f'gen_b_{r}', False): buy_cond = buy_cond | df_sim[r]
@@ -354,8 +351,8 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         
         # --- MÓDULO GÉNESIS ---
         if s_id == "GENESIS":
-            st.markdown("### 🧬 Constructor Genético de Algoritmos (V320)")
-            st.info("Active los gatillos de entrada y salida. La IA mutará las combinaciones para encontrar el ADN perfecto.")
+            st.markdown("### 🧬 Constructor Genético (Multivariante)")
+            st.info("Pulse la IA: Encenderá y apagará gatillos combinados para buscar sinergias matemáticas extremas.")
             
             with st.form("form_genesis"):
                 c_b, c_s, c_r = st.columns(3)
@@ -376,54 +373,63 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             c_ia1, c_ia2 = st.columns([1, 3])
             st.session_state.gen_ado = c_ia1.slider("🎯 Target ADO", 0.0, 10.0, value=float(st.session_state.gen_ado), step=0.1, key="sld_gen_ado")
             
-            if c_ia2.button("🚀 Que la IA construya el Bot (Fuerza Bruta)", type="primary", key="btn_ia_gen"):
+            # --- MOTOR DE MUTACIÓN GENÉTICA ---
+            if c_ia2.button("🚀 Búsqueda Estocástica Multivariante", type="primary", key="btn_ia_gen"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
-                best_fit = -999
+                best_fit = -999999
                 bp = {}
                 
-                for b_r in buy_rules:
-                    for s_r in sell_rules:
-                        for k in buy_rules: st.session_state[f'gen_b_{k}'] = False
-                        for k in sell_rules: st.session_state[f'gen_s_{k}'] = False
-                        st.session_state[f'gen_b_{b_r}'] = True
-                        st.session_state[f'gen_s_{s_r}'] = True
-                        
-                        df_t = generar_senales(df_base.copy(), "GENESIS", 2.5, 1.5, False, False, False, False)
-                        for tp_test in [3.0, 5.0, 8.0]:
-                            for sl_test in [1.5, 3.0]:
-                                c_test, _, _, trds, _ = ejecutar_simulacion(df_t, "GENESIS", tp_test, sl_test, capital_inicial, 0, comision_pct)
-                                dft = pd.DataFrame(trds)
-                                if not dft.empty:
-                                    exits = dft[dft['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
-                                    nt = len(exits)
-                                    if nt > 5:
-                                        gp = exits[exits['Ganancia_$'] > 0]['Ganancia_$'].sum()
-                                        gl = abs(exits[exits['Ganancia_$'] < 0]['Ganancia_$'].sum())
-                                        pf = gp / gl if gl > 0 else 0.5
-                                        np_val = c_test[-1] - capital_inicial
-                                        pk = pd.Series(c_test).cummax()
-                                        m_dd = abs((((pd.Series(c_test) - pk) / pk) * 100).min())
-                                        
-                                        ado_pen = 1.0
-                                        if st.session_state.gen_ado > 0.0:
-                                            ado_pen = 1.0 / (1.0 + abs((nt/dias_analizados) - st.session_state.gen_ado))
-                                            
-                                        fit = ((np_val * pf) / (m_dd + 1.0)) * ado_pen
-                                        if fit > best_fit and np_val > 0:
-                                            best_fit, bp = fit, {'buy':b_r, 'sell':s_r, 'tp':tp_test, 'sl':sl_test}
+                for _ in range(120): # 120 mutaciones aleatorias profundas
+                    # 1. Mutar Gatillos (1 a 3 gatillos encendidos al mismo tiempo)
+                    b_sample = random.sample(buy_rules, random.randint(1, 3))
+                    s_sample = random.sample(sell_rules, random.randint(1, 3))
+                    
+                    # Temporariamente encender solo los de la muestra
+                    for k in buy_rules: st.session_state[f'gen_b_{k}'] = (k in b_sample)
+                    for k in sell_rules: st.session_state[f'gen_s_{k}'] = (k in s_sample)
+                    
+                    df_t = generar_senales(df_base.copy(), "GENESIS", 2.5, 1.5, False, False, False, False)
+                    
+                    # 2. Mutar Riesgo
+                    tp_test = round(random.uniform(2.0, 10.0), 1)
+                    sl_test = round(random.uniform(1.0, 3.5), 1)
+                    
+                    c_test, _, _, trds, _ = ejecutar_simulacion(df_t, "GENESIS", tp_test, sl_test, capital_inicial, 0, comision_pct)
+                    
+                    dft = pd.DataFrame(trds)
+                    if not dft.empty:
+                        exits = dft[dft['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
+                        nt = len(exits)
+                        if nt > 5:
+                            gp = exits[exits['Ganancia_$'] > 0]['Ganancia_$'].sum()
+                            gl = abs(exits[exits['Ganancia_$'] < 0]['Ganancia_$'].sum())
+                            pf = gp / gl if gl > 0 else 0.5
+                            np_val = c_test[-1] - capital_inicial
+                            pk = pd.Series(c_test).cummax()
+                            m_dd = abs((((pd.Series(c_test) - pk) / pk) * 100).min())
+                            
+                            ado_pen = 1.0
+                            if st.session_state.gen_ado > 0.0:
+                                ado_pen = 1.0 / (1.0 + abs((nt/dias_analizados) - st.session_state.gen_ado))
+                                
+                            fit = ((np_val * pf) / (m_dd + 1.0)) * ado_pen
+                            if fit > best_fit and np_val > 0:
+                                best_fit = fit
+                                bp = {'b':b_sample, 's':s_sample, 'tp':tp_test, 'sl':sl_test}
                 
                 ph_holograma.empty()
                 if bp:
-                    for k in buy_rules: st.session_state[f'gen_b_{k}'] = False
-                    for k in sell_rules: st.session_state[f'gen_s_{k}'] = False
-                    st.session_state[f"gen_b_{bp['buy']}"] = True
-                    st.session_state[f"gen_s_{bp['sell']}"] = True
+                    # Aplicar la mutación ganadora a los checkboxes reales
+                    for k in buy_rules: st.session_state[f'gen_b_{k}'] = (k in bp['b'])
+                    for k in sell_rules: st.session_state[f'gen_s_{k}'] = (k in bp['s'])
                     st.session_state.gen_tp = float(bp['tp'])
                     st.session_state.gen_sl = float(bp['sl'])
                     st.session_state.gen_ado = 0.0
-                    st.success(f"🧬 ADN ENCONTRADO: Compra [{bp['buy'].upper()}] | Venta [{bp['sell'].upper()}] | TP {bp['tp']}% | SL {bp['sl']}%")
+                    b_str = ", ".join(bp['b'])
+                    s_str = ", ".join(bp['s'])
+                    st.success(f"🧬 MUTACIÓN ÉPICA! \n\n**+ COMPRAS:** [{b_str}]\n\n**- VENTAS:** [{s_str}]\n\n🎯 TP {bp['tp']}% | 🛑 SL {bp['sl']}%")
                     st.rerun()
-                else: st.error("No se encontró ADN rentable para este mercado.")
+                else: st.error("No se encontraron sinergias rentables.")
 
             df_strat = generar_senales(df_base.copy(), "GENESIS", 2.5, 1.5, False, False, False, False)
             eq_curve, divs, cap_act, t_log, pos_ab = ejecutar_simulacion(df_strat, "GENESIS", st.session_state.gen_tp, st.session_state.gen_sl, capital_inicial, 0.0, comision_pct)
@@ -575,7 +581,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         if not dftr.empty:
             ents = dftr[dftr['Tipo'] == 'ENTRY']
             fig.add_trace(go.Scatter(
-                x=ents['Fecha'], y=ents['Precio'] * 0.96, mode='markers', name='Compra', 
+                x=ents['Fecha'], y=ents['Precio'] * 0.96, mode='markers', name='Compra (Vela Ejecución)', 
                 marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=1)),
                 error_y=dict(type='data', symmetric=False, array=ents['Precio']*0.04, arrayminus=[0]*len(ents), color='cyan', thickness=1, width=0),
                 hovertemplate=ht_clean
