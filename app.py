@@ -7,11 +7,12 @@ import pandas as pd
 import numpy as np
 import random
 import os
+import glob
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="ROCKET PROTOCOL | Lab Quant AI", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="ROCKET PROTOCOL | Lab Quant", layout="wide", initial_sidebar_state="expanded")
 
-# --- MEMORIA IA INDEPENDIENTE POR PESTAÑA ---
+# --- MEMORIA IA INDEPENDIENTE ---
 estrategias = ["TRINITY", "JUGGERNAUT", "DEFCON"]
 for s in estrategias:
     if f'tp_{s}' not in st.session_state: st.session_state[f'tp_{s}'] = 3.0
@@ -21,23 +22,28 @@ for s in estrategias:
     if f'reinvest_{s}' not in st.session_state: st.session_state[f'reinvest_{s}'] = 50.0
     if f'ado_{s}' not in st.session_state: st.session_state[f'ado_{s}'] = 0.0
 
-# --- ESTILOS CSS (HOLOGARAMA COHETE) ---
+# --- HOLOGRAMA COHETE CSS ---
 css_spinner = """
 <style>
 .loader-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; pointer-events: none; background: transparent; }
-.rocket { font-size: 8rem; animation: spin 1.2s linear infinite; filter: drop-shadow(0 0 20px rgba(0, 255, 255, 0.8)); }
+.rocket { font-size: 10rem; animation: spin 1s linear infinite; filter: drop-shadow(0 0 25px rgba(0, 255, 255, 0.9)); }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 </style>
 <div class="loader-container"><div class="rocket">🚀</div></div>
 """
+ph_holograma = st.empty() # Placeholder global para el holograma
 
-# --- 1. PANEL LATERAL GLOBAL ---
-if os.path.exists("logo.png"): st.sidebar.image("logo.png", use_container_width=True)
-else: st.sidebar.markdown("### 🚀 ROCKET PROTOCOL LAB")
+# --- 1. PANEL LATERAL GLOBAL Y LOGO ---
+# Búsqueda dinámica del logo sin importar la extensión
+logo_files = glob.glob("logo.*")
+if logo_files:
+    st.sidebar.image(logo_files[0], use_container_width=True)
+else:
+    st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL</h2>", unsafe_allow_html=True)
 
-if st.sidebar.button("🔄 Forzar Sincronización Live", use_container_width=True): st.cache_data.clear()
-
+if st.sidebar.button("🔄 Sincronización Live", use_container_width=True): st.cache_data.clear()
 st.sidebar.markdown("---")
+
 st.sidebar.header("📡 Enlace de Mercado")
 exchanges_soportados = {"Coinbase (Pro)": "coinbase", "Binance": "binance", "Kraken": "kraken", "KuCoin": "kucoin"}
 exchange_sel = st.sidebar.selectbox("🏦 Exchange", list(exchanges_soportados.keys()))
@@ -57,14 +63,6 @@ dias_analizados = max((end_date - start_date).days, 1)
 st.sidebar.markdown("---")
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=13364.0, step=1000.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
-
-with st.sidebar.expander("📂 Repositorio de Scripts (PineScript)"):
-    st.markdown("**TRINITY V357**")
-    st.code("// Copie desde su archivo original", language="pine")
-    st.markdown("**JUGGERNAUT V356**")
-    st.code("// Copie desde su archivo original", language="pine")
-    st.markdown("**DEFCON V329**")
-    st.code("// Copie desde su archivo original", language="pine")
 
 # --- 2. EXTRACCIÓN Y PRE-CÁLCULO MATEMÁTICO GLOBAL ---
 @st.cache_data(ttl=60)
@@ -89,7 +87,6 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res):
         df = df[~df.index.duplicated(keep='first')]
         if iv_down != iv_res: df = df.resample(iv_res).agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
         
-        # CÁLCULO DE INDICADORES (Se hace una sola vez para todas las pestañas)
         if len(df) > 5:
             df['EMA_200'] = ta.ema(df['Close'], length=200).fillna(df['Close'])
             df['Vol_MA'] = ta.sma(df['Volume'], length=20).fillna(df['Volume'])
@@ -118,10 +115,12 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res):
         return df
     except Exception: return pd.DataFrame()
 
-with st.spinner('Extrayendo y Procesando Matrices...'):
-    df_global = cargar_y_preprocesar(id_exchange, ticker, start_date, end_date, iv_download, iv_resample)
+# Mostrar holograma mientras carga datos
+ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
+df_global = cargar_y_preprocesar(id_exchange, ticker, start_date, end_date, iv_download, iv_resample)
+ph_holograma.empty() # Borrar holograma al terminar
 
-# --- 3. MOTORES CUÁNTICOS (FUNCIONES) ---
+# --- 3. MOTORES CUÁNTICOS ---
 def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, def_sell):
     df_sim['Whale_Cond'] = df_sim['Cuerpo_Vela'] > (df_sim['ATR'] * 0.3)
     df_sim['Vol_Anormal'] = (df_sim['Volume'] > (df_sim['Vol_MA'] * w_factor)) & df_sim['Whale_Cond']
@@ -203,14 +202,14 @@ def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
             
     return curva_capital, divs, cap_activo, registro_trades, en_pos
 
-# --- 4. RENDERIZADO DE PESTAÑAS (MULTI-TAB) ---
+# --- 4. RENDERIZADO DE PESTAÑAS Y VENTANA DINÁMICA ---
 st.title("🛡️ Terminal Táctico Multipestaña")
 tab_tri, tab_jug, tab_def = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329"])
 
 def renderizar_estrategia(strat_name, tab_obj, df_base):
     with tab_obj:
         if df_base.empty:
-            st.warning("Sin datos para operar.")
+            st.warning("Matriz de datos vacía.")
             return
 
         s_id = strat_name.split()[0]
@@ -244,14 +243,13 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 if s_id != "DEFCON": st.session_state[f'whale_{s_id}'], st.session_state[f'radar_{s_id}'] = t_whale, t_radar
                 st.rerun()
 
-        # MOTOR DE IA (FUERA DEL FORM PARA ACTUALIZAR SLIDERS)
+        # MOTOR DE IA Y DICTAMEN
         col_ia1, col_ia2 = st.columns([1, 3])
         t_ado = col_ia1.slider(f"🎯 ADO Target ({s_id})", 0.0, 10.0, value=float(st.session_state[f'ado_{s_id}']), step=0.1)
         st.session_state[f'ado_{s_id}'] = t_ado
         
         if col_ia2.button(f"🚀 Ejecutar IA Cuántica ({s_id})", use_container_width=True):
-            spinner = st.empty()
-            spinner.markdown(css_spinner, unsafe_allow_html=True)
+            ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
             
             best_fit = -999999
             bp = {}
@@ -286,7 +284,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                         if fit > best_fit and np_val > 0:
                             best_fit, bp = fit, {'tp':rtp, 'sl':rsl, 'reinv':rrv, 'whale':rwh, 'radar':rrd}
             
-            spinner.empty()
+            ph_holograma.empty()
             if bp:
                 st.session_state[f'tp_{s_id}'] = float(bp['tp'])
                 st.session_state[f'sl_{s_id}'] = float(bp['sl'])
@@ -296,38 +294,24 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 st.rerun()
             else: st.error("IA: Mercado demasiado hostil para esta estrategia bajo estos parámetros.")
 
-        # EJECUCIÓN GRÁFICA
+        # EJECUCIÓN GRÁFICA BASE
         df_strat = generar_senales(df_base.copy(), strat_name, st.session_state[f'whale_{s_id}'], st.session_state[f'radar_{s_id}'], mac_sh, atr_sh, d_buy, d_sell)
         eq_curve, divs, cap_act, t_log, pos_ab = ejecutar_simulacion(df_strat, strat_name, st.session_state[f'tp_{s_id}'], st.session_state[f'sl_{s_id}'], capital_inicial, st.session_state[f'reinvest_{s_id}'], comision_pct)
         df_strat['Total_Portfolio'] = eq_curve
-        ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
 
-        # MÉTRICAS
+        # DICTAMEN DE SUPERVIVENCIA
+        st.markdown("---")
         dftr = pd.DataFrame(t_log)
-        tt, wr, pf_val, ado_act = 0, 0.0, 0.0, 0.0
-        if not dftr.empty:
-            exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
-            tt = len(exs)
-            ado_act = tt / dias_analizados
-            if tt > 0:
-                ws = len(exs[exs['Tipo'].isin(['TP', 'DYNAMIC_WIN'])])
-                wr = (ws / tt) * 100
-                gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum()
-                gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
-                pf_val = gpp / gll if gll > 0 else float('inf')
+        tt_global = len(dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]) if not dftr.empty else 0
+        ado_global = tt_global / dias_analizados if dias_analizados > 0 else 0
+
+        horizonte, vida_util = "Corto Plazo", "Recalibración en 3-5 días."
+        if dias_analizados >= 180: horizonte, vida_util = "Largo Plazo", "Sostenible indefinidamente."
+        elif dias_analizados >= 45: horizonte, vida_util = "Medio Plazo", "Recalibración en 2-4 semanas."
         
-        mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
+        st.info(f"**🧠 DICTAMEN IA:** Horizonte: **{horizonte}** | Vida Útil: **{vida_util}** | ADO Base: **{ado_global:.2f}**")
 
-        st.markdown(f"### 📊 Auditoría: {s_id}")
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
-        c1.metric("Portafolio Neto", f"${eq_curve[-1]:,.2f} {'🟢' if pos_ab else ''}", f"{ret_pct:.2f}%")
-        c2.metric("Flujo/Capital", f"${divs if s_id=='TRINITY' else cap_act:,.2f}")
-        c3.metric("Win Rate", f"{wr:.1f}%")
-        c4.metric("Profit Factor", f"{pf_val:.2f}x")
-        c5.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
-        c6.metric("ADO (Trades/Día)", f"{ado_act:.2f} ⚡")
-
-        # PLOTLY INTERACTIVO SCROLL ZOOM + RIGHT Y-AXIS
+        # GRÁFICA (PAN VS ZOOM CORREGIDO)
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
         ht_clean = "F: %{x}<br>P: $%{y:,.4f}<extra></extra>"
 
@@ -347,18 +331,51 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 
         fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad ($)', line=dict(color='#00FF00', width=3), hovertemplate="Cap: $%{y:,.2f}<extra></extra>"), row=2, col=1)
 
-        # CONFIGURACIÓN RIGHT Y-AXIS Y CROSSHAIR
         fig.update_yaxes(side="right", row=1, col=1)
         fig.update_yaxes(side="right", row=2, col=1)
         fig.update_xaxes(showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="toaxis+across", spikethickness=1, spikedash="solid")
         fig.update_yaxes(showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="toaxis+across", spikethickness=1, spikedash="solid")
 
-        fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
+        # dragmode='pan' por defecto. El usuario usa el menú superior para cambiar a Zoom (Box).
+        fig.update_layout(template='plotly_dark', height=650, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
         
-        # ACTIVAR SCROLL ZOOM DE RATÓN
-        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
+        # displayModeBar en True para permitir cambiar entre Mover (Pan) y Acercar (Zoom)
+        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': False, 'displayModeBar': True, 'modeBarButtonsToRemove': ['lasso2d', 'select2d']})
 
-# RENDERIZAR LAS 3 PESTAÑAS
+        # --- MÓDULO DE VENTANA DINÁMICA (SUB-RANGO) ---
+        st.markdown("### 🔎 Análisis Financiero por Ventana Dinámica")
+        fecha_min, fecha_max = df_strat.index[0].date(), df_strat.index[-1].date()
+        v_start, v_end = st.slider(f"Seleccione Sub-Rango de Evaluación ({s_id})", min_value=fecha_min, max_value=fecha_max, value=(fecha_min, fecha_max), format="YYYY-MM-DD", key=f"win_{s_id}")
+        
+        mask = (df_strat.index >= pd.to_datetime(v_start)) & (df_strat.index <= pd.to_datetime(v_end) + timedelta(days=1))
+        df_sub = df_strat.loc[mask]
+        
+        if not df_sub.empty:
+            cap_ini_sub = df_sub['Total_Portfolio'].iloc[0]
+            cap_fin_sub = df_sub['Total_Portfolio'].iloc[-1]
+            ret_sub = ((cap_fin_sub - cap_ini_sub) / cap_ini_sub) * 100
+            
+            t_sub = [t for t in t_log if pd.to_datetime(v_start) <= pd.to_datetime(t['Fecha']) <= (pd.to_datetime(v_end) + timedelta(days=1))]
+            df_tsub = pd.DataFrame(t_sub)
+            
+            tt_sub, wr_sub, pf_sub = 0, 0.0, 0.0
+            if not df_tsub.empty:
+                exs_sub = df_tsub[df_tsub['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
+                tt_sub = len(exs_sub)
+                if tt_sub > 0:
+                    ws_sub = len(exs_sub[exs_sub['Tipo'].isin(['TP', 'DYNAMIC_WIN'])])
+                    wr_sub = (ws_sub / tt_sub) * 100
+                    gp_sub = exs_sub[exs_sub['Ganancia_$'] > 0]['Ganancia_$'].sum()
+                    gl_sub = abs(exs_sub[exs_sub['Ganancia_$'] < 0]['Ganancia_$'].sum())
+                    pf_sub = gp_sub / gl_sub if gl_sub > 0 else float('inf')
+
+            mc1, mc2, mc3, mc4 = st.columns(4)
+            mc1.metric("Inicio Ventana", f"${cap_ini_sub:,.2f}")
+            mc2.metric("Fin Ventana (Efectividad)", f"${cap_fin_sub:,.2f}", f"{ret_sub:.2f}% Neto")
+            mc3.metric("Trades en Ventana", f"{tt_sub}")
+            mc4.metric("Win Rate Ventana", f"{wr_sub:.1f}%")
+
+# RENDERIZAR PESTAÑAS
 renderizar_estrategia("TRINITY V357", tab_tri, df_global)
 renderizar_estrategia("JUGGERNAUT V356", tab_jug, df_global)
 renderizar_estrategia("DEFCON V329", tab_def, df_global)
