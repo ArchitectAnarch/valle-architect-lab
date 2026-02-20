@@ -18,18 +18,12 @@ if 'radar_sens' not in st.session_state: st.session_state.radar_sens = 1.5
 if 'reinvest_pct' not in st.session_state: st.session_state.reinvest_pct = 50.0
 
 st.title("⚙️ ROCKET PROTOCOL LAB - Centro de Inteligencia Quant")
-st.markdown("Extracción CCXT Profunda, Terminología Institucional y Optimización de ADN Matemático.")
+st.markdown("Extracción Profunda CCXT, Ejecución Acelerada y Repositorio de Estrategias.")
 
 # --- 1. PANEL DE CONTROL: EXCHANGES Y MERCADO ---
 st.sidebar.markdown("### 🚀 ROCKET PROTOCOL LAB")
 
-exchanges_soportados = {
-    "Coinbase (Pro)": "coinbase",
-    "Binance": "binance",
-    "Kraken": "kraken",
-    "KuCoin": "kucoin",
-    "Bybit": "bybit"
-}
+exchanges_soportados = {"Coinbase (Pro)": "coinbase", "Binance": "binance", "Kraken": "kraken", "KuCoin": "kucoin", "Bybit": "bybit"}
 exchange_sel = st.sidebar.selectbox("🏦 Proveedor de Liquidez (Exchange)", list(exchanges_soportados.keys()))
 id_exchange = exchanges_soportados[exchange_sel]
 
@@ -46,22 +40,18 @@ intervalos = {
 intervalo_sel = st.sidebar.selectbox("Temporalidad (Velas)", list(intervalos.keys()), index=4)
 iv_download, iv_resample = intervalos[intervalo_sel]
 
-# Slider temporal EXPANSO (Time Frame)
+# Slider temporal EXPANSO PROFUNDO (Time Frame)
 hoy = datetime.today().date()
-limite_dias = 30 if iv_download == "1m" else 365 if iv_download in ["5m", "15m", "30m"] else 1800
+limite_dias = 30 if iv_download == "1m" else 730 if iv_download in ["5m", "15m", "30m"] else 1800
 fecha_minima = hoy - timedelta(days=limite_dias)
 
-# Ajuste automático del Time Frame por defecto para no saturar si no es necesario
-dias_defecto = 30 if limite_dias > 30 else limite_dias
-default_start = hoy - timedelta(days=dias_defecto)
-
-start_date, end_date = st.sidebar.slider("📅 Time Frame (Rango Histórico)", min_value=fecha_minima, max_value=hoy, value=(default_start, hoy), format="YYYY-MM-DD")
+start_date, end_date = st.sidebar.slider("📅 Time Frame (Rango Histórico)", min_value=fecha_minima, max_value=hoy, value=(hoy - timedelta(days=30), hoy), format="YYYY-MM-DD")
 
 st.sidebar.markdown("---")
 capital_inicial = st.sidebar.number_input("Capital Inicial Base (USD)", value=13364.0, step=1000.0)
 comision_pct = st.sidebar.number_input("Comisión por Trade (%)", value=0.25, step=0.05) / 100.0
 
-# --- 2. SELECCIÓN DE ARQUITECTURA ---
+# --- 2. SELECCIÓN DE ARQUITECTURA Y ACELERADOR DE UI ---
 st.sidebar.header("🧠 Selección de Arquitectura")
 estrategia_activa = st.sidebar.radio("Motor de Ejecución:", [
     "TRINITY V357 (Dividendos + Compuesto)", 
@@ -69,39 +59,38 @@ estrategia_activa = st.sidebar.radio("Motor de Ejecución:", [
     "DEFCON V329 (Pura Expansión Squeeze)"
 ])
 
+# FORMULARIO PARA EVITAR LAG AL MOVER SLIDERS
 st.sidebar.header(f"🎯 Calibración: {estrategia_activa.split(' ')[0]}")
+with st.sidebar.form("calibracion_form"):
+    st.session_state.tp_pct = st.slider("🎯 Take Profit (%)", 0.5, 15.0, value=float(st.session_state.tp_pct), step=0.1)
+    st.session_state.sl_pct = st.slider("🛑 Stop Loss (%)", 0.5, 10.0, value=float(st.session_state.sl_pct), step=0.1)
 
-tp_val = st.sidebar.slider("🎯 Take Profit (%)", 0.5, 15.0, value=float(st.session_state.tp_pct), step=0.1)
-st.session_state.tp_pct = tp_val
+    use_macro_shield, use_atr_shield, bot_defcon_buy, bot_defcon_sell = False, False, True, True
 
-sl_val = st.sidebar.slider("🛑 Stop Loss (%)", 0.5, 10.0, value=float(st.session_state.sl_pct), step=0.1)
-st.session_state.sl_pct = sl_val
+    if "TRINITY" in estrategia_activa:
+        st.session_state.reinvest_pct = st.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.reinvest_pct), step=5.0)
+        st.session_state.whale_factor = st.slider("🐋 Factor Ballena (xVol)", 1.0, 5.0, value=float(st.session_state.whale_factor), step=0.1)
+        st.session_state.radar_sens = st.slider("📡 Sensibilidad Radar (%)", 0.1, 5.0, value=float(st.session_state.radar_sens), step=0.1)
+    elif "JUGGERNAUT" in estrategia_activa:
+        use_macro_shield = st.checkbox("Bloqueo Macroeconómico (EMA 200)", value=True)
+        use_atr_shield = st.checkbox("Bloqueo Volatilidad Extrema (>1.5 ATR)", value=True)
+        st.session_state.whale_factor = st.slider("🐋 Factor Ballena (xVol)", 1.0, 5.0, value=float(st.session_state.whale_factor), step=0.1)
+        st.session_state.radar_sens = st.slider("📡 Sensibilidad Radar (%)", 0.1, 5.0, value=float(st.session_state.radar_sens), step=0.1)
+    elif "DEFCON" in estrategia_activa:
+        bot_defcon_buy = st.checkbox("Entrada: Ruptura Alcista", value=True)
+        bot_defcon_sell = st.checkbox("Salida Dinámica: Ruptura Bajista", value=True)
+        
+    submit_calibracion = st.form_submit_button("⚡ Aplicar Calibración")
 
-use_macro_shield, use_atr_shield, bot_defcon_buy, bot_defcon_sell = False, False, True, True
-
-if "TRINITY" in estrategia_activa:
-    reinvest_val = st.sidebar.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.reinvest_pct), step=5.0)
-    st.session_state.reinvest_pct = reinvest_val
-    
-    whale_val = st.sidebar.slider("🐋 Factor Ballena (xVol)", 1.0, 5.0, value=float(st.session_state.whale_factor), step=0.1)
-    st.session_state.whale_factor = whale_val
-    
-    radar_val = st.sidebar.slider("📡 Sensibilidad Radar (%)", 0.1, 5.0, value=float(st.session_state.radar_sens), step=0.1)
-    st.session_state.radar_sens = radar_val
-
-elif "JUGGERNAUT" in estrategia_activa:
-    use_macro_shield = st.sidebar.checkbox("Bloqueo Macroeconómico (EMA 200)", value=True)
-    use_atr_shield = st.sidebar.checkbox("Bloqueo Volatilidad Extrema (>1.5 ATR)", value=True)
-    
-    whale_val = st.sidebar.slider("🐋 Factor Ballena (xVol)", 1.0, 5.0, value=float(st.session_state.whale_factor), step=0.1)
-    st.session_state.whale_factor = whale_val
-    
-    radar_val = st.sidebar.slider("📡 Sensibilidad Radar (%)", 0.1, 5.0, value=float(st.session_state.radar_sens), step=0.1)
-    st.session_state.radar_sens = radar_val
-
-elif "DEFCON" in estrategia_activa:
-    bot_defcon_buy = st.sidebar.checkbox("Entrada: Ruptura Alcista", value=True)
-    bot_defcon_sell = st.sidebar.checkbox("Salida Dinámica: Ruptura Bajista", value=True)
+# --- REPOSITORIO DE SCRIPTS ---
+st.sidebar.markdown("---")
+with st.sidebar.expander("📂 Repositorio de Scripts (PineScript)"):
+    st.markdown("**TRINITY V357 (Dividend Yield)**")
+    st.code("//@version=5\n// 🛡️ V357: VALLE ARCHITECT [TRINITY + DIVIDEND YIELD]\nstrategy(\"VALLE ARCHITECT [TRINITY V357]\", overlay=true, initial_capital=1000)\n// (Código Completo en su Archivo Original)", language="pine")
+    st.markdown("**JUGGERNAUT V356 (Lineal + Aegis)**")
+    st.code("//@version=5\n// 🛡️ V356: VALLE ARCHITECT [JUGGERNAUT]\nstrategy(\"VALLE ARCHITECT [JUGGERNAUT V356]\", overlay=true, initial_capital=13364, default_qty_type=strategy.cash)\n// (Código Completo en su Archivo Original)", language="pine")
+    st.markdown("**DEFCON V329 (Pura Expansión)**")
+    st.code("//@version=5\n// 🛡️ V329: VALLE ARCHITECT [DEFCON ONLY STRATEGY]\nstrategy(\"VALLE ARCHITECT [AUTOBOT V329]\", overlay=true, initial_capital=1000)\n// (Código Completo en su Archivo Original)", language="pine")
 
 # --- 3. EXTRACCIÓN CCXT ---
 @st.cache_data(ttl=300)
@@ -119,7 +108,7 @@ def cargar_datos_ccxt(exchange_id, sym, start, end, iv_down, iv_res):
             if not ohlcv: break
             all_ohlcv.extend(ohlcv)
             current_ts = ohlcv[-1][0] + 1
-            if len(all_ohlcv) > 200000: break # Limite superior de seguridad expandido
+            if len(all_ohlcv) > 200000: break # Seguro expansión
             
         if not all_ohlcv: return pd.DataFrame()
             
@@ -134,37 +123,21 @@ def cargar_datos_ccxt(exchange_id, sym, start, end, iv_down, iv_res):
     except Exception as e:
         return pd.DataFrame()
 
-with st.spinner(f'Descargando matriz histórica desde {exchange_sel}...'):
+with st.spinner(f'Descargando matriz histórica profunda desde {exchange_sel}...'):
     df = cargar_datos_ccxt(id_exchange, ticker, start_date, end_date, iv_download, iv_resample)
 
-# --- 4. CÁLCULO MATEMÁTICO BLINDADO (ANTI-CRASH) ---
+# --- 4. CÁLCULO MATEMÁTICO ---
 if not df.empty and len(df) > 5:
-    # EMA 200 con Fallback a Precio de Cierre
-    ema200 = ta.ema(df['Close'], length=200)
-    df['EMA_200'] = ema200 if ema200 is not None else df['Close']
-    df['EMA_200'] = df['EMA_200'].fillna(df['Close'])
-
-    # SMA Volumen
-    vol_ma = ta.sma(df['Volume'], length=20)
-    df['Vol_MA'] = vol_ma if vol_ma is not None else df['Volume']
-    df['Vol_MA'] = df['Vol_MA'].fillna(df['Volume'])
-
-    # ATR 14
-    atr14 = ta.atr(df['High'], df['Low'], df['Close'], length=14)
-    df['ATR'] = atr14 if atr14 is not None else 0.001
-    df['ATR'] = df['ATR'].fillna(0.001)
-
-    # RSI 14
-    rsi14 = ta.rsi(df['Close'], length=14)
-    df['RSI'] = rsi14 if rsi14 is not None else 50.0
-    df['RSI'] = df['RSI'].fillna(50.0)
-
-    # ADX 14
+    df['EMA_200'] = ta.ema(df['Close'], length=200).fillna(df['Close'])
+    df['Vol_MA'] = ta.sma(df['Volume'], length=20).fillna(df['Volume'])
+    df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14).fillna(0.001)
+    df['RSI'] = ta.rsi(df['Close'], length=14).fillna(50.0)
     adx_df = ta.adx(df['High'], df['Low'], df['Close'], length=14)
-    df['ADX'] = adx_df.iloc[:, 0] if adx_df is not None else 0.0
-    df['ADX'] = df['ADX'].fillna(0.0)
+    df['ADX'] = adx_df.iloc[:, 0].fillna(0.0) if adx_df is not None else 0.0
 
-    # Bollinger Bands
+    df['KC_Upper'] = df['EMA_200'] + (df['ATR'] * 1.5) 
+    df['KC_Lower'] = df['EMA_200'] - (df['ATR'] * 1.5)
+    
     bb = ta.bbands(df['Close'], length=20, std=2.0)
     if bb is not None:
         df = pd.concat([df, bb], axis=1)
@@ -175,18 +148,13 @@ if not df.empty and len(df) > 5:
     df['BBU'] = df['BBU'].fillna(df['Close'])
     df['BBL'] = df['BBL'].fillna(df['Close'])
 
-    # Keltner Channels
-    df['KC_Upper'] = df['EMA_200'] + (df['ATR'] * 1.5) # Aproximación segura
-    df['KC_Lower'] = df['EMA_200'] - (df['ATR'] * 1.5)
-
     df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
     df['BB_Delta'] = (df['BBU'] - df['BBL']).diff().fillna(0)
     df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10).mean().fillna(0)
-    
     df['Vela_Verde'] = df['Close'] > df['Open']
     df['Vela_Roja'] = df['Close'] < df['Open']
 
-    # --- 5. SIMULACIÓN Y COMISIONES ---
+    # --- 5. SIMULACIÓN ---
     def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh):
         df_sim['Vol_Anormal'] = df_sim['Volume'] > (df_sim['Vol_MA'] * w_factor)
         df_sim['Radar_Activo'] = (abs(df_sim['Close'] - df_sim['EMA_200']) / df_sim['Close']) * 100 <= r_sens
@@ -204,7 +172,6 @@ if not df.empty and len(df) > 5:
             cuerpo_previo = df_sim['Open'].shift(1).fillna(0) - df_sim['Close'].shift(1).fillna(0)
             atr_previo = df_sim['ATR'].shift(1).fillna(0.001)
             df_sim['ATR_Safe'] = ~(cuerpo_previo > (atr_previo * 1.5)) if atr_sh else True
-            
             df_sim['Signal_Buy'] = (df_sim['Vol_Anormal'] & df_sim['Vela_Verde']) | ((df_sim['Radar_Activo'] | df_sim['Defcon_Buy']) & df_sim['Vela_Verde'] & df_sim['Macro_Safe'] & df_sim['ATR_Safe'])
             df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell']
         elif "DEFCON" in strat:
@@ -275,14 +242,14 @@ if not df.empty and len(df) > 5:
             
         return curva_capital, divs, cap_activo, registro_trades
 
-    # --- 6. OPTIMIZADOR IA CON "GHOST HANDS" ---
+    # --- 6. OPTIMIZADOR IA MODO GHOST ---
     st.sidebar.markdown("---")
-    st.sidebar.markdown("### 🧠 Central de Inteligencia")
-    if st.sidebar.button("🤖 Optimizar Parámetros (Auto-Ajustar)", type="primary"):
-        with st.spinner('IA Ejecutando simulaciones estocásticas...'):
+    st.sidebar.markdown("### 🧠 Centro de Inteligencia")
+    if st.sidebar.button("🤖 Optimizar Parámetros IA", type="primary"):
+        with st.spinner('IA Calculando Escenarios Estocásticos...'):
             best_profit = -999999
             best_params = {}
-            for _ in range(150):
+            for _ in range(50): # Limite ajustado para fluidez
                 t_tp = round(random.uniform(1.0, 10.0), 1)
                 t_sl = round(random.uniform(0.5, 4.0), 1)
                 t_whale = round(random.uniform(1.5, 4.0), 1)
@@ -302,7 +269,6 @@ if not df.empty and len(df) > 5:
             st.session_state.radar_sens = float(best_params['radar'])
             if "TRINITY" in estrategia_activa:
                 st.session_state.reinvest_pct = float(best_params['reinvest'])
-            
             st.rerun()
 
     # Ejecución Base
@@ -343,40 +309,43 @@ if not df.empty and len(df) > 5:
     col4.metric("Profit Factor", f"{profit_factor:.2f}x")
     col5.metric("Máximo Drawdown", f"{max_drawdown:.2f}%", delta_color="inverse")
 
-    # --- 8. MOTOR GRÁFICO (CON CROSSHAIR INYECTADO) ---
+    # --- 8. MOTOR GRÁFICO (CROSSHAIR LÁSER) ---
     st.markdown("---")
     st.subheader(f"📈 Mapa de Impacto Algorítmico ({id_exchange.upper()})")
     
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.65, 0.35], specs=[[{"secondary_y": False}], [{"secondary_y": True}]])
 
+    # HOVER CLEANUP: Solo Fecha y Precio
+    hovertemp_clean = "Fecha: %{x}<br>Precio: $%{y:,.4f}<extra></extra>"
+
     fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Mercado"), row=1, col=1)
     
     if "DEFCON" in estrategia_activa and 'BBU' in df.columns:
-        fig.add_trace(go.Scatter(x=df.index, y=df['BBU'], mode='lines', line=dict(color='rgba(0,255,255,0.3)', width=1), name='Bollinger Top'), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df.index, y=df['BBL'], mode='lines', line=dict(color='rgba(0,255,255,0.3)', width=1), name='Bollinger Bot'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df['BBU'], mode='lines', line=dict(color='rgba(0,255,255,0.3)', width=1), name='Bollinger Top', hovertemplate=hovertemp_clean), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df['BBL'], mode='lines', line=dict(color='rgba(0,255,255,0.3)', width=1), name='Bollinger Bot', hovertemplate=hovertemp_clean), row=1, col=1)
     elif 'EMA_200' in df.columns:
-        fig.add_trace(go.Scatter(x=df.index, y=df['EMA_200'], mode='lines', name='Filtro EMA 200', line=dict(color='orange', width=2)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df.index, y=df['EMA_200'], mode='lines', name='Filtro EMA 200', line=dict(color='orange', width=2), hovertemplate=hovertemp_clean), row=1, col=1)
 
     if not df_trades.empty:
         entradas = df_trades[df_trades['Tipo'] == 'ENTRY']
-        fig.add_trace(go.Scatter(x=entradas['Fecha'], y=entradas['Precio'] * 0.98, mode='markers', name='Fuego de Compra', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(color='white', width=1))), row=1, col=1)
+        fig.add_trace(go.Scatter(x=entradas['Fecha'], y=entradas['Precio'] * 0.98, mode='markers', name='Fuego de Compra', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(color='white', width=1)), hovertemplate=hovertemp_clean), row=1, col=1)
         
         salidas = df_trades[df_trades['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
         colores_salida = ['#00FF00' if t in ['TP', 'DYNAMIC_WIN'] else '#FF0000' for t in salidas['Tipo']]
-        fig.add_trace(go.Scatter(x=salidas['Fecha'], y=salidas['Precio'] * 1.02, mode='markers', name='Cierre Táctico', marker=dict(symbol='triangle-down', color=colores_salida, size=14, line=dict(color='white', width=1)), text=salidas['Tipo'], hovertemplate="Cierre: %{text} a $%{y}<extra></extra>"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=salidas['Fecha'], y=salidas['Precio'] * 1.02, mode='markers', name='Cierre Táctico', marker=dict(symbol='triangle-down', color=colores_salida, size=14, line=dict(color='white', width=1)), text=salidas['Tipo'], hovertemplate="Cierre: %{text}<br>Fecha: %{x}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
 
-    fig.add_trace(go.Scatter(x=df.index, y=df['Total_Portfolio'], mode='lines', name='Equidad Neta ($)', line=dict(color='#00FF00', width=3)), row=2, col=1, secondary_y=False)
-    fig.add_trace(go.Scatter(x=df.index, y=df['Rentabilidad_Pct'], mode='lines', name='Rentabilidad (%)', line=dict(color='rgba(0,0,0,0)')), row=2, col=1, secondary_y=True)
+    fig.add_trace(go.Scatter(x=df.index, y=df['Total_Portfolio'], mode='lines', name='Equidad Neta ($)', line=dict(color='#00FF00', width=3), hovertemplate="Fecha: %{x}<br>Capital: $%{y:,.2f}<extra></extra>"), row=2, col=1, secondary_y=False)
 
-    fig.update_xaxes(showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot")
-    fig.update_yaxes(showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot")
+    # 🎯 CONFIGURACIÓN CROSSHAIR LÁSER
+    fig.update_xaxes(showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="toaxis+across", spikethickness=1, spikedash="solid")
+    fig.update_yaxes(showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="toaxis+across", spikethickness=1, spikedash="solid")
 
     fig.update_layout(
         template='plotly_dark', height=850, xaxis_rangeslider_visible=False, 
         margin=dict(l=20, r=20, t=30, b=20), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        hovermode="x unified"
+        hovermode="closest" # Desactiva el cuadro grande
     )
     st.plotly_chart(fig, use_container_width=True)
 
 else:
-    st.error("⚠️ No hay suficientes velas para iniciar el motor algorítmico. Expanda el Time Frame.")
+    st.error("⚠️ Extraer historial tan profundo requiere ajustar el Time Frame o cambiar de Exchange. Reduzca el rango de fechas.")
