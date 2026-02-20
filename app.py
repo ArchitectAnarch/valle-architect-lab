@@ -23,10 +23,11 @@ for s in estrategias:
     if f'reinvest_{s}' not in st.session_state: st.session_state[f'reinvest_{s}'] = 50.0
     if f'ado_{s}' not in st.session_state: st.session_state[f'ado_{s}'] = 0.0
 
-# --- MEMORIA GÉNESIS (COMBINATORIA) ---
+# --- MEMORIA GÉNESIS ---
 if 'gen_tp' not in st.session_state: st.session_state.gen_tp = 3.0
 if 'gen_sl' not in st.session_state: st.session_state.gen_sl = 1.5
 if 'gen_ado' not in st.session_state: st.session_state.gen_ado = 0.0
+if 'winning_dna' not in st.session_state: st.session_state.winning_dna = ""
 
 buy_rules = ['Pink_Whale_Buy', 'Lock_Bounce', 'Lock_Break', 'Defcon_Buy', 'Neon_Up', 'Therm_Bounce', 'Therm_Vacuum', 'Nuclear_Buy', 'Early_Buy', 'Rebound_Buy']
 sell_rules = ['Defcon_Sell', 'Neon_Dn', 'Therm_Wall_Sell', 'Therm_Panic_Sell', 'Lock_Reject', 'Lock_Breakd', 'Nuclear_Sell', 'Early_Sell']
@@ -86,7 +87,7 @@ st.sidebar.markdown("---")
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=13364.0, step=1000.0, key="num_cap")
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05, key="num_com") / 100.0
 
-# --- 2. EXTRACCIÓN Y RECONSTRUCCIÓN ---
+# --- 2. EXTRACCIÓN MAESTRA ---
 @st.cache_data(ttl=120)
 def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
     try:
@@ -106,7 +107,6 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
         df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
-        
         df.index = df.index + timedelta(hours=offset)
         df = df[~df.index.duplicated(keep='first')]
         
@@ -118,7 +118,6 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
             df['Vol_MA'] = ta.sma(df['Volume'], length=20).fillna(df['Volume'])
             df['Vol_MA_100'] = ta.sma(df['Volume'], length=100).fillna(df['Volume'])
             df['RVol'] = df['Volume'] / df['Vol_MA_100']
-            
             df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14).fillna(df['High'] - df['Low']).replace(0, 0.001)
             df['RSI'] = ta.rsi(df['Close'], length=14).fillna(50.0)
             adx_df = ta.adx(df['High'], df['Low'], df['Close'], length=14)
@@ -147,19 +146,14 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
             df['PL300'] = df['Low'].rolling(300).min().fillna(df['Low'])
             df['PH300'] = df['High'].rolling(300).max().fillna(df['High'])
             
-            df['Target_Lock_Sup'] = df[['PL30', 'PL100', 'PL300']].max(axis=1)
-            df['Target_Lock_Res'] = df[['PH30', 'PH100', 'PH300']].min(axis=1)
-
             basis_sigma = df['Close'].rolling(20).mean()
             dev_sigma = df['Close'].rolling(20).std().replace(0, 1)
             df['Z_Score'] = (df['Close'] - basis_sigma) / dev_sigma
-            
             rsi_ma = df['RSI'].rolling(14).mean()
             df['RSI_Cross_Up'] = (df['RSI'] > rsi_ma) & (df['RSI'].shift(1) <= rsi_ma.shift(1))
             df['RSI_Cross_Dn'] = (df['RSI'] < rsi_ma) & (df['RSI'].shift(1) >= rsi_ma.shift(1))
             df['Retro_Peak'] = (df['RSI'] < 30) & (df['Close'] < df['BBL'])
             
-            # --- ADN GÉNESIS ---
             ap = (df['High'] + df['Low'] + df['Close']) / 3
             esa = ap.ewm(span=10).mean()
             d_wt = abs(ap - esa).ewm(span=10).mean()
@@ -182,15 +176,17 @@ ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
 df_global = cargar_y_preprocesar(id_exchange, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
 ph_holograma.empty() 
 
-# --- 3. MOTOR CUÁNTICO ---
-def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, def_sell):
+# --- 3. MOTOR PRE-CÁLCULO UNIVERSAL ---
+def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh):
     df_sim['Whale_Cond'] = df_sim['Cuerpo_Vela'] > (df_sim['ATR'] * 0.3)
     df_sim['Flash_Vol'] = (df_sim['RVol'] > (w_factor * 0.8)) & df_sim['Whale_Cond']
     
+    df_sim['Target_Lock_Sup'] = df_sim[['PL30', 'PL100', 'PL300']].max(axis=1)
+    df_sim['Target_Lock_Res'] = df_sim[['PH30', 'PH100', 'PH300']].min(axis=1)
     tol = df_sim['ATR'] * 0.5
+    
     df_sim['Lock_Bounce'] = (df_sim['Low'] <= (df_sim['Target_Lock_Sup'] + tol)) & (df_sim['Close'] > df_sim['Target_Lock_Sup']) & df_sim['Vela_Verde']
     df_sim['Lock_Break'] = (df_sim['Close'] > df_sim['Target_Lock_Res']) & (df_sim['Open'] <= df_sim['Target_Lock_Res']) & df_sim['Flash_Vol'] & df_sim['Vela_Verde']
-    
     df_sim['Lock_Reject'] = (df_sim['High'] >= (df_sim['Target_Lock_Res'] - tol)) & (df_sim['Close'] < df_sim['Target_Lock_Res']) & df_sim['Vela_Roja']
     df_sim['Lock_Breakd'] = (df_sim['Close'] < df_sim['Target_Lock_Sup']) & (df_sim['Open'] >= df_sim['Target_Lock_Sup']) & df_sim['Vela_Roja']
     
@@ -216,7 +212,6 @@ def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, 
     scan_range = df_sim['ATR'] * 2.0
     ceil_w = np.zeros(len(df_sim))
     floor_w = np.zeros(len(df_sim))
-    
     for p_col, w in [('PL30', 1), ('PH30', 1), ('PL100', 3), ('PH100', 3), ('PL300', 5), ('PH300', 5)]:
         p_val = df_sim[p_col].values
         c_val = df_sim['Close'].values
@@ -229,33 +224,29 @@ def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy, 
     df_sim['Therm_Panic_Sell'] = (floor_w == 0) & df_sim['Vela_Roja']
     df_sim['Cielo_Libre'] = dist_res > (r_sens * 2) 
 
-    # --- LÓGICAS PURAS GÉNESIS ---
     df_sim['Nuclear_Buy'] = is_magenta & (df_sim['WT_Oversold'] | df_sim['WT_Cross_Up'])
     df_sim['Early_Buy'] = is_magenta
     df_sim['Nuclear_Sell'] = (df_sim['RSI'] > 70) & (df_sim['WT_Overbought'] | df_sim['WT_Cross_Dn'])
     df_sim['Early_Sell'] = (df_sim['RSI'] > 70) & df_sim['Vela_Roja']
     df_sim['Rebound_Buy'] = df_sim['RSI_Cross_Up'] & ~is_magenta
 
-    if "TRINITY" in strat:
+    # Mapeo según la estrategia seleccionada
+    if strat == "TRINITY":
         df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | df_sim['Lock_Bounce'] | df_sim['Lock_Break'] | df_sim['Defcon_Buy'] | df_sim['Therm_Bounce'] | df_sim['Therm_Vacuum']
         df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell'] | df_sim['Therm_Panic_Sell'] | df_sim['Lock_Reject'] | df_sim['Lock_Breakd']
-    elif "JUGGERNAUT" in strat:
+    elif strat == "JUGGERNAUT":
         df_sim['Macro_Safe'] = df_sim['Close'] > df_sim['EMA_200'] if macro_sh else True
         df_sim['ATR_Safe'] = ~(df_sim['Cuerpo_Vela'].shift(1).fillna(0) > (df_sim['ATR'].shift(1).fillna(0.001) * 1.5)) if atr_sh else True
         df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | ((df_sim['Lock_Bounce'] | df_sim['Lock_Break'] | df_sim['Defcon_Buy'] | df_sim['Therm_Bounce'] | df_sim['Therm_Vacuum']) & df_sim['Macro_Safe'] & df_sim['ATR_Safe'])
         df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell'] | df_sim['Therm_Panic_Sell'] | df_sim['Lock_Reject'] | df_sim['Lock_Breakd']
-    elif "DEFCON" in strat:
-        df_sim['Signal_Buy'] = df_sim['Defcon_Buy'] if def_buy else False
-        df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] if def_sell else False
-    elif "GENESIS" in strat:
-        # Sumatoria de todas las variables activadas en UI para crear Gatillos Compuestos
-        buy_cond = pd.Series(False, index=df_sim.index)
+    elif strat == "GENESIS":
+        buy_cond = np.zeros(len(df_sim), dtype=bool)
         for r in buy_rules:
-            if st.session_state.get(f'gen_b_{r}', False): buy_cond = buy_cond | df_sim[r]
+            if st.session_state.get(f'gen_b_{r}', False): buy_cond |= df_sim[r].values
         
-        sell_cond = pd.Series(False, index=df_sim.index)
+        sell_cond = np.zeros(len(df_sim), dtype=bool)
         for r in sell_rules:
-            if st.session_state.get(f'gen_s_{r}', False): sell_cond = sell_cond | df_sim[r]
+            if st.session_state.get(f'gen_s_{r}', False): sell_cond |= df_sim[r].values
             
         df_sim['Signal_Buy'] = buy_cond
         df_sim['Signal_Sell'] = sell_cond
@@ -337,7 +328,7 @@ def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
             
     return curva_capital.tolist(), divs, cap_activo, registro_trades, en_pos
 
-# --- 4. RENDERIZADO DE PESTAÑAS BLINDADAS ---
+# --- 4. RENDERIZADO DE PESTAÑAS ---
 st.title("🛡️ Terminal Táctico Multipestaña")
 tab_tri, tab_jug, tab_def, tab_gen = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329", "🧬 GÉNESIS V320"])
 
@@ -349,52 +340,61 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 
         s_id = strat_name.split()[0]
         
-        # --- MÓDULO GÉNESIS ---
+        # --- MÓDULO GÉNESIS (DEEP SCAN) ---
         if s_id == "GENESIS":
-            st.markdown("### 🧬 Constructor Genético (Multivariante)")
-            st.info("Pulse la IA: Encenderá y apagará gatillos combinados para buscar sinergias matemáticas extremas.")
+            st.markdown("### 🧬 Laboratorio Genético Deep Scan (V320)")
+            st.info("La IA vectorizará matrices probando de 1 a 4 lógicas simultáneas en compras y ventas hasta encontrar la combinación perfecta.")
             
             with st.form("form_genesis"):
                 c_b, c_s, c_r = st.columns(3)
-                c_b.markdown("**🟢 Gatillos de Compra**")
+                c_b.markdown("**🟢 Módulo de Compras**")
                 for r in buy_rules:
                     st.session_state[f'gen_b_{r}'] = c_b.checkbox(r.replace('_', ' '), value=st.session_state[f'gen_b_{r}'], key=f"chk_b_{r}")
                 
-                c_s.markdown("**🔴 Gatillos de Venta**")
+                c_s.markdown("**🔴 Módulo de Cierres**")
                 for r in sell_rules:
                     st.session_state[f'gen_s_{r}'] = c_s.checkbox(r.replace('_', ' '), value=st.session_state[f'gen_s_{r}'], key=f"chk_s_{r}")
                 
-                c_r.markdown("**🎯 Riesgo**")
+                c_r.markdown("**🎯 Gestión de Riesgo**")
                 st.session_state.gen_tp = c_r.slider("Take Profit (%)", 0.5, 20.0, value=float(st.session_state.gen_tp), step=0.1, key="sld_gen_tp")
                 st.session_state.gen_sl = c_r.slider("Stop Loss (%)", 0.5, 15.0, value=float(st.session_state.gen_sl), step=0.1, key="sld_gen_sl")
                 
-                if st.form_submit_button("🧪 Compilar Bot Manual"): st.rerun()
+                if st.form_submit_button("🧪 Aplicar Selección Manual"): st.rerun()
 
             c_ia1, c_ia2 = st.columns([1, 3])
             st.session_state.gen_ado = c_ia1.slider("🎯 Target ADO", 0.0, 10.0, value=float(st.session_state.gen_ado), step=0.1, key="sld_gen_ado")
             
-            # --- MOTOR DE MUTACIÓN GENÉTICA ---
-            if c_ia2.button("🚀 Búsqueda Estocástica Multivariante", type="primary", key="btn_ia_gen"):
+            # --- MOTOR DE FUERZA BRUTA VECTORIZADA ---
+            if c_ia2.button("🚀 Iniciar Deep Scan (500 Mutaciones)", type="primary", key="btn_ia_gen"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
+                
+                # Precalculamos todo UNA VEZ para que la IA vuele
+                df_precalc = generar_senales(df_base.copy(), "GENESIS_PRECALC", 2.5, 1.5, False, False)
+                
                 best_fit = -999999
                 bp = {}
                 
-                for _ in range(120): # 120 mutaciones aleatorias profundas
-                    # 1. Mutar Gatillos (1 a 3 gatillos encendidos al mismo tiempo)
-                    b_sample = random.sample(buy_rules, random.randint(1, 3))
-                    s_sample = random.sample(sell_rules, random.randint(1, 3))
+                # 500 ciclos profundos
+                for _ in range(500): 
+                    # Elige entre 1 y 4 lógicas de compra al mismo tiempo
+                    b_sample = random.sample(buy_rules, random.randint(1, 4))
+                    # Elige entre 1 y 4 lógicas de venta
+                    s_sample = random.sample(sell_rules, random.randint(1, 4))
                     
-                    # Temporariamente encender solo los de la muestra
-                    for k in buy_rules: st.session_state[f'gen_b_{k}'] = (k in b_sample)
-                    for k in sell_rules: st.session_state[f'gen_s_{k}'] = (k in s_sample)
+                    buy_cond = np.zeros(len(df_precalc), dtype=bool)
+                    for r in b_sample: buy_cond |= df_precalc[r].values
+                        
+                    sell_cond = np.zeros(len(df_precalc), dtype=bool)
+                    for r in s_sample: sell_cond |= df_precalc[r].values
                     
-                    df_t = generar_senales(df_base.copy(), "GENESIS", 2.5, 1.5, False, False, False, False)
+                    df_test = df_precalc.copy()
+                    df_test['Signal_Buy'] = buy_cond
+                    df_test['Signal_Sell'] = sell_cond
                     
-                    # 2. Mutar Riesgo
-                    tp_test = round(random.uniform(2.0, 10.0), 1)
-                    sl_test = round(random.uniform(1.0, 3.5), 1)
+                    tp_test = round(random.uniform(2.0, 15.0), 1)
+                    sl_test = round(random.uniform(1.0, 5.0), 1)
                     
-                    c_test, _, _, trds, _ = ejecutar_simulacion(df_t, "GENESIS", tp_test, sl_test, capital_inicial, 0, comision_pct)
+                    c_test, _, _, trds, _ = ejecutar_simulacion(df_test, "GENESIS", tp_test, sl_test, capital_inicial, 0, comision_pct)
                     
                     dft = pd.DataFrame(trds)
                     if not dft.empty:
@@ -419,19 +419,28 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 
                 ph_holograma.empty()
                 if bp:
-                    # Aplicar la mutación ganadora a los checkboxes reales
+                    # Enciende los botones en el panel
                     for k in buy_rules: st.session_state[f'gen_b_{k}'] = (k in bp['b'])
                     for k in sell_rules: st.session_state[f'gen_s_{k}'] = (k in bp['s'])
                     st.session_state.gen_tp = float(bp['tp'])
                     st.session_state.gen_sl = float(bp['sl'])
                     st.session_state.gen_ado = 0.0
+                    
                     b_str = ", ".join(bp['b'])
                     s_str = ", ".join(bp['s'])
-                    st.success(f"🧬 MUTACIÓN ÉPICA! \n\n**+ COMPRAS:** [{b_str}]\n\n**- VENTAS:** [{s_str}]\n\n🎯 TP {bp['tp']}% | 🛑 SL {bp['sl']}%")
+                    
+                    # Genera el Bloque de Código para Copiar
+                    dna_str = f"🧬 FÓRMULA GANADORA V320:\n\nCOMPRAS = [ {b_str} ]\nVENTAS  = [ {s_str} ]\nTP = {bp['tp']}%\nSL = {bp['sl']}%"
+                    st.session_state.winning_dna = dna_str
                     st.rerun()
-                else: st.error("No se encontraron sinergias rentables.")
+                else: 
+                    st.error("No se encontraron sinergias rentables en 500 universos.")
 
-            df_strat = generar_senales(df_base.copy(), "GENESIS", 2.5, 1.5, False, False, False, False)
+            if st.session_state.winning_dna != "":
+                st.success("¡Evolución Genética Completada! Copie el ADN y envíemelo para generar su PineScript:")
+                st.code(st.session_state.winning_dna, language="text")
+
+            df_strat = generar_senales(df_base.copy(), "GENESIS", 2.5, 1.5, False, False)
             eq_curve, divs, cap_act, t_log, pos_ab = ejecutar_simulacion(df_strat, "GENESIS", st.session_state.gen_tp, st.session_state.gen_sl, capital_inicial, 0.0, comision_pct)
             
         # --- BLOQUE TRINITY / JUGGERNAUT / DEFCON ---
@@ -443,8 +452,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 
                 mac_sh = st.session_state.get(f"mac_{s_id}", True)
                 atr_sh = st.session_state.get(f"atr_{s_id}", True)
-                d_buy = st.session_state.get(f"db_{s_id}", True)
-                d_sell = st.session_state.get(f"ds_{s_id}", True)
+                
                 t_reinv, t_whale, t_radar = 0.0, 2.5, 1.5
                 
                 if s_id == "TRINITY":
@@ -456,9 +464,6 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     t_radar = c4.slider("📡 Tolerancia Target Lock", 0.1, 5.0, value=float(st.session_state[f'radar_{s_id}']), step=0.1, key=f"sld_rd_{s_id}")
                     st.checkbox("Bloqueo Macro (EMA)", value=mac_sh, key=f"mac_{s_id}")
                     st.checkbox("Bloqueo Crash (ATR)", value=atr_sh, key=f"atr_{s_id}")
-                else:
-                    st.checkbox("Entrada Squeeze Up", value=d_buy, key=f"db_{s_id}")
-                    st.checkbox("Salida Squeeze Dn", value=d_sell, key=f"ds_{s_id}")
 
                 if st.form_submit_button("⚡ Aplicar Configuraciones"):
                     st.session_state[f'tp_{s_id}'] = t_tp
@@ -468,11 +473,6 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                         st.session_state[f'whale_{s_id}'] = t_whale
                         st.session_state[f'radar_{s_id}'] = t_radar
                     st.rerun()
-
-            mac_sh = st.session_state.get(f"mac_{s_id}", True)
-            atr_sh = st.session_state.get(f"atr_{s_id}", True)
-            d_buy = st.session_state.get(f"db_{s_id}", True)
-            d_sell = st.session_state.get(f"ds_{s_id}", True)
 
             col_ia1, col_ia2 = st.columns([1, 3])
             t_ado = col_ia1.slider(f"🎯 ADO Target ({s_id})", 0.0, 10.0, value=float(st.session_state[f'ado_{s_id}']), step=0.1, key=f"sld_ado_{s_id}")
@@ -489,7 +489,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     rwh = round(random.uniform(1.5, 3.5), 1) if s_id != "DEFCON" else 2.5
                     rrd = round(random.uniform(0.5, 3.0), 1) if s_id != "DEFCON" else 1.5
                     
-                    df_t = generar_senales(df_base.copy(), strat_name, rwh, rrd, mac_sh, atr_sh, d_buy, d_sell)
+                    df_t = generar_senales(df_base.copy(), strat_name, rwh, rrd, mac_sh, atr_sh)
                     c_test, _, _, trds, _ = ejecutar_simulacion(df_t, strat_name, rtp, rsl, capital_inicial, rrv, comision_pct)
                     
                     dft = pd.DataFrame(trds)
@@ -506,8 +506,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                             
                             ado_pen = 1.0
                             if st.session_state[f'ado_{s_id}'] > 0.0:
-                                sim_ado = nt / dias_analizados
-                                ado_pen = 1.0 / (1.0 + abs(sim_ado - st.session_state[f'ado_{s_id}']))
+                                ado_pen = 1.0 / (1.0 + abs((nt/dias_analizados) - st.session_state[f'ado_{s_id}']))
                                 
                             fit = ((np_val * pf) / (m_dd + 1.0)) * ado_pen
                             if fit > best_fit and np_val > 0:
@@ -525,7 +524,9 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     st.rerun()
                 else: st.error("IA: Mercado demasiado hostil para esta estrategia.")
 
-            df_strat = generar_senales(df_base.copy(), strat_name, st.session_state[f'whale_{s_id}'], st.session_state[f'radar_{s_id}'], mac_sh, atr_sh, d_buy, d_sell)
+            mac_sh = st.session_state.get(f"mac_{s_id}", True)
+            atr_sh = st.session_state.get(f"atr_{s_id}", True)
+            df_strat = generar_senales(df_base.copy(), strat_name, st.session_state[f'whale_{s_id}'], st.session_state[f'radar_{s_id}'], mac_sh, atr_sh)
             eq_curve, divs, cap_act, t_log, pos_ab = ejecutar_simulacion(df_strat, strat_name, st.session_state[f'tp_{s_id}'], st.session_state[f'sl_{s_id}'], capital_inicial, st.session_state[f'reinvest_{s_id}'], comision_pct)
 
         # --- SECCIÓN COMÚN (GRÁFICAS Y MÉTRICAS) PARA TODAS LAS PESTAÑAS ---
@@ -581,7 +582,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         if not dftr.empty:
             ents = dftr[dftr['Tipo'] == 'ENTRY']
             fig.add_trace(go.Scatter(
-                x=ents['Fecha'], y=ents['Precio'] * 0.96, mode='markers', name='Compra (Vela Ejecución)', 
+                x=ents['Fecha'], y=ents['Precio'] * 0.96, mode='markers', name='Compra', 
                 marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=1)),
                 error_y=dict(type='data', symmetric=False, array=ents['Precio']*0.04, arrayminus=[0]*len(ents), color='cyan', thickness=1, width=0),
                 hovertemplate=ht_clean
@@ -613,31 +614,6 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         
         fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
         st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True, 'modeBarButtonsToRemove': ['lasso2d', 'select2d']})
-
-        st.markdown("### 🔎 Análisis Financiero por Ventana Dinámica")
-        fecha_min, fecha_max = df_strat.index[0].date(), df_strat.index[-1].date()
-        v_start, v_end = st.slider(f"Recortar Rango ({s_id})", min_value=fecha_min, max_value=fecha_max, value=(fecha_min, fecha_max), format="YYYY-MM-DD", key=f"win_{s_id}")
-        
-        mask = (df_strat.index >= pd.to_datetime(v_start)) & (df_strat.index <= pd.to_datetime(v_end) + timedelta(days=1))
-        df_sub = df_strat.loc[mask]
-        
-        if not df_sub.empty:
-            cap_ini_sub, cap_fin_sub = df_sub['Total_Portfolio'].iloc[0], df_sub['Total_Portfolio'].iloc[-1]
-            ret_sub = ((cap_fin_sub - cap_ini_sub) / cap_ini_sub) * 100
-            t_sub = [t for t in t_log if pd.to_datetime(v_start) <= pd.to_datetime(t['Fecha']) <= (pd.to_datetime(v_end) + timedelta(days=1))]
-            df_tsub = pd.DataFrame(t_sub)
-            
-            tt_sub, wr_sub = 0, 0.0
-            if not df_tsub.empty:
-                exs_sub = df_tsub[df_tsub['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
-                tt_sub = len(exs_sub)
-                if tt_sub > 0: wr_sub = (len(exs_sub[exs_sub['Tipo'].isin(['TP', 'DYNAMIC_WIN'])]) / tt_sub) * 100
-
-            mc1, mc2, mc3, mc4 = st.columns(4)
-            mc1.metric("Inicio de Ventana", f"${cap_ini_sub:,.2f}")
-            mc2.metric("Fin de Ventana", f"${cap_fin_sub:,.2f}", f"{ret_sub:.2f}% Neto")
-            mc3.metric("Trades en Ventana", f"{tt_sub}")
-            mc4.metric("Win Rate en Ventana", f"{wr_sub:.1f}%")
 
 renderizar_estrategia("TRINITY V357", tab_tri, df_global)
 renderizar_estrategia("JUGGERNAUT V356", tab_jug, df_global)
