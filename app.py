@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="ROCKET PROTOCOL | Lab Quant AI", layout="wide", initial_sidebar_state="expanded")
 
-# --- MEMORIA IA BLINDADA (EVITA EL STREAMLIT API EXCEPTION) ---
+# --- MEMORIA IA BLINDADA ---
 if 'tp_pct' not in st.session_state: st.session_state.tp_pct = 3.0
 if 'sl_pct' not in st.session_state: st.session_state.sl_pct = 1.5
 if 'whale_factor' not in st.session_state: st.session_state.whale_factor = 2.5
@@ -18,7 +18,7 @@ if 'radar_sens' not in st.session_state: st.session_state.radar_sens = 1.5
 if 'reinvest_pct' not in st.session_state: st.session_state.reinvest_pct = 50.0
 
 st.title("⚙️ ROCKET PROTOCOL LAB - Centro de Inteligencia Quant")
-st.markdown("Extracción CCXT, Comisiones Reales (0.25%), IA Optimizadora y Crosshair Táctico.")
+st.markdown("Extracción CCXT Profunda, Terminología Institucional y Optimización de ADN Matemático.")
 
 # --- 1. PANEL DE CONTROL: EXCHANGES Y MERCADO ---
 st.sidebar.markdown("### 🚀 ROCKET PROTOCOL LAB")
@@ -43,19 +43,25 @@ intervalos = {
     "2 Horas": ("1h", "2H"), "4 Horas": ("4h", "4H"), 
     "1 Día": ("1d", "1D"), "1 Semana": ("1w", "1W")
 }
-intervalo_sel = st.sidebar.selectbox("Resolución Espacial", list(intervalos.keys()), index=4)
+intervalo_sel = st.sidebar.selectbox("Temporalidad (Velas)", list(intervalos.keys()), index=4)
 iv_download, iv_resample = intervalos[intervalo_sel]
 
+# Slider temporal EXPANSO (Time Frame)
 hoy = datetime.today().date()
-limite_dias = 10 if iv_download == "1m" else 90 if iv_download in ["5m", "15m", "30m"] else 730
+limite_dias = 30 if iv_download == "1m" else 365 if iv_download in ["5m", "15m", "30m"] else 1800
 fecha_minima = hoy - timedelta(days=limite_dias)
-start_date, end_date = st.sidebar.slider("📅 Rango de Extracción", min_value=fecha_minima, max_value=hoy, value=(fecha_minima, hoy), format="YYYY-MM-DD")
+
+# Ajuste automático del Time Frame por defecto para no saturar si no es necesario
+dias_defecto = 30 if limite_dias > 30 else limite_dias
+default_start = hoy - timedelta(days=dias_defecto)
+
+start_date, end_date = st.sidebar.slider("📅 Time Frame (Rango Histórico)", min_value=fecha_minima, max_value=hoy, value=(default_start, hoy), format="YYYY-MM-DD")
 
 st.sidebar.markdown("---")
 capital_inicial = st.sidebar.number_input("Capital Inicial Base (USD)", value=13364.0, step=1000.0)
 comision_pct = st.sidebar.number_input("Comisión por Trade (%)", value=0.25, step=0.05) / 100.0
 
-# --- 2. SELECCIÓN DE ARQUITECTURA Y SLIDERS DINÁMICOS ---
+# --- 2. SELECCIÓN DE ARQUITECTURA ---
 st.sidebar.header("🧠 Selección de Arquitectura")
 estrategia_activa = st.sidebar.radio("Motor de Ejecución:", [
     "TRINITY V357 (Dividendos + Compuesto)", 
@@ -65,7 +71,6 @@ estrategia_activa = st.sidebar.radio("Motor de Ejecución:", [
 
 st.sidebar.header(f"🎯 Calibración: {estrategia_activa.split(' ')[0]}")
 
-# Sliders libres (sin parametro key) para que la IA los sobreescriba sin crashear
 tp_val = st.sidebar.slider("🎯 Take Profit (%)", 0.5, 15.0, value=float(st.session_state.tp_pct), step=0.1)
 st.session_state.tp_pct = tp_val
 
@@ -114,7 +119,7 @@ def cargar_datos_ccxt(exchange_id, sym, start, end, iv_down, iv_res):
             if not ohlcv: break
             all_ohlcv.extend(ohlcv)
             current_ts = ohlcv[-1][0] + 1
-            if len(all_ohlcv) > 50000: break
+            if len(all_ohlcv) > 200000: break # Limite superior de seguridad expandido
             
         if not all_ohlcv: return pd.DataFrame()
             
@@ -129,20 +134,37 @@ def cargar_datos_ccxt(exchange_id, sym, start, end, iv_down, iv_res):
     except Exception as e:
         return pd.DataFrame()
 
-with st.spinner(f'Conectando a {exchange_sel}...'):
+with st.spinner(f'Descargando matriz histórica desde {exchange_sel}...'):
     df = cargar_datos_ccxt(id_exchange, ticker, start_date, end_date, iv_download, iv_resample)
 
-# --- 4. CÁLCULO MATEMÁTICO ---
-if not df.empty and len(df) > 20:
-    df['EMA_200'] = ta.ema(df['Close'], length=200)
-    df['Vol_MA'] = ta.sma(df['Volume'], length=20)
-    df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
-    df['RSI'] = ta.rsi(df['Close'], length=14)
-    adx_df = ta.adx(df['High'], df['Low'], df['Close'], length=14)
-    df['ADX'] = adx_df.iloc[:, 0] if adx_df is not None else 0
+# --- 4. CÁLCULO MATEMÁTICO BLINDADO (ANTI-CRASH) ---
+if not df.empty and len(df) > 5:
+    # EMA 200 con Fallback a Precio de Cierre
+    ema200 = ta.ema(df['Close'], length=200)
+    df['EMA_200'] = ema200 if ema200 is not None else df['Close']
+    df['EMA_200'] = df['EMA_200'].fillna(df['Close'])
 
-    df['KC_Upper'] = ta.ema(df['Close'], length=20) + (df['ATR'] * 1.5)
-    df['KC_Lower'] = ta.ema(df['Close'], length=20) - (df['ATR'] * 1.5)
+    # SMA Volumen
+    vol_ma = ta.sma(df['Volume'], length=20)
+    df['Vol_MA'] = vol_ma if vol_ma is not None else df['Volume']
+    df['Vol_MA'] = df['Vol_MA'].fillna(df['Volume'])
+
+    # ATR 14
+    atr14 = ta.atr(df['High'], df['Low'], df['Close'], length=14)
+    df['ATR'] = atr14 if atr14 is not None else 0.001
+    df['ATR'] = df['ATR'].fillna(0.001)
+
+    # RSI 14
+    rsi14 = ta.rsi(df['Close'], length=14)
+    df['RSI'] = rsi14 if rsi14 is not None else 50.0
+    df['RSI'] = df['RSI'].fillna(50.0)
+
+    # ADX 14
+    adx_df = ta.adx(df['High'], df['Low'], df['Close'], length=14)
+    df['ADX'] = adx_df.iloc[:, 0] if adx_df is not None else 0.0
+    df['ADX'] = df['ADX'].fillna(0.0)
+
+    # Bollinger Bands
     bb = ta.bbands(df['Close'], length=20, std=2.0)
     if bb is not None:
         df = pd.concat([df, bb], axis=1)
@@ -150,9 +172,17 @@ if not df.empty and len(df) > 20:
     else:
         df['BBU'], df['BBL'] = df['Close'], df['Close']
 
+    df['BBU'] = df['BBU'].fillna(df['Close'])
+    df['BBL'] = df['BBL'].fillna(df['Close'])
+
+    # Keltner Channels
+    df['KC_Upper'] = df['EMA_200'] + (df['ATR'] * 1.5) # Aproximación segura
+    df['KC_Lower'] = df['EMA_200'] - (df['ATR'] * 1.5)
+
     df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
-    df['BB_Delta'] = (df['BBU'] - df['BBL']).diff()
-    df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10).mean()
+    df['BB_Delta'] = (df['BBU'] - df['BBL']).diff().fillna(0)
+    df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10).mean().fillna(0)
+    
     df['Vela_Verde'] = df['Close'] > df['Open']
     df['Vela_Roja'] = df['Close'] < df['Open']
 
@@ -171,9 +201,10 @@ if not df.empty and len(df) > 20:
             df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell']
         elif "JUGGERNAUT" in strat:
             df_sim['Macro_Safe'] = df_sim['Close'] > df_sim['EMA_200'] if macro_sh else True
-            cuerpo_previo = df_sim['Open'].shift(1) - df_sim['Close'].shift(1)
-            atr_previo = df_sim['ATR'].shift(1)
+            cuerpo_previo = df_sim['Open'].shift(1).fillna(0) - df_sim['Close'].shift(1).fillna(0)
+            atr_previo = df_sim['ATR'].shift(1).fillna(0.001)
             df_sim['ATR_Safe'] = ~(cuerpo_previo > (atr_previo * 1.5)) if atr_sh else True
+            
             df_sim['Signal_Buy'] = (df_sim['Vol_Anormal'] & df_sim['Vela_Verde']) | ((df_sim['Radar_Activo'] | df_sim['Defcon_Buy']) & df_sim['Vela_Verde'] & df_sim['Macro_Safe'] & df_sim['ATR_Safe'])
             df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell']
         elif "DEFCON" in strat:
@@ -248,7 +279,7 @@ if not df.empty and len(df) > 20:
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🧠 Central de Inteligencia")
     if st.sidebar.button("🤖 Optimizar Parámetros (Auto-Ajustar)", type="primary"):
-        with st.spinner('IA Ejecutando 150 simulaciones paralelas...'):
+        with st.spinner('IA Ejecutando simulaciones estocásticas...'):
             best_profit = -999999
             best_params = {}
             for _ in range(150):
@@ -265,7 +296,6 @@ if not df.empty and len(df) > 20:
                     best_profit = curva_test[-1]
                     best_params = {'tp': t_tp, 'sl': t_sl, 'whale': t_whale, 'radar': t_radar, 'reinvest': t_reinvest}
             
-            # Auto-asignación de variables
             st.session_state.tp_pct = float(best_params['tp'])
             st.session_state.sl_pct = float(best_params['sl'])
             st.session_state.whale_factor = float(best_params['whale'])
@@ -273,7 +303,7 @@ if not df.empty and len(df) > 20:
             if "TRINITY" in estrategia_activa:
                 st.session_state.reinvest_pct = float(best_params['reinvest'])
             
-            st.rerun() # Reinicia la pantalla con los nuevos deslizadores
+            st.rerun()
 
     # Ejecución Base
     df = generar_senales(df, estrategia_activa, st.session_state.whale_factor, st.session_state.radar_sens, use_macro_shield, use_atr_shield)
@@ -338,19 +368,15 @@ if not df.empty and len(df) > 20:
     fig.add_trace(go.Scatter(x=df.index, y=df['Total_Portfolio'], mode='lines', name='Equidad Neta ($)', line=dict(color='#00FF00', width=3)), row=2, col=1, secondary_y=False)
     fig.add_trace(go.Scatter(x=df.index, y=df['Rentabilidad_Pct'], mode='lines', name='Rentabilidad (%)', line=dict(color='rgba(0,0,0,0)')), row=2, col=1, secondary_y=True)
 
-    # 🚀 ACTIVACIÓN DEL CROSSHAIR (SPIKELINES)
     fig.update_xaxes(showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot")
     fig.update_yaxes(showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot")
 
     fig.update_layout(
-        template='plotly_dark', 
-        height=850, 
-        xaxis_rangeslider_visible=False, 
-        margin=dict(l=20, r=20, t=30, b=20), 
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        hovermode="x unified" # Unifica la caja de lectura en la parte superior
+        template='plotly_dark', height=850, xaxis_rangeslider_visible=False, 
+        margin=dict(l=20, r=20, t=30, b=20), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        hovermode="x unified"
     )
     st.plotly_chart(fig, use_container_width=True)
 
 else:
-    st.error("⚠️ El Exchange no arrojó datos para este Símbolo o Temporalidad. Asegúrese de usar el formato correcto (Ej: HNT/USD para Coinbase).")
+    st.error("⚠️ No hay suficientes velas para iniciar el motor algorítmico. Expanda el Time Frame.")
