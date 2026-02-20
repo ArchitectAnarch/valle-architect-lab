@@ -11,13 +11,13 @@ import glob
 import gc
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="ROCKET PROTOCOL | Apex Quant", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="ROCKET PROTOCOL | Alpha Quant", layout="wide", initial_sidebar_state="expanded")
 
 # --- MEMORIA IA INSTITUCIONAL ---
 buy_rules = ['Pink_Whale_Buy', 'Lock_Bounce', 'Lock_Break', 'Defcon_Buy', 'Neon_Up', 'Therm_Bounce', 'Therm_Vacuum', 'Nuclear_Buy', 'Early_Buy', 'Rebound_Buy']
 sell_rules = ['Defcon_Sell', 'Neon_Dn', 'Therm_Wall_Sell', 'Therm_Panic_Sell', 'Lock_Reject', 'Lock_Breakd', 'Nuclear_Sell', 'Early_Sell']
 
-# INICIALIZACIÓN ESTRICTA DE LLAVES PARA STREAMLIT (State-Binding)
+# INICIALIZACIÓN ESTRICTA
 for r_idx in range(1, 5):
     if f'gen_r{r_idx}_b' not in st.session_state: st.session_state[f'gen_r{r_idx}_b'] = ['Nuclear_Buy']
     if f'gen_r{r_idx}_s' not in st.session_state: st.session_state[f'gen_r{r_idx}_s'] = ['Nuclear_Sell']
@@ -41,18 +41,18 @@ css_spinner = """
 .rocket { font-size: 10rem; animation: spin 1s linear infinite; filter: drop-shadow(0 0 35px rgba(0, 255, 255, 1)); }
 @keyframes spin { 0% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.2) rotate(180deg); } 100% { transform: scale(1) rotate(360deg); } }
 </style>
-<div class="loader-container"><div class="rocket">🌌</div></div>
+<div class="loader-container"><div class="rocket">🚀</div></div>
 """
 ph_holograma = st.empty()
 
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 THE APEX ARSENAL</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ALPHA QUANT LAB</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     gc.collect()
 
 st.sidebar.markdown("---")
 exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["coinbase", "binance", "kraken", "kucoin"], index=0)
-ticker = st.sidebar.text_input("Símbolo Exacto", value="BTC/USD")
+ticker = st.sidebar.text_input("Símbolo Exacto", value="HNT/USD")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
 
 intervalos = {
@@ -63,7 +63,7 @@ intervalos = {
     "2 Horas": ("1h", "2h"), "4 Horas": ("4h", "4h"), 
     "1 Día": ("1d", "1D"), "1 Semana": ("1d", "1W")
 }
-intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=4) 
+intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=2) 
 iv_download, iv_resample = intervalos[intervalo_sel]
 
 hoy = datetime.today().date()
@@ -74,7 +74,7 @@ dias_analizados = max((end_date - start_date).days, 1)
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=13364.0, step=1000.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
-# --- 2. EXTRACCIÓN MAESTRA ---
+# --- 2. EXTRACCIÓN MAESTRA (SIN PUNTOS CIEGOS) ---
 @st.cache_data(ttl=120)
 def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
     try:
@@ -101,64 +101,61 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
             df = df.resample(iv_res).agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
         
         if len(df) > 50:
-            df['EMA_200'] = ta.ema(df['Close'], length=200).fillna(df['Close'])
-            df['Vol_MA_100'] = ta.sma(df['Volume'], length=100).fillna(df['Volume'])
+            # CORRECCIÓN PINE SCRIPT (min_periods=1 para que calcule desde la vela 1)
+            df['EMA_200'] = df['Close'].ewm(span=200, min_periods=1, adjust=False).mean()
+            df['Vol_MA_100'] = df['Volume'].rolling(window=100, min_periods=1).mean()
             df['RVol'] = df['Volume'] / df['Vol_MA_100'].replace(0, 1)
+            
             df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14).fillna(df['High'] - df['Low']).replace(0, 0.001)
             df['RSI'] = ta.rsi(df['Close'], length=14).fillna(50.0)
             df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
 
             df['KC_Upper'] = df['EMA_200'] + (df['ATR'] * 1.5)
             df['KC_Lower'] = df['EMA_200'] - (df['ATR'] * 1.5)
-            bb = ta.bbands(df['Close'], length=20, std=2.0)
-            if bb is not None:
-                df = pd.concat([df, bb], axis=1)
-                df.rename(columns={bb.columns[0]: 'BBL', bb.columns[2]: 'BBU'}, inplace=True)
-            else: df['BBU'], df['BBL'] = df['Close'], df['Close']
-            df['BBU'], df['BBL'] = df['BBU'].fillna(df['Close']), df['BBL'].fillna(df['Close'])
+            
+            # Bandas de Bollinger robustas
+            basis = df['Close'].rolling(20, min_periods=1).mean()
+            dev = df['Close'].rolling(20, min_periods=1).std().replace(0, 1)
+            df['BBU'] = basis + (2.0 * dev)
+            df['BBL'] = basis - (2.0 * dev)
 
             df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
             df['BB_Delta'] = (df['BBU'] - df['BBL']).diff().fillna(0)
-            df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10).mean().fillna(0)
+            df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10, min_periods=1).mean().fillna(0)
             df['Vela_Verde'] = df['Close'] > df['Open']
             df['Vela_Roja'] = df['Close'] < df['Open']
             df['Cuerpo_Vela'] = abs(df['Close'] - df['Open'])
             
-            df['PL30'] = df['Low'].rolling(30).min().fillna(df['Low'])
-            df['PH30'] = df['High'].rolling(30).max().fillna(df['High'])
-            df['PL100'] = df['Low'].rolling(100).min().fillna(df['Low'])
-            df['PH100'] = df['High'].rolling(100).max().fillna(df['High'])
-            df['PL300'] = df['Low'].rolling(300).min().fillna(df['Low'])
-            df['PH300'] = df['High'].rolling(300).max().fillna(df['High'])
+            # Pivotes simulados con ventana expansiva inicial
+            df['PL30'] = df['Low'].rolling(30, min_periods=1).min()
+            df['PH30'] = df['High'].rolling(30, min_periods=1).max()
+            df['PL100'] = df['Low'].rolling(100, min_periods=1).min()
+            df['PH100'] = df['High'].rolling(100, min_periods=1).max()
+            df['PL300'] = df['Low'].rolling(300, min_periods=1).min()
+            df['PH300'] = df['High'].rolling(300, min_periods=1).max()
             
-            basis_sigma = df['Close'].rolling(20).mean()
-            dev_sigma = df['Close'].rolling(20).std().replace(0, 1)
-            df['Z_Score'] = (df['Close'] - basis_sigma) / dev_sigma
-            rsi_ma = df['RSI'].rolling(14).mean()
-            df['RSI_Cross_Up'] = (df['RSI'] > rsi_ma) & (df['RSI'].shift(1) <= rsi_ma.shift(1))
-            df['RSI_Cross_Dn'] = (df['RSI'] < rsi_ma) & (df['RSI'].shift(1) >= rsi_ma.shift(1))
+            df['Z_Score'] = (df['Close'] - basis) / dev
+            rsi_ma = df['RSI'].rolling(14, min_periods=1).mean()
+            df['RSI_Cross_Up'] = (df['RSI'] > rsi_ma) & (df['RSI'].shift(1).fillna(50) <= rsi_ma.shift(1).fillna(50))
+            df['RSI_Cross_Dn'] = (df['RSI'] < rsi_ma) & (df['RSI'].shift(1).fillna(50) >= rsi_ma.shift(1).fillna(50))
             df['Retro_Peak'] = (df['RSI'] < 30) & (df['Close'] < df['BBL'])
             
             ap = (df['High'] + df['Low'] + df['Close']) / 3
-            esa = ap.ewm(span=10).mean()
-            d_wt = abs(ap - esa).ewm(span=10).mean()
-            ci = (ap - esa) / (0.015 * d_wt.replace(0, 1))
-            wt1 = ci.ewm(span=21).mean()
-            wt2 = wt1.rolling(4).mean()
-            df['WT_Cross_Up'] = (wt1 > wt2) & (wt1.shift(1) <= wt2.shift(1))
-            df['WT_Cross_Dn'] = (wt1 < wt2) & (wt1.shift(1) >= wt2.shift(1))
+            esa = ap.ewm(span=10, min_periods=1).mean()
+            d_wt = abs(ap - esa).ewm(span=10, min_periods=1).mean().replace(0, 1)
+            ci = (ap - esa) / (0.015 * d_wt)
+            wt1 = ci.ewm(span=21, min_periods=1).mean()
+            wt2 = wt1.rolling(4, min_periods=1).mean()
+            df['WT_Cross_Up'] = (wt1 > wt2) & (wt1.shift(1).fillna(0) <= wt2.shift(1).fillna(0))
+            df['WT_Cross_Dn'] = (wt1 < wt2) & (wt1.shift(1).fillna(0) >= wt2.shift(1).fillna(0))
             df['WT_Oversold'] = wt1 < -60
             df['WT_Overbought'] = wt1 > 60
             
-            # --- 4 CUADRANTES DE LA MATRIZ ---
-            # 1: Bull Trend | 2: Bull Chop | 3: Bear Trend | 4: Bear Chop
-            is_bull = df['Close'] >= df['EMA_200']
+            df['Macro_Bull'] = df['Close'] >= df['EMA_200']
             is_trend = df['ADX'] >= 25
-            
-            df['Regime'] = np.where(is_bull & is_trend, 1,
-                           np.where(is_bull & ~is_trend, 2,
-                           np.where(~is_bull & is_trend, 3, 4)))
-            df['Macro_Bull'] = is_bull
+            df['Regime'] = np.where(df['Macro_Bull'] & is_trend, 1,
+                           np.where(df['Macro_Bull'] & ~is_trend, 2,
+                           np.where(~df['Macro_Bull'] & is_trend, 3, 4)))
             gc.collect()
 
         return df
@@ -167,7 +164,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
 
 df_global = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
 if df_global.empty:
-    st.error(f"🚨 ERROR API: No hay datos para {ticker} en {exchange_sel.upper()}. Verifique el par.")
+    st.error(f"🚨 ERROR API: No hay datos para {ticker} en {exchange_sel.upper()}.")
 
 # --- 3. MOTOR PRE-CÁLCULO TOPOLÓGICO ---
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
@@ -344,8 +341,8 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
     return curva.tolist(), divs, cap_act, registro_trades, en_pos
 
 # --- 4. TERMINAL RENDER ---
-st.title("🛡️ The Apex Quant Terminal")
-tab_tri, tab_jug, tab_def, tab_gen = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329", "🌌 GÉNESIS V320 (THE MATRIX)"])
+st.title("🛡️ The Alpha Quant Terminal")
+tab_tri, tab_jug, tab_def, tab_gen = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329", "🌌 GÉNESIS V320 (ALPHA EXTR)"])
 
 def renderizar_estrategia(strat_name, tab_obj, df_base):
     with tab_obj:
@@ -374,8 +371,8 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 
         # --- MÓDULO GÉNESIS (MATRIX ARSENAL) ---
         if s_id == "GENESIS":
-            st.markdown("### 🌌 La Matriz Cuántica (The Arsenal)")
-            st.info("La IA evaluará los 4 regímenes de mercado simultáneamente. Buscando el crecimiento exponencial a través de la Fuerza Bruta.")
+            st.markdown("### 🌌 Alpha Extractor (Anti Buy & Hold)")
+            st.info("La IA DESTRUIRÁ cualquier ADN que gane menos dinero que el simple acto de 'Comprar y Holdear' el mercado.")
             
             c_ia1, c_ia2 = st.columns([1, 3])
             st.session_state['gen_ado'] = c_ia1.slider("🎯 Target ADO (Trades/Día)", 0.0, 100.0, value=float(st.session_state.get('gen_ado', 5.0)), step=0.5, key="ui_gen_ado")
@@ -412,7 +409,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r4_sl")
 
             st.markdown("---")
-            if c_ia2.button("🌌 RECOCIDO CUÁNTICO (Forzar Arsenal HFT)", type="primary"):
+            if c_ia2.button("🚀 EXTRACCIÓN ALPHA (Forzar Superioridad al Mercado)", type="primary"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
                 
                 df_p = inyectar_adn(df_base.copy(), 1.5, 2.5)
@@ -422,13 +419,16 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 b_mat = {r: df_p[r].values for r in buy_rules}
                 s_mat = {r: df_p[r].values for r in sell_rules}
                 
+                # CÁLCULO BASE: BUY & HOLD RETURN
+                buy_hold_ret = ((c_a[-1] - o_a[0]) / o_a[0]) * 100
+                buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
+                
                 best_fit = -float('inf')
                 bp = None
                 
                 for _ in range(3000): 
-                    # Escoge entre 1 y 3 gatillos para cada cuadrante (para no sobre-operar al unísono)
-                    dna_b = [random.sample(buy_rules, random.randint(1, 3)) for _ in range(4)]
-                    dna_s = [random.sample(sell_rules, random.randint(1, 3)) for _ in range(4)]
+                    dna_b = [random.sample(buy_rules, random.randint(1, 4)) for _ in range(4)]
+                    dna_s = [random.sample(sell_rules, random.randint(1, 4)) for _ in range(4)]
                     dna_tp = [random.uniform(2.0, 15.0) for _ in range(4)]
                     dna_sl = [random.uniform(1.0, 5.0) for _ in range(4)]
                     
@@ -451,81 +451,50 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     
                     net, pf, nt, mdd = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, f_buy, f_sell, f_tp, f_sl, capital_inicial, comision_pct)
                     
+                    # ECUACIÓN ALPHA (ASESINO DE HOLD)
+                    alpha_money = net - buy_hold_money
+                    
                     actual_ado = nt / dias_analizados if dias_analizados > 0 else 0
                     target_ado = st.session_state.get('gen_ado', 0.0)
                     
-                    # LA IA NUNCA SE RINDE. 
-                    # Si no gana dinero, su puntaje es negativo pero se evalúa. 
-                    if nt == 0:
-                        fit = -9999999
-                    elif net > 0:
-                        fit = (net * (pf**2) * np.sqrt(nt)) / ((mdd**1.5) + 1.0)
-                    else:
-                        fit = net / ((pf + 0.01) * (mdd + 1.0))
-
-                    # Látigo ADO para forzar operaciones (solo castiga si está por debajo del target)
-                    if target_ado > 0 and net > 0:
-                        if actual_ado < target_ado:
-                            fit *= (actual_ado / target_ado) ** 2  
-
-                    if fit > best_fit:
-                        best_fit = fit
-                        bp = {
-                            'b1': dna_b[0], 's1': dna_s[0], 'tp1': dna_tp[0], 'sl1': dna_sl[0],
-                            'b2': dna_b[1], 's2': dna_s[1], 'tp2': dna_tp[1], 'sl2': dna_sl[1],
-                            'b3': dna_b[2], 's3': dna_s[2], 'tp3': dna_tp[2], 'sl3': dna_sl[2],
-                            'b4': dna_b[3], 's4': dna_s[3], 'tp4': dna_tp[3], 'sl4': dna_sl[3],
-                            'net': net, 'pf': pf, 'nt': nt
-                        }
+                    ado_multiplier = 1.0
+                    if target_ado > 0:
+                        if actual_ado < target_ado: ado_multiplier = (actual_ado / target_ado) ** 3  
+                        
+                    # Solo vive si produce ALPHA real (le gana al mercado natural) y hace operaciones
+                    if nt >= max(5, int(dias_analizados * (target_ado * 0.5))) and alpha_money > 0: 
+                        fit = ((alpha_money * pf * np.sqrt(nt)) / ((mdd ** 1.5) + 1.0)) * ado_multiplier
+                        if fit > best_fit:
+                            best_fit = fit
+                            bp = {
+                                'b1': dna_b[0], 's1': dna_s[0], 'tp1': dna_tp[0], 'sl1': dna_sl[0],
+                                'b2': dna_b[1], 's2': dna_s[1], 'tp2': dna_tp[1], 'sl2': dna_sl[1],
+                                'b3': dna_b[2], 's3': dna_s[2], 'tp3': dna_tp[2], 'sl3': dna_sl[2],
+                                'b4': dna_b[3], 's4': dna_s[3], 'tp4': dna_tp[3], 'sl4': dna_sl[3],
+                                'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money
+                            }
                 
                 ph_holograma.empty()
                 if bp: 
                     st.session_state[f'update_pending_{s_id}'] = True
                     st.session_state[f'pending_bp_{s_id}'] = bp
-                    
-                    dna_str = f"""🌌 THE MATRIX ARSENAL (V320.X)
-Net Profit: +${bp['net']:,.2f} | PF: {bp['pf']:.2f}x | Trades Totales: {bp['nt']}
-
-// 🟢 BULL TREND (EMA 200+ | ADX 25+)
-Compras = {bp['b1']}
-Ventas  = {bp['s1']}
-TP = {bp['tp1']:.1f}% | SL = {bp['sl1']:.1f}%
-
-// 🟡 BULL CHOP (EMA 200+ | ADX < 25)
-Compras = {bp['b2']}
-Ventas  = {bp['s2']}
-TP = {bp['tp2']:.1f}% | SL = {bp['sl2']:.1f}%
-
-// 🔴 BEAR TREND (EMA 200- | ADX 25+)
-Compras = {bp['b3']}
-Ventas  = {bp['s3']}
-TP = {bp['tp3']:.1f}% | SL = {bp['sl3']:.1f}%
-
-// 🟠 BEAR CHOP (EMA 200- | ADX < 25)
-Compras = {bp['b4']}
-Ventas  = {bp['s4']}
-TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
-
+                    dna_str = f"🌌 ALPHA EXTRACTOR\nNet Profit: +${bp['net']:,.2f} | ALPHA: +${bp['alpha']:,.2f} | PF: {bp['pf']:.2f}x | Trades: {bp['nt']}\n(Configuración inyectada en los paneles para PineScript)"
                     st.session_state['winning_dna'] = dna_str
                     st.rerun() 
                 else:
-                    st.error("Error crítico de cálculo espacial.")
+                    st.error(f"❌ La IA calculó 3000 universos. En TODOS ellos era más rentable simplemente 'Holdear' la moneda (+${buy_hold_money:,.2f}) que encender el Bot con este ADO. No se extraerá ADN basura.")
 
             if st.session_state.get('winning_dna') != "":
-                st.success("¡Arsenal Extraído Exitosamente! Copie este bloque y envíemelo para crear el PineScript:")
+                st.success("¡Alpha Extraído Exitosamente!")
                 st.code(st.session_state['winning_dna'], language="text")
 
-            # --- DIBUJO ESTRUCTURAL EXACTO PARA GÉNESIS ---
+            # RECONSTRUIR LÓGICA VISUAL
             df_strat = inyectar_adn(df_base.copy(), 1.5, 2.5)
-            f_buy = np.zeros(len(df_strat), dtype=bool)
-            f_sell = np.zeros(len(df_strat), dtype=bool)
-            f_tp = np.full(len(df_strat), 3.0)
-            f_sl = np.full(len(df_strat), 1.5)
+            f_buy, f_sell = np.zeros(len(df_strat), dtype=bool), np.zeros(len(df_strat), dtype=bool)
+            f_tp, f_sl = np.zeros(len(df_strat)), np.zeros(len(df_strat))
             
-            regimes = df_strat['Regime'].values
             for idx in range(1, 5):
-                mask = (regimes == idx)
-                
+                mask = (df_strat['Regime'].values == idx)
                 r_b_cond = np.zeros(len(df_strat), dtype=bool)
                 for r in st.session_state.get(f'gen_r{idx}_b', []): r_b_cond |= df_strat[r].values
                 f_buy[mask] = r_b_cond[mask]
@@ -633,6 +602,9 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
         df_strat['Total_Portfolio'] = eq_curve
         ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
 
+        buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
+        alpha_pct = ret_pct - buy_hold_ret
+
         dftr = pd.DataFrame(t_log)
         tt, wr, pf_val, ado_act = 0, 0.0, 0.0, 0.0
         if not dftr.empty:
@@ -651,7 +623,10 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
         st.markdown(f"### 📊 Auditoría: {s_id}")
         c1, c2, c3, c4, c5, c6 = st.columns(6)
         c1.metric("Portafolio Neto", f"${eq_curve[-1]:,.2f}", f"{ret_pct:.2f}%")
-        c2.metric("Flujo Neto", f"${divs:,.2f}")
+        
+        # EL NUEVO INDICADOR ALPHA (RENDIMIENTO SOBRE HOLD)
+        c2.metric("ALPHA (vs Hold)", f"{alpha_pct:.2f}%", f"Hold: {buy_hold_ret:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
+        
         c3.metric("Win Rate", f"{wr:.1f}%")
         c4.metric("Profit Factor", f"{pf_val:.2f}x")
         c5.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
