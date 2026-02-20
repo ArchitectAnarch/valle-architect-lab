@@ -6,6 +6,7 @@ import pandas_ta as ta
 import pandas as pd
 import numpy as np
 import random
+import time
 import os
 import glob
 import gc
@@ -174,7 +175,7 @@ def cargar_y_preprocesar(exchange_id, sym, start, end, iv_down, iv_res, offset):
 
 df_global = cargar_y_preprocesar(id_exchange, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
 
-# --- 3. MOTOR PRE-CÁLCULO UNIVERSAL ---
+# --- 3. MOTOR PRE-CÁLCULO UNIVERSAL (RUTAS CORREGIDAS) ---
 def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy=True, def_sell=True):
     df_sim['Whale_Cond'] = df_sim['Cuerpo_Vela'] > (df_sim['ATR'] * 0.3)
     df_sim['Flash_Vol'] = (df_sim['RVol'] > (w_factor * 0.8)) & df_sim['Whale_Cond']
@@ -228,28 +229,31 @@ def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy=T
     df_sim['Early_Sell'] = (df_sim['RSI'] > 70) & df_sim['Vela_Roja']
     df_sim['Rebound_Buy'] = df_sim['RSI_Cross_Up'] & ~is_magenta
 
-    if strat == "TRINITY":
+    # 🧬 ENRUTAMIENTO ESTRICTO DE PESTAÑAS (IN)
+    if "TRINITY" in strat:
         df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | df_sim['Lock_Bounce'] | df_sim['Lock_Break'] | df_sim['Defcon_Buy'] | df_sim['Therm_Bounce'] | df_sim['Therm_Vacuum']
         df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell'] | df_sim['Therm_Panic_Sell'] | df_sim['Lock_Reject'] | df_sim['Lock_Breakd']
-    elif strat == "JUGGERNAUT":
+    elif "JUGGERNAUT" in strat:
         df_sim['Macro_Safe'] = df_sim['Close'] > df_sim['EMA_200'] if macro_sh else True
         df_sim['ATR_Safe'] = ~(df_sim['Cuerpo_Vela'].shift(1).fillna(0) > (df_sim['ATR'].shift(1).fillna(0.001) * 1.5)) if atr_sh else True
         df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | ((df_sim['Lock_Bounce'] | df_sim['Lock_Break'] | df_sim['Defcon_Buy'] | df_sim['Therm_Bounce'] | df_sim['Therm_Vacuum']) & df_sim['Macro_Safe'] & df_sim['ATR_Safe'])
         df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell'] | df_sim['Therm_Panic_Sell'] | df_sim['Lock_Reject'] | df_sim['Lock_Breakd']
-    elif strat == "DEFCON":
+    elif "DEFCON" in strat:
         df_sim['Signal_Buy'] = df_sim['Defcon_Buy'] if def_buy else False
         df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] if def_sell else False
-    elif strat == "GENESIS" or strat == "GENESIS_PRECALC":
+    elif "GENESIS" in strat:
         buy_cond = np.zeros(len(df_sim), dtype=bool)
         sell_cond = np.zeros(len(df_sim), dtype=bool)
-        # Si es la visualización final, usa los checkboxes. Si es precalc, lo deja en 0.
-        if strat == "GENESIS":
+        if "PRECALC" not in strat:
             for r in buy_rules:
                 if st.session_state.get(f'chk_b_{r}', False): buy_cond |= df_sim[r].values
             for r in sell_rules:
                 if st.session_state.get(f'chk_s_{r}', False): sell_cond |= df_sim[r].values
         df_sim['Signal_Buy'] = buy_cond
         df_sim['Signal_Sell'] = sell_cond
+    else:
+        df_sim['Signal_Buy'] = False
+        df_sim['Signal_Sell'] = False
         
     return df_sim
 
@@ -313,7 +317,7 @@ def ejecutar_simulacion_fast(high_arr, low_arr, close_arr, open_arr, sig_buy_arr
     net_val = cap_activo - cap_ini
     return net_val, pf, num_trades, max_dd
 
-# NÚCLEO DE SIMULACIÓN VISUAL (Para dibujar el gráfico)
+# NÚCLEO DE SIMULACIÓN VISUAL
 def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
     registro_trades = []
     n = len(df_sim)
@@ -325,19 +329,23 @@ def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
     open_arr = df_sim['Open'].values
     sig_buy_arr = df_sim['Signal_Buy'].values
     sig_sell_arr = df_sim['Signal_Sell'].values
+    cielo_arr = df_sim['Cielo_Libre'].values if 'Cielo_Libre' in df_sim.columns else np.zeros(n, dtype=bool)
+    whale_arr = df_sim['Pink_Whale_Buy'].values if 'Pink_Whale_Buy' in df_sim.columns else np.zeros(n, dtype=bool)
     fechas_arr = df_sim.index
     
     en_pos, precio_ent, cap_activo, divs = False, 0.0, cap_ini, 0.0
     is_trinity = "TRINITY" in strat
+    tp_dinamico_activo = False 
     
     for i in range(n):
         trade_cerrado = False
         if en_pos:
-            tp_price = precio_ent * (1 + (tp / 100))
+            tp_efectivo = tp * 1.5 if tp_dinamico_activo else tp
+            tp_price = precio_ent * (1 + (tp_efectivo / 100))
             sl_price = precio_ent * (1 - (sl / 100))
             
             if high_arr[i] >= tp_price:
-                g_bruta = (cap_activo if is_trinity else cap_ini) * (tp / 100)
+                g_bruta = (cap_activo if is_trinity else cap_ini) * (tp_efectivo / 100)
                 costo = ((cap_activo if is_trinity else cap_ini) + g_bruta) * com_pct
                 g_neta = g_bruta - costo
                 if is_trinity:
@@ -375,6 +383,7 @@ def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
             costo_ent = (cap_activo if is_trinity else cap_ini) * com_pct
             cap_activo -= costo_ent
             en_pos = True
+            tp_dinamico_activo = whale_arr[i] or cielo_arr[i] 
             registro_trades.append({'Fecha': fecha_ent, 'Tipo': 'ENTRY', 'Precio': precio_ent, 'Ganancia_$': -costo_ent})
 
         if en_pos and cap_activo > 0:
@@ -398,10 +407,10 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 
         s_id = strat_name.split()[0]
         
-        # --- MÓDULO GÉNESIS (ALGORITMO GENÉTICO APEX) ---
+        # --- MÓDULO GÉNESIS (MONTE CARLO) ---
         if s_id == "GENESIS":
-            st.markdown("### 🧬 Laboratorio Evolutivo Genético (V320)")
-            st.info("La IA no adivina. Cruza, muta y evoluciona miles de ADN en 15 generaciones hasta encontrar la rentabilidad absoluta.")
+            st.markdown("### 🧬 Laboratorio Genético Monte Carlo (V320)")
+            st.info("La IA evaluará miles de universos para encontrar la combinación que genere verdadero Crecimiento de Portafolio.")
             
             with st.form("form_genesis"):
                 c_b, c_s, c_r = st.columns(3)
@@ -417,136 +426,74 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 st.session_state['sld_gen_tp'] = c_r.slider("Take Profit (%)", 0.5, 20.0, value=float(st.session_state['sld_gen_tp']), step=0.5, key="f_sld_tp")
                 st.session_state['sld_gen_sl'] = c_r.slider("Stop Loss (%)", 0.5, 15.0, value=float(st.session_state['sld_gen_sl']), step=0.5, key="f_sld_sl")
                 
-                if st.form_submit_button("🧪 Aplicar Selección Manual"): st.rerun()
+                if st.form_submit_button("🧪 Aplicar Configuración Manual"): st.rerun()
 
             c_ia1, c_ia2 = st.columns([1, 3])
             st.session_state['sld_gen_ado'] = c_ia1.slider("🎯 Target ADO (Opcional)", 0.0, 10.0, value=float(st.session_state['sld_gen_ado']), step=0.1, key="f_sld_ado")
             
-            # --- MOTOR DE INTELIGENCIA EVOLUTIVA ---
-            if c_ia2.button("🚀 Iniciar Evolución Genética (15 Generaciones)", type="primary", key="btn_ia_gen"):
+            # --- MOTOR DE MONTE CARLO ESTOCÁSTICO ---
+            if c_ia2.button("🚀 Iniciar Monte Carlo (2000 Mutaciones)", type="primary", key="btn_ia_gen"):
                 
-                txt_prog = st.empty()
-                progress_bar = st.progress(0.0)
-                txt_prog.markdown("### 🧬 Extrayendo Matrices de C++...")
-                
+                progress_bar = st.progress(0.0, text="🧬 Extrayendo ADN Base...")
                 df_precalc = generar_senales(df_base.copy(), "GENESIS_PRECALC", 2.5, 1.5, False, False)
+                
                 h_arr = df_precalc['High'].values
                 l_arr = df_precalc['Low'].values
                 c_arr = df_precalc['Close'].values
                 o_arr = df_precalc['Open'].values
                 
-                # Arrays booleanos para acceso rápido
                 b_mat = {r: df_precalc[r].values for r in buy_rules}
                 s_mat = {r: df_precalc[r].values for r in sell_rules}
                 
-                def eval_fitness(dna):
-                    b_cond = np.zeros(len(df_precalc), dtype=bool)
-                    for i, r in enumerate(buy_rules):
-                        if dna['b'][i]: b_cond |= b_mat[r]
-                    s_cond = np.zeros(len(df_precalc), dtype=bool)
-                    for i, r in enumerate(sell_rules):
-                        if dna['s'][i]: s_cond |= s_mat[r]
-                        
-                    net, pf, nt, mdd = ejecutar_simulacion_fast(h_arr, l_arr, c_arr, o_arr, b_cond, s_cond, dna['tp'], dna['sl'], capital_inicial, comision_pct)
-                    
-                    if nt < 5: return -999, net, pf  # Descarta estrategias que no operan
-                    ado_pen = 1.0
-                    if st.session_state['sld_gen_ado'] > 0.0:
-                        ado_pen = 1.0 / (1.0 + abs((nt/dias_analizados) - st.session_state['sld_gen_ado']))
-                        
-                    fitness = ((net * pf) / (mdd + 1.0)) * ado_pen
-                    return fitness, net, pf
-
-                # --- 1. Crear Población Inicial ---
-                pop_size = 40
-                generations = 15
-                population = []
-                for _ in range(pop_size):
-                    dna = {
-                        'b': [random.choice([True, False]) for _ in buy_rules],
-                        's': [random.choice([True, False]) for _ in sell_rules],
-                        'tp': random.uniform(2.0, 12.0),
-                        'sl': random.uniform(1.0, 4.0)
-                    }
-                    if not any(dna['b']): dna['b'][random.randint(0, len(buy_rules)-1)] = True
-                    if not any(dna['s']): dna['s'][random.randint(0, len(sell_rules)-1)] = True
-                    population.append(dna)
-                    
-                best_dna_overall = None
-                best_fit_overall = -9999
-                best_net = 0
-                best_pf = 0
-
-                # --- 2. Bucle de Evolución Genética ---
-                for gen in range(generations):
-                    txt_prog.markdown(f"### 🧬 Evolucionando: Generación {gen+1}/{generations} ...")
-                    progress_bar.progress((gen+1) / generations)
-                    
-                    scored_pop = []
-                    for dna in population:
-                        fit, net, pf = eval_fitness(dna)
-                        scored_pop.append((fit, dna, net, pf))
-                        if fit > best_fit_overall:
-                            best_fit_overall = fit
-                            best_dna_overall = dna
-                            best_net = net
-                            best_pf = pf
-                            
-                    scored_pop.sort(key=lambda x: x[0], reverse=True)
-                    
-                    # Crossover y Mutación
-                    next_gen = [scored_pop[0][1], scored_pop[1][1]] # Pasan los 2 mejores intactos
-                    while len(next_gen) < pop_size:
-                        p1 = random.choice(scored_pop[:15])[1] # Cruza a los mejores
-                        p2 = random.choice(scored_pop[:15])[1]
-                        child = {
-                            'b': [p1['b'][i] if random.random() > 0.5 else p2['b'][i] for i in range(len(buy_rules))],
-                            's': [p1['s'][i] if random.random() > 0.5 else p2['s'][i] for i in range(len(sell_rules))],
-                            'tp': (p1['tp'] + p2['tp']) / 2.0,
-                            'sl': (p1['sl'] + p2['sl']) / 2.0
-                        }
-                        
-                        # Muta el 20% de las veces
-                        if random.random() < 0.2:
-                            idx = random.randint(0, len(buy_rules)-1)
-                            child['b'][idx] = not child['b'][idx]
-                        if random.random() < 0.2:
-                            idx = random.randint(0, len(sell_rules)-1)
-                            child['s'][idx] = not child['s'][idx]
-                        if random.random() < 0.2:
-                            child['tp'] += random.uniform(-1.5, 1.5)
-                            child['tp'] = max(1.0, child['tp'])
-                        if random.random() < 0.2:
-                            child['sl'] += random.uniform(-1.0, 1.0)
-                            child['sl'] = max(0.5, child['sl'])
-                            
-                        if not any(child['b']): child['b'][random.randint(0, len(buy_rules)-1)] = True
-                        if not any(child['s']): child['s'][random.randint(0, len(sell_rules)-1)] = True
-                        
-                        next_gen.append(child)
-                        
-                    population = next_gen
-                    
-                txt_prog.empty()
-                progress_bar.empty()
+                best_fit = -999999
+                bp = {}
                 
-                # --- 3. Resultado Final ---
-                if best_dna_overall and best_fit_overall > 0: # Si es rentable
-                    for i, r in enumerate(buy_rules): st.session_state[f'chk_b_{r}'] = best_dna_overall['b'][i]
-                    for i, r in enumerate(sell_rules): st.session_state[f'chk_s_{r}'] = best_dna_overall['s'][i]
-                    st.session_state['sld_gen_tp'] = round(best_dna_overall['tp'], 1)
-                    st.session_state['sld_gen_sl'] = round(best_dna_overall['sl'], 1)
+                total_iters = 2000
+                for i in range(total_iters): 
+                    if i % 100 == 0:
+                        progress_bar.progress(i / total_iters, text=f"🧬 Mutando ADN: Probando Universo {i}/{total_iters}...")
+                    
+                    b_sample = random.sample(buy_rules, random.randint(1, 4))
+                    s_sample = random.sample(sell_rules, random.randint(1, 4))
+                    
+                    b_cond = np.zeros(len(df_precalc), dtype=bool)
+                    for r in b_sample: b_cond |= b_mat[r]
+                    s_cond = np.zeros(len(df_precalc), dtype=bool)
+                    for r in s_sample: s_cond |= s_mat[r]
+                    
+                    tp_test = round(random.uniform(2.0, 12.0), 1)
+                    sl_test = round(random.uniform(1.0, 4.0), 1)
+                    
+                    net, pf, nt, mdd = ejecutar_simulacion_fast(h_arr, l_arr, c_arr, o_arr, b_cond, s_cond, tp_test, sl_test, capital_inicial, comision_pct)
+                    
+                    if net > (capital_inicial * 0.05) and nt >= 5 and pf > 1.2: 
+                        ado_pen = 1.0
+                        if st.session_state['sld_gen_ado'] > 0.0:
+                            ado_pen = 1.0 / (1.0 + abs((nt/dias_analizados) - st.session_state['sld_gen_ado']))
+                            
+                        fit = ((net * pf) / (mdd + 1.0)) * ado_pen
+                        if fit > best_fit:
+                            best_fit = fit
+                            bp = {'b':b_sample, 's':s_sample, 'tp':tp_test, 'sl':sl_test, 'pf':pf, 'np':net}
+                
+                progress_bar.progress(1.0, text="✅ Análisis Cuántico Completado.")
+                
+                if bp:
+                    for k in buy_rules: st.session_state[f'chk_b_{k}'] = (k in bp['b'])
+                    for k in sell_rules: st.session_state[f'chk_s_{k}'] = (k in bp['s'])
+                    st.session_state['sld_gen_tp'] = float(bp['tp'])
+                    st.session_state['sld_gen_sl'] = float(bp['sl'])
                     st.session_state['sld_gen_ado'] = 0.0
                     
-                    b_str = ", ".join([buy_rules[i] for i in range(len(buy_rules)) if best_dna_overall['b'][i]])
-                    s_str = ", ".join([sell_rules[i] for i in range(len(sell_rules)) if best_dna_overall['s'][i]])
+                    b_str = ", ".join(bp['b'])
+                    s_str = ", ".join(bp['s'])
                     
-                    dna_str = f"🧬 GÉNESIS DNA ALPHA (V320)\n-------------------------\n☑️ COMPRAS ACTIVAS: {b_str}\n☑️ VENTAS ACTIVAS: {s_str}\n🎯 TAKE PROFIT: {st.session_state['sld_gen_tp']}%\n🛑 STOP LOSS: {st.session_state['sld_gen_sl']}%\n-------------------------"
+                    dna_str = f"🧬 FÓRMULA GANADORA ENCONTRADA (Profit Factor {bp['pf']:.2f}x):\n\nCOMPRAS ACTIVAS = [ {b_str} ]\nVENTAS ACTIVAS  = [ {s_str} ]\nTAKE PROFIT = {bp['tp']}%\nSTOP LOSS = {bp['sl']}%"
                     st.session_state['winning_dna'] = dna_str
-                    st.rerun() # Aplica los botones físicamente en pantalla
+                    st.rerun()
                 else: 
                     st.session_state['winning_dna'] = ""
-                    st.error("❌ El motor evolutivo analizó 600 variaciones completas. El mercado actual es un agujero negro bajista. Ninguna combinación superó matemáticamente la erosión por comisiones.")
+                    st.error("❌ El motor Monte Carlo no encontró ninguna combinación que produzca crecimiento real sostenido en este mercado y marco de tiempo. Aumente el Time Frame o cambie de activo.")
 
             if st.session_state['winning_dna'] != "":
                 st.success("¡Evolución Genética Completada! Copie el ADN y envíemelo para generar su PineScript Bot:")
@@ -566,7 +513,6 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 atr_sh = st.session_state.get(f"atr_{s_id}", True)
                 d_buy = st.session_state.get(f"db_{s_id}", True)
                 d_sell = st.session_state.get(f"ds_{s_id}", True)
-                
                 t_reinv, t_whale, t_radar = 0.0, 2.5, 1.5
                 
                 if s_id == "TRINITY":
@@ -599,43 +545,35 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
                 best_fit = -999999
                 bp = {}
-                for _ in range(80): 
+                
+                df_precalc = generar_senales(df_base.copy(), strat_name, st.session_state[f'whale_{s_id}'], st.session_state[f'radar_{s_id}'], mac_sh, atr_sh, d_buy, d_sell)
+                h_arr = df_precalc['High'].values
+                l_arr = df_precalc['Low'].values
+                c_arr = df_precalc['Close'].values
+                o_arr = df_precalc['Open'].values
+                b_cond = df_precalc['Signal_Buy'].values
+                s_cond = df_precalc['Signal_Sell'].values
+                
+                for _ in range(120): 
                     rtp = round(random.uniform(1.2, 8.0), 1)
                     rsl = round(random.uniform(0.5, 3.5), 1)
                     rrv = round(random.uniform(20, 100), -1) if s_id == "TRINITY" else 0.0
-                    rwh = round(random.uniform(1.5, 3.5), 1) if s_id != "DEFCON" else 2.5
-                    rrd = round(random.uniform(0.5, 3.0), 1) if s_id != "DEFCON" else 1.5
                     
-                    df_t = generar_senales(df_base.copy(), strat_name, rwh, rrd, mac_sh, atr_sh, d_buy, d_sell)
-                    c_test, _, _, trds, _ = ejecutar_simulacion(df_t, strat_name, rtp, rsl, capital_inicial, rrv, comision_pct)
+                    net, pf, nt, mdd = ejecutar_simulacion_fast(h_arr, l_arr, c_arr, o_arr, b_cond, s_cond, rtp, rsl, capital_inicial, comision_pct)
                     
-                    dft = pd.DataFrame(trds)
-                    if not dft.empty:
-                        exits = dft[dft['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
-                        nt = len(exits)
-                        if nt > 2:
-                            gp = exits[exits['Ganancia_$'] > 0]['Ganancia_$'].sum()
-                            gl = abs(exits[exits['Ganancia_$'] < 0]['Ganancia_$'].sum())
-                            pf = gp / gl if gl > 0 else 0.5
-                            np_val = c_test[-1] - capital_inicial
-                            pk = pd.Series(c_test).cummax()
-                            m_dd = abs((((pd.Series(c_test) - pk) / pk) * 100).min())
+                    if nt > 2:
+                        ado_pen = 1.0
+                        if st.session_state[f'ado_{s_id}'] > 0.0:
+                            ado_pen = 1.0 / (1.0 + abs((nt/dias_analizados) - st.session_state[f'ado_{s_id}']))
                             
-                            ado_pen = 1.0
-                            if st.session_state[f'ado_{s_id}'] > 0.0:
-                                ado_pen = 1.0 / (1.0 + abs((nt/dias_analizados) - st.session_state[f'ado_{s_id}']))
-                                
-                            fit = ((np_val * pf) / (m_dd + 1.0)) * ado_pen
-                            if fit > best_fit and np_val > 0:
-                                best_fit, bp = fit, {'tp':rtp, 'sl':rsl, 'reinv':rrv, 'whale':rwh, 'radar':rrd}
+                        fit = ((net * pf) / (mdd + 1.0)) * ado_pen
+                        if fit > best_fit and net > 0:
+                            best_fit, bp = fit, {'tp':rtp, 'sl':rsl, 'reinv':rrv}
                 
                 ph_holograma.empty()
                 if bp:
                     st.session_state[f'tp_{s_id}'], st.session_state[f'sl_{s_id}'] = float(bp['tp']), float(bp['sl'])
                     if s_id == "TRINITY": st.session_state[f'reinvest_{s_id}'] = float(bp['reinv'])
-                    if s_id != "DEFCON": 
-                        st.session_state[f'whale_{s_id}'] = float(bp['whale'])
-                        st.session_state[f'radar_{s_id}'] = float(bp['radar'])
                     st.session_state[f'ado_{s_id}'] = 0.0
                     gc.collect()
                     st.rerun()
