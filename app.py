@@ -174,7 +174,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
 
 df_global = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
 if df_global.empty:
-    st.error(f"🚨 ERROR API: No hay datos para {ticker} en {exchange_sel.upper()}.")
+    st.error(f"🚨 ERROR API: No hay datos para {ticker} en {exchange_sel.upper()}. Verifique el par (Ej: BTC/USD para Coinbase, BTC/USDT para Binance).")
 
 # --- 3. MOTOR PRE-CÁLCULO TOPOLÓGICO ---
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
@@ -360,7 +360,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 
         s_id = strat_name.split()[0]
         
-        # 🔥 PATRÓN PRE-RENDER (EL SECRETO DEL HACKEO DE LA UI) 🔥
+        # 🔥 PATRÓN PRE-RENDER SOMBRA (EL SECRETO DEL HACKEO DE LA UI) 🔥
         if st.session_state.get(f'update_pending_{s_id}', False):
             bp = st.session_state[f'pending_bp_{s_id}']
             if s_id == "GENESIS":
@@ -398,20 +398,20 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             <h4 style='color:lime; margin-top:0;'>🟢 PROTOCOLO ALCISTA (EMA 200+)</h4>
             </div>""", unsafe_allow_html=True)
             
-            for r in buy_rules: c_bull.checkbox(f"COMPRA: {r.replace('_', ' ')}", key=f"gen_bull_b_{r}")
-            for r in sell_rules: c_bull.checkbox(f"CIERRE: {r.replace('_', ' ')}", key=f"gen_bull_s_{r}")
-            c_bull.slider("🎯 TP Alcista (%)", 0.5, 20.0, step=0.5, key="gen_bull_tp")
-            c_bull.slider("🛑 SL Alcista (%)", 0.5, 15.0, step=0.5, key="gen_bull_sl")
+            for r in buy_rules: c_bull.checkbox(f"COMPRA: {r.replace('_', ' ')}", value=st.session_state[f'gen_bull_b_{r}'], key=f"gen_bull_b_{r}")
+            for r in sell_rules: c_bull.checkbox(f"CIERRE: {r.replace('_', ' ')}", value=st.session_state[f'gen_bull_s_{r}'], key=f"gen_bull_s_{r}")
+            c_bull.slider("🎯 TP Alcista (%)", 0.5, 20.0, value=float(st.session_state['gen_bull_tp']), step=0.5, key="gen_bull_tp")
+            c_bull.slider("🛑 SL Alcista (%)", 0.5, 15.0, value=float(st.session_state['gen_bull_sl']), step=0.5, key="gen_bull_sl")
 
             c_bear.markdown("""
             <div style='background-color:rgba(255, 0, 0, 0.1); padding:10px; border-radius:10px; border-left: 5px solid red; margin-top:20px;'>
             <h4 style='color:red; margin-top:0;'>🔴 PROTOCOLO BAJISTA (EMA 200-)</h4>
             </div>""", unsafe_allow_html=True)
             
-            for r in buy_rules: c_bear.checkbox(f"COMPRA: {r.replace('_', ' ')}", key=f"gen_bear_b_{r}")
-            for r in sell_rules: c_bear.checkbox(f"CIERRE: {r.replace('_', ' ')}", key=f"gen_bear_s_{r}")
-            c_bear.slider("🎯 TP Bajista (%)", 0.5, 20.0, step=0.5, key="gen_bear_tp")
-            c_bear.slider("🛑 SL Bajista (%)", 0.5, 15.0, step=0.5, key="gen_bear_sl")
+            for r in buy_rules: c_bear.checkbox(f"COMPRA: {r.replace('_', ' ')}", value=st.session_state[f'gen_bear_b_{r}'], key=f"gen_bear_b_{r}")
+            for r in sell_rules: c_bear.checkbox(f"CIERRE: {r.replace('_', ' ')}", value=st.session_state[f'gen_bear_s_{r}'], key=f"gen_bear_s_{r}")
+            c_bear.slider("🎯 TP Bajista (%)", 0.5, 20.0, value=float(st.session_state['gen_bear_tp']), step=0.5, key="gen_bear_tp")
+            c_bear.slider("🛑 SL Bajista (%)", 0.5, 15.0, value=float(st.session_state['gen_bear_sl']), step=0.5, key="gen_bear_sl")
 
             st.markdown("---")
             if st.button("🌌 INICIAR RECOCIDO CUÁNTICO (Forzar Crecimiento Exponencial)", type="primary"):
@@ -429,7 +429,8 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 
                 # LA FUERZA BRUTA DEL DEPREDADOR (3000 Universos)
                 for i in range(3000): 
-                    b_bull = random.sample(buy_rules, random.randint(1, 6)) # Obligado a encender hasta 6 gatillos
+                    # El algoritmo elige hasta 6 combinaciones (DEPREDADOR ACTIVO)
+                    b_bull = random.sample(buy_rules, random.randint(1, 6))
                     b_bear = random.sample(buy_rules, random.randint(1, 6))
                     s_bull = random.sample(sell_rules, random.randint(1, 6))
                     s_bear = random.sample(sell_rules, random.randint(1, 6))
@@ -458,15 +459,13 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     target_ado = st.session_state.get('gen_ado', 0.0)
                     
                     if target_ado > 0:
-                        # Si hace menos trades que el target, su puntuación es destruida (Castigo Asimétrico)
                         if actual_ado < target_ado:
                             ado_multiplier = (actual_ado / target_ado) ** 3  
                         else:
-                            ado_multiplier = 1.0 # Si opera más de lo pedido y gana, se le premia dejándolo intacto
+                            ado_multiplier = 1.0 
                     else:
                         ado_multiplier = 1.0
 
-                    # Filtro Base: Debe ganar dinero y hacer al menos 5 trades para considerarse una estrategia
                     if nt >= 5 and net > (capital_inicial * 0.02): 
                         fit = ((net * pf * np.sqrt(nt)) / (mdd + 1.0)) * ado_multiplier
                         
@@ -536,9 +535,9 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 if st.form_submit_button("⚡ Aplicar"): st.rerun()
 
             c_ia1, c_ia2 = st.columns([1, 3])
-            st.session_state[f'ado_{s_id}'] = col_ia1.slider(f"🎯 ADO Target ({s_id})", 0.0, 10.0, value=float(st.session_state.get(f'ado_{s_id}', 0.0)), step=0.1)
+            st.session_state[f'ado_{s_id}'] = c_ia1.slider(f"🎯 ADO Target ({s_id})", 0.0, 10.0, value=float(st.session_state.get(f'ado_{s_id}', 0.0)), step=0.1)
             
-            if col_ia2.button(f"🚀 Ejecutar IA Cuántica ({s_id})", use_container_width=True):
+            if c_ia2.button(f"🚀 Ejecutar IA Cuántica ({s_id})", use_container_width=True):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
                 best_fit = -999999
                 bp = {}
