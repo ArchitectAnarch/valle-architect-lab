@@ -18,7 +18,7 @@ if 'radar_sens' not in st.session_state: st.session_state.radar_sens = 1.5
 if 'reinvest_pct' not in st.session_state: st.session_state.reinvest_pct = 50.0
 
 st.title("⚙️ ROCKET PROTOCOL LAB - Gemelo Digital Quant")
-st.markdown("IA con Función de Aptitud Estricta (Fitness Score). Anti-Overfitting Activo.")
+st.markdown("Aislamiento de ADN Estratégico y Optimización Anti-Overfitting Activa.")
 
 # --- 1. PANEL DE CONTROL ---
 st.sidebar.markdown("### 🚀 ROCKET PROTOCOL LAB")
@@ -127,11 +127,13 @@ if not df.empty and len(df) > 5:
     df['Pivot_Low_30'] = df['Low'].rolling(window=30, center=False).min().fillna(df['Low'])
     df['Pivot_High_30'] = df['High'].rolling(window=30, center=False).max().fillna(df['High'])
     
-    # --- 5. SIMULADOR QUANT ---
+    # --- 5. SIMULADOR QUANT ESTRICTO ---
     def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh):
         df_sim['Whale_Cond'] = df_sim['Cuerpo_Vela'] > (df_sim['ATR'] * 0.3)
         df_sim['Vol_Anormal'] = (df_sim['Volume'] > (df_sim['Vol_MA'] * w_factor)) & df_sim['Whale_Cond']
-        df_sim['Radar_Activo'] = ((abs(df_sim['Close'] - df_sim['Pivot_Low_30']) / df_sim_['Close']) * 100 <= r_sens) | ((abs(df_sim['Close'] - df_sim['Pivot_High_30']) / df_sim_['Close']) * 100 <= r_sens)
+        
+        # 🛠️ CORRECCIÓN TIPOGRÁFICA (df_sim_ eliminado)
+        df_sim['Radar_Activo'] = ((abs(df_sim['Close'] - df_sim['Pivot_Low_30']) / df_sim['Close']) * 100 <= r_sens) | ((abs(df_sim['Close'] - df_sim['Pivot_High_30']) / df_sim['Close']) * 100 <= r_sens)
         
         df_sim['Neon_Up'] = df_sim['Squeeze_On'] & (df_sim['Close'] >= df_sim['BBU'] * 0.999) & df_sim['Vela_Verde']
         df_sim['Neon_Dn'] = df_sim['Squeeze_On'] & (df_sim['Close'] <= df_sim['BBL'] * 1.001) & df_sim['Vela_Roja']
@@ -139,6 +141,7 @@ if not df.empty and len(df) > 5:
         df_sim['Defcon_Sell'] = df_sim['Neon_Dn'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['ADX'] > 20)
         df_sim['Therm_Wall_Sell'] = (df_sim['RSI'] > 70) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Roja']
 
+        # AISLAMIENTO DE ADN
         if "TRINITY" in strat:
             df_sim['Signal_Buy'] = (df_sim['Vol_Anormal'] & df_sim['Vela_Verde']) | ((df_sim['Radar_Activo'] | df_sim['Defcon_Buy']) & df_sim['Vela_Verde'])
             df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell']
@@ -202,19 +205,24 @@ if not df.empty and len(df) > 5:
             curva_capital[i] = (cap_activo + divs) if "TRINITY" in strat else cap_activo
         return curva_capital, divs, cap_activo, registro_trades
 
-    # --- 6. CEREBRO IA: FUNCIÓN DE APTITUD (FITNESS SCORE) ---
+    # --- 6. CEREBRO IA: FUNCIÓN DE APTITUD CON AISLAMIENTO ---
     st.sidebar.markdown("---")
     st.sidebar.markdown("### 🧠 Centro IA Estricto")
     if st.sidebar.button("🔬 Optimizar por Robustez (Anti-Overfit)", type="primary"):
-        with st.spinner('IA Evaluando Funciones de Aptitud...'):
+        with st.spinner('IA Evaluando Funciones de Aptitud en aislamiento...'):
             best_fitness = -999999
             best_params = {}
             for _ in range(120):
+                # AISLAMIENTO: La IA solo muta lo que le importa a la estrategia actual
                 t_tp = round(random.uniform(1.5, 8.0), 1)
                 t_sl = round(random.uniform(0.5, 3.5), 1)
-                t_whale = round(random.uniform(1.5, 3.5), 1) if "DEFCON" not in estrategia_activa else 2.5
-                t_radar = round(random.uniform(0.5, 3.0), 1) if "DEFCON" not in estrategia_activa else 1.5
-                t_reinvest = round(random.uniform(20, 100), -1)
+                
+                # Trinity muta reinversión. Juggernaut/Defcon la ignoran (se fuerza a 0.0)
+                t_reinvest = round(random.uniform(20, 100), -1) if "TRINITY" in estrategia_activa else 0.0
+                
+                # Defcon ignora Ballenas y Radares (se mantienen los actuales para no estorbar)
+                t_whale = round(random.uniform(1.5, 3.5), 1) if "DEFCON" not in estrategia_activa else st.session_state.whale_factor
+                t_radar = round(random.uniform(0.5, 3.0), 1) if "DEFCON" not in estrategia_activa else st.session_state.radar_sens
                 
                 df_test = generar_senales(df.copy(), estrategia_activa, t_whale, t_radar, use_macro_shield, use_atr_shield)
                 curva_test, _, _, trades_test = ejecutar_simulacion(df_test, estrategia_activa, t_tp, t_sl, capital_inicial, t_reinvest, comision_pct)
@@ -224,7 +232,7 @@ if not df.empty and len(df) > 5:
                 if not df_tt.empty:
                     exits = df_tt[df_tt['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
                     num_trades = len(exits)
-                    if num_trades > 5: # Penaliza fuertemente sistemas que operan muy poco
+                    if num_trades > 5:
                         g_profit = exits[exits['Ganancia_$'] > 0]['Ganancia_$'].sum()
                         g_loss = abs(exits[exits['Ganancia_$'] < 0]['Ganancia_$'].sum())
                         pf = g_profit / g_loss if g_loss > 0 else 1.0
@@ -234,7 +242,6 @@ if not df.empty and len(df) > 5:
                         dd_arr = ((pd.Series(curva_test) - peak_arr) / peak_arr) * 100
                         max_dd = abs(dd_arr.min())
                         
-                        # LA ECUACIÓN DEL QUANT: Busca equilibrio entre ganancia, ratio y riesgo bajo
                         fitness = (net_profit * pf) / (max_dd + 1.0)
                         
                         if fitness > best_fitness and net_profit > 0:
@@ -243,11 +250,13 @@ if not df.empty and len(df) > 5:
             
             if best_params:
                 st.session_state.tp_pct, st.session_state.sl_pct = float(best_params['tp']), float(best_params['sl'])
-                st.session_state.whale_factor, st.session_state.radar_sens = float(best_params['whale']), float(best_params['radar'])
-                if "TRINITY" in estrategia_activa: st.session_state.reinvest_pct = float(best_params['reinvest'])
+                if "DEFCON" not in estrategia_activa:
+                    st.session_state.whale_factor, st.session_state.radar_sens = float(best_params['whale']), float(best_params['radar'])
+                if "TRINITY" in estrategia_activa: 
+                    st.session_state.reinvest_pct = float(best_params['reinvest'])
                 st.rerun()
             else:
-                st.sidebar.error("IA: El activo en este marco temporal es demasiado errático. No se encontró configuración segura.")
+                st.sidebar.error("IA: El mercado carece de condiciones robustas en este Time Frame.")
 
     # EJECUCIÓN DEL CEREBRO EN FRONT-END
     df = generar_senales(df, estrategia_activa, st.session_state.whale_factor, st.session_state.radar_sens, use_macro_shield, use_atr_shield)
