@@ -43,6 +43,16 @@ if not any([st.session_state.get(f'chk_b_{r}') for r in buy_rules]): st.session_
 if not any([st.session_state.get(f'chk_s_{r}') for r in sell_rules]): st.session_state['chk_s_Nuclear_Sell'] = True
 
 # --- 1. PANEL LATERAL ---
+css_spinner = """
+<style>
+.loader-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; pointer-events: none; background: transparent; }
+.rocket { font-size: 10rem; animation: spin 1s linear infinite; filter: drop-shadow(0 0 25px rgba(0, 255, 255, 0.9)); }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+</style>
+<div class="loader-container"><div class="rocket">🚀</div></div>
+"""
+ph_holograma = st.empty()
+
 logo_files = glob.glob("logo.*")
 if logo_files: st.sidebar.image(logo_files[0], use_container_width=True)
 else: st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL</h2>", unsafe_allow_html=True)
@@ -220,7 +230,6 @@ def generar_senales(df_sim, strat, w_factor, r_sens, macro_sh, atr_sh, def_buy=T
     df_sim['Early_Sell'] = (df_sim['RSI'] > 70) & df_sim['Vela_Roja']
     df_sim['Rebound_Buy'] = df_sim['RSI_Cross_Up'] & ~is_magenta
 
-    # ENRUTAMIENTO
     if strat == "TRINITY":
         df_sim['Signal_Buy'] = df_sim['Pink_Whale_Buy'] | df_sim['Lock_Bounce'] | df_sim['Lock_Break'] | df_sim['Defcon_Buy'] | df_sim['Therm_Bounce'] | df_sim['Therm_Vacuum']
         df_sim['Signal_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell'] | df_sim['Therm_Panic_Sell'] | df_sim['Lock_Reject'] | df_sim['Lock_Breakd']
@@ -291,9 +300,7 @@ def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
                 costo = ((cap_activo if is_trinity else cap_ini) - p_bruta) * com_pct
                 p_neta = p_bruta + costo
                 cap_activo -= p_neta
-                # SI PIERDE TODO EL CAPITAL, EL BOT MUERE
-                if cap_activo <= 0:
-                    cap_activo = 0.0
+                if cap_activo <= 0: cap_activo = 0.0
                 registro_trades.append({'Fecha': fechas_arr[i], 'Tipo': 'SL', 'Precio': sl_price, 'Ganancia_$': -p_neta})
                 en_pos, trade_cerrado = False, True
             elif sig_sell_arr[i]:
@@ -329,7 +336,7 @@ def ejecutar_simulacion(df_sim, strat, tp, sl, cap_ini, reinvest, com_pct):
             
     return curva_capital.tolist(), divs, cap_activo, registro_trades, en_pos
 
-# --- 4. RENDERIZADO DE PESTAÑAS ---
+# --- 4. RENDERIZADO DE PESTAÑAS BLINDADAS ---
 st.title("🛡️ Terminal Táctico Multipestaña")
 tab_tri, tab_jug, tab_def, tab_gen = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329", "🧬 GÉNESIS V320"])
 
@@ -379,7 +386,6 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     if i % 100 == 0:
                         progress_bar.progress(i / total_iters, text=f"🧬 Mutando ADN: Probando Universo {i}/{total_iters}...")
                     
-                    # Selección probabilística: Coger entre 1 y 4 lógicas al azar
                     b_sample = random.sample(buy_rules, random.randint(1, 4))
                     s_sample = random.sample(sell_rules, random.randint(1, 4))
                     
@@ -398,18 +404,17 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     
                     c_test, _, _, trds, _ = ejecutar_simulacion(df_test, "GENESIS", tp_test, sl_test, capital_inicial, 0, comision_pct)
                     
-                    # Evaluación Feroz Institucional
-                    if c_test[-1] > capital_inicial * 1.05: # MÍNIMO 5% de crecimiento
+                    if c_test[-1] > capital_inicial * 1.05: 
                         dft = pd.DataFrame(trds)
                         if not dft.empty:
                             exits = dft[dft['Tipo'].isin(['TP', 'SL', 'DYNAMIC_WIN', 'DYNAMIC_LOSS'])]
                             nt = len(exits)
-                            if nt >= 5: # Requiere consistencia
+                            if nt >= 5: 
                                 gp = exits[exits['Ganancia_$'] > 0]['Ganancia_$'].sum()
                                 gl = abs(exits[exits['Ganancia_$'] < 0]['Ganancia_$'].sum())
                                 pf = gp / gl if gl > 0 else 0.5
                                 
-                                if pf > 1.2: # Requiere Eficiencia Institucional
+                                if pf > 1.2: 
                                     np_val = c_test[-1] - capital_inicial
                                     pk = pd.Series(c_test).cummax()
                                     m_dd = abs((((pd.Series(c_test) - pk) / pk) * 100).min())
@@ -426,7 +431,6 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 progress_bar.progress(1.0, text="✅ Análisis Cuántico Completado.")
                 
                 if bp:
-                    # Sincronización Estricta de Keys y Sesiones
                     for k in buy_rules: st.session_state[f'chk_b_{k}'] = (k in bp['b'])
                     for k in sell_rules: st.session_state[f'chk_s_{k}'] = (k in bp['s'])
                     st.session_state['sld_gen_tp'] = float(bp['tp'])
@@ -577,6 +581,12 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         </div>
         """, unsafe_allow_html=True)
 
+        st.markdown("---")
+        horizonte, vida_util, riesgo = "Corto Plazo", "Recalibración en 3-5 días.", "⚠️ ALTO: Riesgo de Sobreoptimización."
+        if dias_analizados >= 180: horizonte, vida_util, riesgo = "Largo Plazo", "Sostenible indefinidamente.", "🛡️ BAJO: Estructura blindada."
+        elif dias_analizados >= 45: horizonte, vida_util, riesgo = "Medio Plazo", "Recalibración en 2-4 semanas.", "⚖️ MODERADO: Adaptado al ciclo actual."
+        st.info(f"**🧠 DICTAMEN IA:** Horizonte: **{horizonte}** | Esperanza de Vida: **{vida_util}** | Riesgo Técnico: **{riesgo}**")
+
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
         ht_clean = "F: %{x}<br>P: $%{y:,.4f}<extra></extra>"
 
@@ -620,8 +630,9 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         fig.update_yaxes(side="right", fixedrange=False, row=2, col=1)
         fig.update_xaxes(fixedrange=False, showspikes=True, spikecolor="cyan", spikesnap="cursor", spikemode="toaxis+across", spikethickness=1, spikedash="solid")
         
+        # KEY INYECTADO PARA QUE PLOTLY NO COLAPSE AL REFRESCAR PESTAÑAS
         fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan", legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01))
-        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True, 'modeBarButtonsToRemove': ['lasso2d', 'select2d']})
+        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True, 'modeBarButtonsToRemove': ['lasso2d', 'select2d']}, key=f"chart_{s_id}")
 
         st.markdown("### 🔎 Análisis Financiero por Ventana Dinámica")
         fecha_min, fecha_max = df_strat.index[0].date(), df_strat.index[-1].date()
