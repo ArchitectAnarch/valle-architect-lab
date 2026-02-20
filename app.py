@@ -64,7 +64,8 @@ if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=Tr
 
 st.sidebar.markdown("---")
 exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["coinbase", "binance", "kraken", "kucoin"], index=1)
-ticker = st.sidebar.text_input("Símbolo Exacto", value="HNT/USDT")
+# CORRECCIÓN DE SUMINISTRO: BTC/USDT POR DEFECTO
+ticker = st.sidebar.text_input("Símbolo Exacto", value="BTC/USDT")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
 
 intervalos = {"1 Minuto": "1min", "5 Minutos": "5min", "15 Minutos": "15min", "30 Minutos": "30min", "1 Hora": "1h", "4 Horas": "4h", "1 Día": "1D", "1 Semana": "1W"}
@@ -80,7 +81,7 @@ dias_analizados = max((end_date - start_date).days, 1)
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=13364.0, step=1000.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
-# --- 2. EXTRACCIÓN MAESTRA (SIN CUELLOS DE BOTELLA) ---
+# --- 2. EXTRACCIÓN MAESTRA ---
 @st.cache_data(ttl=120)
 def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
     try:
@@ -164,6 +165,10 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
         return pd.DataFrame()
 
 df_global = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
+
+# SISTEMA DE ALERTA DE SUMINISTRO API
+if df_global.empty:
+    st.error(f"🚨 ERROR DE SUMINISTRO API: El Exchange ({exchange_sel.upper()}) no encontró el par '{ticker}' o no hay datos en estas fechas. Recuerde: Binance usa USDT (Ej: BTC/USDT), Coinbase usa USD (Ej: BTC/USD).")
 
 # --- 3. MOTOR PRE-CÁLCULO TOPOLÓGICO ---
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
@@ -345,7 +350,6 @@ tab_tri, tab_jug, tab_def, tab_gen = st.tabs(["💠 TRINITY V357", "⚔️ JUGGE
 def renderizar_estrategia(strat_name, tab_obj, df_base):
     with tab_obj:
         if df_base.empty:
-            st.warning("Datos insuficientes.")
             return
 
         s_id = strat_name.split()[0]
@@ -410,9 +414,9 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     f_tp = np.where(is_bull, tp_bull, tp_bear)
                     f_sl = np.where(is_bull, sl_bull, sl_bear)
                     
-                    net, pf, nt, mdd = ejecutar_simulacion_fast_adaptive(h_a, l_a, c_a, o_a, f_buy, f_sell, f_tp, f_sl, capital_inicial, comision_pct)
+                    net, pf, nt, mdd = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, f_buy, f_sell, f_tp, f_sl, capital_inicial, comision_pct)
                     
-                    # LA ECUACIÓN DEL DEPREDADOR (Fitness)
+                    # LA ECUACIÓN DEL DEPREDADOR (Fitness Exponencial)
                     if nt > 0:
                         fit = (net * pf * np.sqrt(nt)) / (mdd + 1.0)
                     else:
@@ -427,7 +431,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                         }
                 
                 ph_holograma.empty()
-                if bp and bp['net'] > 0: # Solo si gana dinero
+                if bp and bp['net'] > 0: 
                     # 🔥 SOBREESCRIBIR LAS LLAVES DE LA INTERFAZ FÍSICA 🔥
                     for r in buy_rules:
                         st.session_state[f'ui_bull_b_{r}'] = (r in bp['b_bull'])
@@ -443,7 +447,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     
                     dna_str = f"🌌 QUANTUM DNA: Profit {bp['pf']:.2f}x | Net +${bp['net']:,.2f}\nBULL BUY: {bp['b_bull']}\nBULL SELL: {bp['s_bull']}\nBULL TP/SL: {st.session_state['ui_bull_tp']}% / {st.session_state['ui_bull_sl']}%\n---\nBEAR BUY: {bp['b_bear']}\nBEAR SELL: {bp['s_bear']}\nBEAR TP/SL: {st.session_state['ui_bear_tp']}% / {st.session_state['ui_bear_sl']}%"
                     st.session_state['winning_dna'] = dna_str
-                    st.rerun() # Dispara la magia visual
+                    st.rerun() 
                 else:
                     st.error("❌ El mercado está destruido. 2000 universos calculados y ninguno superó la comisión del Exchange. Cambie de moneda o temporalidad.")
 
@@ -471,7 +475,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             df_strat['Active_SL'] = np.where(df_strat['Macro_Bull'], st.session_state['ui_bull_sl'], st.session_state['ui_bear_sl'])
             
             # En Génesis, asumimos el 100% de reinversión para mostrar el potencial cuántico
-            eq_curve, divs, cap_act, t_log, pos_ab = simular_visual(df_strat, "GENESIS", capital_inicial, 100.0, comision_pct)
+            eq_curve, divs, cap_act, t_log, pos_ab = simular_visual(df_strat, capital_inicial, 100.0, comision_pct)
 
         # --- BLOQUES NORMALES (TRINITY/JUGG/DEFCON) ---
         else:
@@ -505,7 +509,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 df_strat['Signal_Buy'], df_strat['Signal_Sell'] = df_strat['Defcon_Buy'], df_strat['Defcon_Sell']
                 df_strat['Active_TP'], df_strat['Active_SL'] = st.session_state[f'sld_tp_{s_id}'], st.session_state[f'sld_sl_{s_id}']
                 
-            eq_curve, divs, cap_act, t_log, pos_ab = simular_visual(df_strat, s_id, capital_inicial, st.session_state.get(f'sld_reinv_{s_id}', 0.0), comision_pct)
+            eq_curve, divs, cap_act, t_log, pos_ab = simular_visual(df_strat, capital_inicial, st.session_state.get(f'sld_reinv_{s_id}', 0.0), comision_pct)
 
         # --- SECCIÓN COMÚN (MÉTRICAS Y GRÁFICO) ---
         df_strat['Total_Portfolio'] = eq_curve
