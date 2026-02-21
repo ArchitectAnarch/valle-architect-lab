@@ -51,8 +51,7 @@ if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=Tr
     gc.collect()
 
 st.sidebar.markdown("---")
-# 🔥 BINANCE POR DEFECTO: 100 VECES MÁS RÁPIDO QUE COINBASE PARA DESCARGAR DATOS
-st.sidebar.info("⚡ Use Binance para extraer el ADN rápido. Luego úselo en Coinbase dentro de TradingView.")
+st.sidebar.info("⚡ ARRANQUE SEGURO: Binance + BTC/USDT. Cámbielo a Coinbase y HNT/USD para extraer el ADN de Helium, pero use un 'Scope Histórico' menor (Ej: 365 días).")
 exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["binance", "coinbase", "kraken", "kucoin"], index=0)
 ticker = st.sidebar.text_input("Símbolo Exacto", value="BTC/USDT")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
@@ -65,19 +64,19 @@ intervalos = {
     "2 Horas": ("1h", "2h"), "4 Horas": ("4h", "4h"), 
     "1 Día": ("1d", "1D"), "1 Semana": ("1d", "1W")
 }
-intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=1) 
+intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=2) 
 iv_download, iv_resample = intervalos[intervalo_sel]
 
 hoy = datetime.today().date()
 limite_dias = 30 if iv_download == "1m" else 180 if iv_download == "5m" else 1500
-start_date, end_date = st.sidebar.slider(f"📅 Time Frame Global (Máx {limite_dias} días para no colapsar la RAM)", min_value=hoy - timedelta(days=limite_dias), max_value=hoy, value=(hoy - timedelta(days=min(60, limite_dias)), hoy), format="YYYY-MM-DD")
+start_date, end_date = st.sidebar.slider(f"📅 Scope Histórico (Máx {limite_dias} días para esta temp)", min_value=hoy - timedelta(days=limite_dias), max_value=hoy, value=(hoy - timedelta(days=min(60, limite_dias)), hoy), format="YYYY-MM-DD")
 dias_analizados = max((end_date - start_date).days, 1)
 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
 # --- 2. EXTRACCIÓN MAESTRA (WARP DRIVE) ---
-@st.cache_data(ttl=3600, show_spinner="📡 WARP DRIVE: Descargando y ensamblando miles de velas. Por favor espere unos segundos...")
+@st.cache_data(ttl=3600, show_spinner="📡 WARP DRIVE: Descargando y ensamblando miles de velas. Por favor espere...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -90,10 +89,10 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
             if not ohlcv: break
             all_ohlcv.extend(ohlcv)
             current_ts = ohlcv[-1][0] + 1
-            # 🔥 LÍMITE DE PROTECCIÓN RAM: 150,000 Velas (Suficiente para un Backtest HFT Letal)
             if len(all_ohlcv) > 150000: break
             
-        if not all_ohlcv: return pd.DataFrame()
+        if not all_ohlcv: return pd.DataFrame(), "El Exchange devolvió 0 velas. Símbolo incorrecto o fecha muy antigua."
+        
         df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
@@ -163,13 +162,13 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
                            np.where(~df['Macro_Bull'] & is_trend, 3, 4)))
             gc.collect()
 
-        return df
+        return df, "OK"
     except Exception as e: 
-        return pd.DataFrame()
+        return pd.DataFrame(), str(e)
 
-df_global = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
+df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
 if df_global.empty:
-    st.error(f"🚨 ERROR API: No hay datos suficientes o el par no existe. Use BINANCE y BTC/USDT para mayor velocidad y profundidad.")
+    st.error(f"🚨 ERROR API: No hay datos suficientes. Detalles del servidor CCXT: {status_api}. Use BINANCE y BTC/USDT para historial profundo, o acorte las fechas si usa altcoins recientes.")
 
 # --- 3. MOTOR PRE-CÁLCULO TOPOLÓGICO ---
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
@@ -374,7 +373,7 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
 
 # --- 4. TERMINAL RENDER ---
 st.title("🛡️ The Alpha Quant Terminal")
-tab_tri, tab_jug, tab_def, tab_gen = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329", "🌌 GÉNESIS V320 (ALPHA EXTR)"])
+tab_tri, tab_jug, tab_def, tab_gen = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329", "🌌 GÉNESIS V320 (RISK-ADJUSTED)"])
 
 def renderizar_estrategia(strat_name, tab_obj, df_base):
     with tab_obj:
@@ -400,10 +399,10 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     st.session_state[f'sld_rd_{s_id}'] = float(bp['rd'])
             st.session_state[f'update_pending_{s_id}'] = False
 
-        # --- MÓDULO GÉNESIS (MATRIX ARSENAL) ---
+        # --- MÓDULO GÉNESIS ---
         if s_id == "GENESIS":
-            st.markdown("### 🌌 Alpha Extractor (Anti Buy & Hold)")
-            st.info(f"Matriz analizando {dias_analizados} días reales. La IA DESTRUIRÁ cualquier ADN que gane menos dinero que simplemente 'Holdear' la moneda en este mismo periodo de tiempo.")
+            st.markdown("### 🌌 Risk-Adjusted Matrix")
+            st.info("La IA evaluará el Hold de la moneda. Si no puede ganarle en dólares brutos, le entregará la combinación que extraiga el mayor rendimiento con el menor riesgo (Drawdown) posible.")
             
             c_ia1, c_ia2 = st.columns([1, 3])
             st.session_state['gen_ado'] = c_ia1.slider("🎯 Target ADO (Trades/Día)", 0.0, 100.0, value=float(st.session_state.get('gen_ado', 5.0)), step=0.5, key="ui_gen_ado")
@@ -440,7 +439,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r4_sl")
 
             st.markdown("---")
-            if c_ia2.button("🚀 EXTRACCIÓN ALPHA (Forzar Superioridad al Mercado)", type="primary"):
+            if c_ia2.button("🚀 EXTRACCIÓN (Prioridad Riesgo/Beneficio)", type="primary"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
                 
                 df_p = inyectar_adn(df_base.copy(), 1.5, 2.5)
@@ -450,7 +449,6 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 b_mat = {r: df_p[r].values for r in buy_rules}
                 s_mat = {r: df_p[r].values for r in sell_rules}
                 
-                # CÁLCULO DE HOLD
                 buy_hold_ret = ((c_a[-1] - o_a[0]) / o_a[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
                 
@@ -460,249 +458,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 for _ in range(3000): 
                     dna_b = [random.sample(buy_rules, random.randint(1, 5)) for _ in range(4)]
                     dna_s = [random.sample(sell_rules, random.randint(1, 5)) for _ in range(4)]
-                    dna_tp = [random.uniform(2.0, 25.0) for _ in range(4)]
+                    dna_tp = [random.uniform(2.0, 30.0) for _ in range(4)]
                     dna_sl = [random.uniform(1.0, 6.0) for _ in range(4)]
                     
-                    f_buy, f_sell = np.zeros(len(df_p), dtype=bool), np.zeros(len(df_p), dtype=bool)
-                    f_tp, f_sl = np.zeros(len(df_p)), np.zeros(len(df_p))
-                    
-                    for idx in range(4):
-                        mask = (regime_arr == (idx + 1))
-                        
-                        r_b_cond = np.zeros(len(df_p), dtype=bool)
-                        for r in dna_b[idx]: r_b_cond |= b_mat[r]
-                        f_buy[mask] = r_b_cond[mask]
-                        
-                        r_s_cond = np.zeros(len(df_p), dtype=bool)
-                        for r in dna_s[idx]: r_s_cond |= s_mat[r]
-                        f_sell[mask] = r_s_cond[mask]
-                        
-                        f_tp[mask] = dna_tp[idx]
-                        f_sl[mask] = dna_sl[idx]
-                    
-                    net, pf, nt, mdd = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, f_buy, f_sell, f_tp, f_sl, capital_inicial, comision_pct)
-                    
-                    # EL ASESINO DE HOLD (ALPHA)
-                    alpha_money = net - buy_hold_money
-                    actual_ado = nt / dias_analizados if dias_analizados > 0 else 0
-                    target_ado = st.session_state.get('gen_ado', 0.0)
-                    
-                    ado_multiplier = 1.0
-                    if target_ado > 0:
-                        if actual_ado < target_ado: ado_multiplier = (actual_ado / target_ado) ** 3  
-                        
-                    # Filtro de Depredador: Supera el mercado en USD y hace operaciones mínimas
-                    if nt >= max(5, int(dias_analizados * (target_ado * 0.3))) and alpha_money > 0: 
-                        fit = ((alpha_money * pf * np.sqrt(nt)) / ((mdd ** 1.5) + 1.0)) * ado_multiplier
-                        if fit > best_fit:
-                            best_fit = fit
-                            bp = {
-                                'b1': dna_b[0], 's1': dna_s[0], 'tp1': dna_tp[0], 'sl1': dna_sl[0],
-                                'b2': dna_b[1], 's2': dna_s[1], 'tp2': dna_tp[1], 'sl2': dna_sl[1],
-                                'b3': dna_b[2], 's3': dna_s[2], 'tp3': dna_tp[2], 'sl3': dna_sl[2],
-                                'b4': dna_b[3], 's4': dna_s[3], 'tp4': dna_tp[3], 'sl4': dna_sl[3],
-                                'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money
-                            }
-                
-                ph_holograma.empty()
-                if bp: 
-                    st.session_state[f'update_pending_{s_id}'] = True
-                    st.session_state[f'pending_bp_{s_id}'] = bp
-                    dna_str = f"""🌌 THE MATRIX ARSENAL (V36.2 PINE SCRIPT)
-Net Profit: +${bp['net']:,.2f} | ALPHA: +${bp['alpha']:,.2f} | PF: {bp['pf']:.2f}x | Trades: {bp['nt']}
-
-// 🟢 QUAD 1: BULL TREND
-Compras = {bp['b1']}
-Cierres = {bp['s1']}
-TP = {bp['tp1']:.1f}% | SL = {bp['sl1']:.1f}%
-
-// 🟡 QUAD 2: BULL CHOP
-Compras = {bp['b2']}
-Cierres = {bp['s2']}
-TP = {bp['tp2']:.1f}% | SL = {bp['sl2']:.1f}%
-
-// 🔴 QUAD 3: BEAR TREND
-Compras = {bp['b3']}
-Cierres = {bp['s3']}
-TP = {bp['tp3']:.1f}% | SL = {bp['sl3']:.1f}%
-
-// 🟠 QUAD 4: BEAR CHOP
-Compras = {bp['b4']}
-Cierres = {bp['s4']}
-TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
-
-                    st.session_state['winning_dna'] = dna_str
-                    st.rerun() 
-                else:
-                    st.error(f"❌ La IA analizó 3000 universos. Ninguno logró ganarle a Holdear la moneda (+${buy_hold_money:,.2f}). Ajuste el ADO o pruebe otra moneda.")
-
-            if st.session_state.get('winning_dna') != "":
-                st.success("¡Alpha Histórico Extraído Exitosamente!")
-                st.code(st.session_state['winning_dna'], language="text")
-
-            df_strat = inyectar_adn(df_base.copy(), 1.5, 2.5)
-            f_buy, f_sell = np.zeros(len(df_strat), dtype=bool), np.zeros(len(df_strat), dtype=bool)
-            f_tp, f_sl = np.zeros(len(df_strat)), np.zeros(len(df_strat))
-            
-            for idx in range(1, 5):
-                mask = (df_strat['Regime'].values == idx)
-                r_b_cond = np.zeros(len(df_strat), dtype=bool)
-                for r in st.session_state.get(f'gen_r{idx}_b', []): r_b_cond |= df_strat[r].values
-                f_buy[mask] = r_b_cond[mask]
-                
-                r_s_cond = np.zeros(len(df_strat), dtype=bool)
-                for r in st.session_state.get(f'gen_r{idx}_s', []): r_s_cond |= df_strat[r].values
-                f_sell[mask] = r_s_cond[mask]
-                
-                f_tp[mask] = st.session_state.get(f'gen_r{idx}_tp', 5.0)
-                f_sl[mask] = st.session_state.get(f'gen_r{idx}_sl', 2.0)
-                
-            df_strat['Signal_Buy'] = f_buy
-            df_strat['Signal_Sell'] = f_sell
-            df_strat['Active_TP'] = f_tp
-            df_strat['Active_SL'] = f_sl
-            
-            # 100% de Interés Compuesto para mostrar el potencial
-            eq_curve, divs, cap_act, t_log, pos_ab = simular_visual(df_strat, capital_inicial, 100.0, comision_pct)
-
-        # --- BLOQUES NORMALES (TRINITY/JUGG/DEFCON) ---
-        else:
-            with st.form(f"form_{s_id}"):
-                c1, c2, c3, c4 = st.columns(4)
-                st.session_state[f'sld_tp_{s_id}'] = c1.slider(f"🎯 TP Base (%)", 0.5, 15.0, value=float(st.session_state.get(f'sld_tp_{s_id}', 3.0)), step=0.1)
-                st.session_state[f'sld_sl_{s_id}'] = c2.slider(f"🛑 SL (%)", 0.5, 10.0, value=float(st.session_state.get(f'sld_sl_{s_id}', 1.5)), step=0.1)
-                
-                mac_sh, atr_sh, d_buy, d_sell = True, True, True, True
-                if s_id == "TRINITY":
-                    st.session_state[f'sld_reinv_{s_id}'] = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'sld_reinv_{s_id}', 100.0)), step=5.0)
-                    st.session_state[f'sld_wh_{s_id}'] = c4.slider("🐋 Factor Ballena", 1.0, 5.0, value=float(st.session_state.get(f'sld_wh_{s_id}', 2.5)), step=0.1)
-                elif s_id == "JUGGERNAUT":
-                    st.session_state[f'sld_reinv_{s_id}'] = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'sld_reinv_{s_id}', 100.0)), step=5.0)
-                    st.session_state[f'sld_wh_{s_id}'] = c4.slider("🐋 Factor", 1.0, 5.0, value=float(st.session_state.get(f'sld_wh_{s_id}', 2.5)), step=0.1)
-                else:
-                    st.session_state[f'sld_reinv_{s_id}'] = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'sld_reinv_{s_id}', 100.0)), step=5.0)
-                    d_buy = st.checkbox("Squeeze Up", value=True)
-                    
-                if st.form_submit_button("⚡ Aplicar"): st.rerun()
-
-            c_ia1, c_ia2 = st.columns([1, 3])
-            st.session_state[f'ado_{s_id}'] = c_ia1.slider(f"🎯 Target ADO ({s_id})", 0.0, 100.0, value=float(st.session_state.get(f'ado_{s_id}', 0.0)), step=0.5)
-            
-            if c_ia2.button(f"🌌 RECOCIDO CUÁNTICO ({s_id})", use_container_width=True):
-                ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
-                best_fit = -999999
-                bp = {}
-                
-                df_precalc = inyectar_adn(df_base.copy(), 1.5, st.session_state.get(f'sld_wh_{s_id}', 2.5))
-                if s_id == "TRINITY":
-                    b_cond = df_precalc['Pink_Whale_Buy'] | df_precalc['Lock_Bounce'] | df_precalc['Defcon_Buy']
-                    s_cond = df_precalc['Defcon_Sell'] | df_precalc['Therm_Wall_Sell']
-                elif s_id == "JUGGERNAUT":
-                    b_cond = df_precalc['Pink_Whale_Buy'] | ((df_precalc['Lock_Bounce'] | df_precalc['Defcon_Buy']) & df_precalc['Macro_Bull'])
-                    s_cond = df_precalc['Defcon_Sell'] | df_precalc['Therm_Wall_Sell']
-                else:
-                    b_cond, s_cond = df_precalc['Defcon_Buy'], df_precalc['Defcon_Sell']
-
-                h_arr, l_arr, c_arr, o_arr = df_precalc['High'].values, df_precalc['Low'].values, df_precalc['Close'].values, df_precalc['Open'].values
-                b_c, s_c = b_cond.values, s_cond.values
-                
-                for _ in range(1000): 
-                    rtp = round(random.uniform(1.2, 8.0), 1)
-                    rsl = round(random.uniform(0.5, 3.5), 1)
-                    rrv = round(random.uniform(20, 100), -1) if s_id == "TRINITY" else 100.0
-                    rwh = round(random.uniform(1.5, 3.5), 1) if s_id != "DEFCON" else 2.5
-                    rrd = round(random.uniform(0.5, 3.0), 1) if s_id != "DEFCON" else 1.5
-                    
-                    t_arr, sl_arr = np.full(len(df_precalc), rtp), np.full(len(df_precalc), rsl)
-                    net, pf, nt, mdd = simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr, sl_arr, capital_inicial, comision_pct)
-                    
-                    actual_ado = nt / dias_analizados if dias_analizados > 0 else 0
-                    target_ado = st.session_state.get(f'ado_{s_id}', 0.0)
-                    ado_multiplier = 1.0
-                    if target_ado > 0 and actual_ado < target_ado: ado_multiplier = (actual_ado / target_ado) ** 2  
-
-                    if nt > 0 and net > 0:
-                        fit = ((net * pf * np.sqrt(nt)) / ((mdd**1.5) + 1.0)) * ado_multiplier
-                        if fit > best_fit:
-                            best_fit, bp = fit, {'tp':rtp, 'sl':rsl, 'reinv':rrv, 'wh':rwh, 'rd':rrd}
-                
-                ph_holograma.empty()
-                if bp:
-                    st.session_state[f'update_pending_{s_id}'] = True
-                    st.session_state[f'pending_bp_{s_id}'] = bp
-                    st.rerun()
-                else: st.error("❌ El mercado carece de fractalidad operable.")
-            
-            df_strat = inyectar_adn(df_base.copy(), st.session_state.get(f'sld_rd_{s_id}', 1.5), st.session_state.get(f'sld_wh_{s_id}', 2.5))
-            if s_id == "TRINITY":
-                df_strat['Signal_Buy'] = df_strat['Pink_Whale_Buy'] | df_strat['Lock_Bounce'] | df_strat['Defcon_Buy']
-                df_strat['Signal_Sell'] = df_strat['Defcon_Sell'] | df_strat['Therm_Wall_Sell']
-                df_strat['Active_TP'], df_strat['Active_SL'] = st.session_state[f'sld_tp_{s_id}'], st.session_state[f'sld_sl_{s_id}']
-            elif s_id == "JUGGERNAUT":
-                macro_safe = df_strat['Macro_Bull'] if mac_sh else True
-                atr_safe = ~(df_strat['Cuerpo_Vela'].shift(1).fillna(0) > (df_strat['ATR'].shift(1).fillna(0.001) * 1.5)) if atr_sh else True
-                df_strat['Signal_Buy'] = df_strat['Pink_Whale_Buy'] | ((df_strat['Lock_Bounce'] | df_strat['Defcon_Buy']) & macro_safe & atr_safe)
-                df_strat['Signal_Sell'] = df_strat['Defcon_Sell'] | df_strat['Therm_Wall_Sell']
-                df_strat['Active_TP'], df_strat['Active_SL'] = st.session_state[f'sld_tp_{s_id}'], st.session_state[f'sld_sl_{s_id}']
-            else:
-                df_strat['Signal_Buy'] = df_strat['Defcon_Buy'] if d_buy else False
-                df_strat['Signal_Sell'] = df_strat['Defcon_Sell'] if d_sell else False
-                df_strat['Active_TP'], df_strat['Active_SL'] = st.session_state[f'sld_tp_{s_id}'], st.session_state[f'sld_sl_{s_id}']
-                
-            eq_curve, divs, cap_act, t_log, pos_ab = simular_visual(df_strat, capital_inicial, st.session_state.get(f'sld_reinv_{s_id}', 100.0), comision_pct)
-
-        # --- SECCIÓN COMÚN (MÉTRICAS Y GRÁFICO TRANSPARENTE) ---
-        df_strat['Total_Portfolio'] = eq_curve
-        ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
-
-        buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
-        alpha_pct = ret_pct - buy_hold_ret
-
-        dftr = pd.DataFrame(t_log)
-        tt, wr, pf_val, ado_act = 0, 0.0, 0.0, 0.0
-        if not dftr.empty:
-            exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
-            tt = len(exs)
-            ado_act = tt / dias_analizados if dias_analizados > 0 else 0
-            if tt > 0:
-                ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
-                wr = (ws / tt) * 100
-                gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum()
-                gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
-                pf_val = gpp / gll if gll > 0 else float('inf')
-        
-        mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
-
-        st.markdown(f"### 📊 Auditoría: {s_id}")
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
-        c1.metric("Portafolio Neto", f"${eq_curve[-1]:,.2f}", f"{ret_pct:.2f}%")
-        
-        c2.metric("ALPHA (vs Hold)", f"{alpha_pct:.2f}%", f"Hold: {buy_hold_ret:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
-        
-        c3.metric("Win Rate", f"{wr:.1f}%")
-        c4.metric("Profit Factor", f"{pf_val:.2f}x")
-        c5.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
-        c6.metric("ADO ⚡", f"{ado_act:.2f}")
-
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
-        fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200', line=dict(color='orange', width=2)), row=1, col=1)
-
-        if not dftr.empty:
-            ents = dftr[dftr['Tipo'] == 'ENTRY']
-            fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white')), hovertemplate="COMPRA<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
-            wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
-            fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white')), text=wins['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
-            loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
-            fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white')), text=loss['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
-
-        fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
-
-        fig.update_yaxes(side="right")
-        fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan")
-        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True}, key=f"chart_{s_id}")
-
-renderizar_estrategia("TRINITY V357", tab_tri, df_global)
-renderizar_estrategia("JUGGERNAUT V356", tab_jug, df_global)
-renderizar_estrategia("DEFCON V329", tab_def, df_global)
-renderizar_estrategia("GENESIS V320", tab_gen, df_global)
+                    f_buy, f_sell = np.zeros(len(df_p),
