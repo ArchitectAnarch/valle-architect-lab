@@ -25,7 +25,7 @@ for r_idx in range(1, 5):
     if f'gen_r{r_idx}_sl' not in st.session_state: st.session_state[f'gen_r{r_idx}_sl'] = 2.0
 
 if 'gen_ado' not in st.session_state: st.session_state['gen_ado'] = 5.0  
-if 'gen_reinv' not in st.session_state: st.session_state['gen_reinv'] = 50.0  
+if 'gen_reinv' not in st.session_state: st.session_state['gen_reinv'] = 100.0  
 if 'winning_dna' not in st.session_state: st.session_state['winning_dna'] = ""
 
 for s in ["TRINITY", "JUGGERNAUT", "DEFCON"]:
@@ -33,7 +33,7 @@ for s in ["TRINITY", "JUGGERNAUT", "DEFCON"]:
     if f'sld_sl_{s}' not in st.session_state: st.session_state[f'sld_sl_{s}'] = 1.5
     if f'sld_wh_{s}' not in st.session_state: st.session_state[f'sld_wh_{s}'] = 2.5
     if f'sld_rd_{s}' not in st.session_state: st.session_state[f'sld_rd_{s}'] = 1.5
-    if f'sld_reinv_{s}' not in st.session_state: st.session_state[f'sld_reinv_{s}'] = 50.0
+    if f'sld_reinv_{s}' not in st.session_state: st.session_state[f'sld_reinv_{s}'] = 100.0
 
 # --- 1. PANEL LATERAL ---
 css_spinner = """
@@ -52,9 +52,8 @@ if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=Tr
     gc.collect()
 
 st.sidebar.markdown("---")
-st.sidebar.info("⚡ Nota: Use 30 Minutos o 1 Hora para viajar a 2022 o 2023 en las APIs públicas.")
-exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["kraken", "kucoin", "binance", "coinbase"], index=0)
-ticker = st.sidebar.text_input("Símbolo Exacto", value="BTC/USD")
+exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["kucoin", "kraken", "binance", "coinbase"], index=0)
+ticker = st.sidebar.text_input("Símbolo Exacto", value="BTC/USDT")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
 
 intervalos = {
@@ -70,14 +69,13 @@ iv_download, iv_resample = intervalos[intervalo_sel]
 
 hoy = datetime.today().date()
 limite_dias = 30 if iv_download == "1m" else 180 if iv_download == "5m" else 1500
-start_date, end_date = st.sidebar.slider(f"📅 Scope Histórico (Máx {limite_dias} días para esta temp)", min_value=hoy - timedelta(days=limite_dias), max_value=hoy, value=(hoy - timedelta(days=min(365, limite_dias)), hoy), format="YYYY-MM-DD")
-dias_analizados = max((end_date - start_date).days, 1)
+start_date, end_date = st.sidebar.slider(f"📅 Scope Solicitado", min_value=hoy - timedelta(days=limite_dias), max_value=hoy, value=(hoy - timedelta(days=min(365, limite_dias)), hoy), format="YYYY-MM-DD")
 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
-# --- 2. EXTRACCIÓN MAESTRA (WARP DRIVE GEO-BYPASS) ---
-@st.cache_data(ttl=3600, show_spinner="📡 WARP DRIVE: Descargando y ensamblando miles de velas. Por favor espere...")
+# --- 2. EXTRACCIÓN MAESTRA ---
+@st.cache_data(ttl=3600, show_spinner="📡 WARP DRIVE: Descargando y ensamblando. Por favor espere...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -92,7 +90,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
             current_ts = ohlcv[-1][0] + 1
             if len(all_ohlcv) > 150000: break
             
-        if not all_ohlcv: return pd.DataFrame(), "El Exchange devolvió 0 velas. Símbolo incorrecto o límite temporal alcanzado."
+        if not all_ohlcv: return pd.DataFrame(), "El Exchange devolvió 0 velas."
         
         df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
@@ -109,19 +107,19 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
             df['RVol'] = df['Volume'] / df['Vol_MA_100'].replace(0, 1)
             
             high_low = df['High'] - df['Low']
-            high_close = np.abs(df['High'] - df['Close'].shift())
-            low_close = np.abs(df['Low'] - df['Close'].shift())
             tr = df[['High', 'Low']].max(axis=1) - df[['High', 'Low']].min(axis=1)
             df['ATR'] = tr.ewm(alpha=1/14, min_periods=1, adjust=False).mean().fillna(high_low).replace(0, 0.001)
             
             df['RSI'] = ta.rsi(df['Close'], length=14).fillna(50.0)
             df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
 
-            df['KC_Upper'] = df['EMA_200'] + (df['ATR'] * 1.5)
-            df['KC_Lower'] = df['EMA_200'] - (df['ATR'] * 1.5)
+            # 🔥 RESTAURACIÓN KELTNER IDÉNTICO A TRADINGVIEW (SMA 20)
+            kc_basis = df['Close'].rolling(20, min_periods=1).mean()
+            df['KC_Upper'] = kc_basis + (df['ATR'] * 1.5)
+            df['KC_Lower'] = kc_basis - (df['ATR'] * 1.5)
             
             basis = df['Close'].rolling(20, min_periods=1).mean()
-            dev = df['Close'].rolling(20, min_periods=1).std().replace(0, 1)
+            dev = df['Close'].rolling(20, min_periods=1).std(ddof=0).replace(0, 1) # ddof=0 equals TV population stdev
             df['BBU'] = basis + (2.0 * dev)
             df['BBL'] = basis - (2.0 * dev)
 
@@ -169,7 +167,12 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
 
 df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
 
-if df_global.empty:
+# 🔥 EL CÁLCULO DE LA REALIDAD: Ignoramos el Slider, medimos los días reales descargados
+if not df_global.empty:
+    dias_reales = max((df_global.index[-1] - df_global.index[0]).days, 1)
+    st.sidebar.success(f"📥 API Realidad: {len(df_global)} velas descargadas ({dias_reales} días de historia).")
+else:
+    dias_reales = 1
     st.error(f"🚨 ERROR API: {status_api}")
 
 # --- 3. MOTOR PRE-CÁLCULO TOPOLÓGICO ---
@@ -228,7 +231,7 @@ def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     
     return df_sim
 
-# --- NÚCLEO FÍSICO C++ (INTEGRACIÓN DE SALARIOS Y DIVIDENDOS) ---
+# --- NÚCLEO FÍSICO C++ CÁLCULO DE INTERÉS COMPUESTO ---
 def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr, sl_arr, cap_ini, com_pct, reinvest_pct):
     cap_act = cap_ini
     divs = 0.0
@@ -245,14 +248,11 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
                 gross = pos_size * (1 - sl_act/100)
                 net = gross * (1 - com_pct)
                 profit = net - invest_amt
-                
                 if profit > 0:
                     reinv = profit * (reinvest_pct / 100.0)
                     divs += (profit - reinv)
                     cap_act += reinv
-                else:
-                    cap_act += profit
-                    
+                else: cap_act += profit
                 g_loss += abs(profit)
                 num_trades += 1
                 en_pos = False
@@ -261,14 +261,11 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
                 gross = pos_size * (1 + tp_act/100)
                 net = gross * (1 - com_pct)
                 profit = net - invest_amt
-                
                 if profit > 0:
                     reinv = profit * (reinvest_pct / 100.0)
                     divs += (profit - reinv)
                     cap_act += reinv
-                else:
-                    cap_act += profit
-                    
+                else: cap_act += profit
                 if profit > 0: g_profit += profit 
                 else: g_loss += abs(profit)
                 num_trades += 1
@@ -279,20 +276,16 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
                 gross = pos_size * (1 + ret)
                 net = gross * (1 - com_pct)
                 profit = net - invest_amt
-                
                 if profit > 0:
                     reinv = profit * (reinvest_pct / 100.0)
                     divs += (profit - reinv)
                     cap_act += reinv
-                else:
-                    cap_act += profit
-                    
+                else: cap_act += profit
                 if profit > 0: g_profit += profit 
                 else: g_loss += abs(profit)
                 num_trades += 1
                 en_pos = False
                 
-            # MAX DRAWDOWN BASADO EN EQUIDAD TOTAL (Cap Activo + Salario Guardado)
             total_equity = cap_act + divs
             if total_equity > peak: peak = total_equity
             if peak > 0:
@@ -302,7 +295,7 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
             
         if not en_pos and b_c[i] and i+1 < len(h_arr):
             invest_amt = cap_act if reinvest_pct == 100 else cap_ini
-            if invest_amt > cap_act: invest_amt = cap_act # Safe lock
+            if invest_amt > cap_act: invest_amt = cap_act 
             pos_size = invest_amt * (1 - com_pct) 
             p_ent = o_arr[i+1]
             tp_act = t_arr[i]
@@ -340,14 +333,11 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
                 gross = pos_size * (1 - sl_act/100)
                 net = gross * (1 - com_pct)
                 profit = net - invest_amt
-                
                 if profit > 0:
                     reinv_amt = profit * (reinvest/100)
                     divs += (profit - reinv_amt)
                     cap_act += reinv_amt
-                else:
-                    cap_act += profit
-                    
+                else: cap_act += profit
                 if cap_act <= 0: cap_act = 0
                 registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'SL', 'Precio': sl_p, 'Ganancia_$': profit})
                 en_pos, cierra = False, True
@@ -356,14 +346,11 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
                 gross = pos_size * (1 + tp_act/100)
                 net = gross * (1 - com_pct)
                 profit = net - invest_amt
-                
                 if profit > 0:
                     reinv_amt = profit * (reinvest/100)
                     divs += (profit - reinv_amt)
                     cap_act += reinv_amt
-                else:
-                    cap_act += profit
-                    
+                else: cap_act += profit
                 registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'TP', 'Precio': tp_p, 'Ganancia_$': profit})
                 en_pos, cierra = False, True
                 
@@ -372,14 +359,11 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
                 gross = pos_size * (1 + ret)
                 net = gross * (1 - com_pct)
                 profit = net - invest_amt
-                
                 if profit > 0:
                     reinv_amt = profit * (reinvest/100)
                     divs += (profit - reinv_amt)
                     cap_act += reinv_amt
-                else:
-                    cap_act += profit
-                    
+                else: cap_act += profit
                 if cap_act <= 0: cap_act = 0
                 registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'DYN_WIN' if profit>0 else 'DYN_LOSS', 'Precio': c_arr[i], 'Ganancia_$': profit})
                 en_pos, cierra = False, True
@@ -404,7 +388,7 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
 
 # --- 4. TERMINAL RENDER ---
 st.title("🛡️ The Alpha Quant Terminal")
-tab_tri, tab_jug, tab_def, tab_gen = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329", "🌌 GÉNESIS V320 (SNIPER EXTR)"])
+tab_tri, tab_jug, tab_def, tab_gen = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329", "🌌 GÉNESIS V320"])
 
 def renderizar_estrategia(strat_name, tab_obj, df_base):
     with tab_obj:
@@ -430,16 +414,14 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     st.session_state[f'sld_rd_{s_id}'] = float(bp['rd'])
             st.session_state[f'update_pending_{s_id}'] = False
 
-        # --- MÓDULO GÉNESIS (SNIPER) ---
+        # --- MÓDULO GÉNESIS ---
         if s_id == "GENESIS":
-            st.markdown("### 🌌 The Sniper Matrix (Anti-Comisiones)")
-            st.info("La IA ahora está forzada a usar máximo 2 gatillos por cuadrante. Esto evita que opere en exceso y se desangre en comisiones. Controle el Salario (Reinversión) para ajustar el riesgo.")
+            st.markdown("### 🌌 The Real-World Matrix")
+            st.info("El algoritmo ahora sabe exactamente cuántos días de historia tiene la gráfica. Extraerá el ADN ajustado a la realidad del Exchange.")
             
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state['gen_ado'] = c_ia1.slider("🎯 Target ADO (Trades/Día)", 0.0, 100.0, value=float(st.session_state.get('gen_ado', 5.0)), step=0.5, key="ui_gen_ado")
-            
-            # 🔥 NUEVO CONTROL DE SALARIO / DIVIDENDO EN GENESIS
-            st.session_state['gen_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get('gen_reinv', 50.0)), step=5.0, key="ui_gen_reinv")
+            st.session_state['gen_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get('gen_reinv', 100.0)), step=5.0, key="ui_gen_reinv")
 
             st.markdown("---")
             c1, c2, c3, c4 = st.columns(4)
@@ -473,7 +455,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r4_sl")
 
             st.markdown("---")
-            if c_ia3.button("🚀 EXTRACCIÓN SNIPER (Evitar Desangre)", type="primary"):
+            if c_ia3.button("🚀 EXTRAER ADN (Realidad Sincronizada)", type="primary"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
                 
                 df_p = inyectar_adn(df_base.copy(), 1.5, 2.5)
@@ -488,15 +470,15 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 
                 best_fit = -float('inf')
                 bp = None
-                
-                reinv_q = st.session_state.get('gen_reinv', 50.0)
+                reinv_q = st.session_state.get('gen_reinv', 100.0)
+                target_ado = st.session_state.get('gen_ado', 0.0)
                 
                 for _ in range(3000): 
-                    # 🔥 LÓGICA SNIPER: Máximo 2 combinaciones, jamás sobreopera.
-                    dna_b = [random.sample(buy_rules, random.randint(1, 2)) for _ in range(4)]
-                    dna_s = [random.sample(sell_rules, random.randint(1, 2)) for _ in range(4)]
+                    # Puede elegir de 1 a 4 gatillos. Tiene libertad si el mercado lo exige.
+                    dna_b = [random.sample(buy_rules, random.randint(1, 4)) for _ in range(4)]
+                    dna_s = [random.sample(sell_rules, random.randint(1, 4)) for _ in range(4)]
                     dna_tp = [random.uniform(2.0, 30.0) for _ in range(4)]
-                    dna_sl = [random.uniform(1.0, 6.0) for _ in range(4)]
+                    dna_sl = [random.uniform(1.0, 8.0) for _ in range(4)]
                     
                     f_buy, f_sell = np.zeros(len(df_p), dtype=bool), np.zeros(len(df_p), dtype=bool)
                     f_tp, f_sl = np.zeros(len(df_p)), np.zeros(len(df_p))
@@ -515,21 +497,21 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                         f_tp[mask] = dna_tp[idx]
                         f_sl[mask] = dna_sl[idx]
                     
-                    # 🔥 Pasa el salario/reinversión real al evaluador
                     net, pf, nt, mdd = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, f_buy, f_sell, f_tp, f_sl, capital_inicial, comision_pct, reinv_q)
                     
-                    alpha_money = net - buy_hold_money
-                    actual_ado = nt / dias_analizados if dias_analizados > 0 else 0
-                    target_ado = st.session_state.get('gen_ado', 0.0)
-                    
+                    # 🔥 CÁLCULO DE ADO BASADO EN DÍAS REALES DESCARGADOS
+                    actual_ado = nt / dias_reales if dias_reales > 0 else 0
                     ado_multiplier = 1.0
                     if target_ado > 0:
                         if actual_ado < target_ado: ado_multiplier = (actual_ado / target_ado) ** 2
                         
-                    if nt >= max(5, int(dias_analizados * (target_ado * 0.2))) and net > 0: 
-                        
+                    # Target mínimo flexibilizado a la realidad del dataset
+                    target_min_trades = max(3, int(dias_reales * (target_ado * 0.1)))
+                    
+                    if nt >= target_min_trades and net > 0: 
                         fit = ((net * (pf**2) * np.sqrt(nt)) / ((mdd ** 1.5) + 1.0)) * ado_multiplier
                         
+                        alpha_money = net - buy_hold_money
                         if alpha_money > 0:
                             fit *= 2.0 
                             
@@ -547,10 +529,9 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 if bp: 
                     st.session_state[f'update_pending_{s_id}'] = True
                     st.session_state[f'pending_bp_{s_id}'] = bp
-                    
                     status_msg = f"🏆 SUPERÓ AL HOLD POR +${bp['alpha']:,.2f}" if bp['alpha'] > 0 else f"🛡️ RIESGO CONTROLADO. Hold = +${buy_hold_money:,.2f} | Bot = +${bp['net']:,.2f} (Max DD: {bp['mdd']:.2f}%)"
                     
-                    dna_str = f"""🌌 THE SNIPER MATRIX
+                    dna_str = f"""🌌 THE REALITY MATRIX
 Net Profit: +${bp['net']:,.2f} | PF: {bp['pf']:.2f}x | Trades: {bp['nt']}
 {status_msg}
 
@@ -577,10 +558,10 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
                     st.session_state['winning_dna'] = dna_str
                     st.rerun() 
                 else:
-                    st.error(f"❌ La IA analizó 3000 universos. Ninguno logró producir ganancias. O baje el ADO, o baje el nivel de Reinversión para sacar salario.")
+                    st.error(f"❌ La IA analizó 3000 universos sobre {dias_reales} días de historia real. Ninguno produjo ganancias netas tras comisiones.")
 
             if st.session_state.get('winning_dna') != "":
-                st.success("¡ADN Sniper Extraído Exitosamente!")
+                st.success("¡ADN Extraído Exitosamente!")
                 st.code(st.session_state['winning_dna'], language="text")
 
             df_strat = inyectar_adn(df_base.copy(), 1.5, 2.5)
@@ -605,7 +586,7 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
             df_strat['Active_TP'] = f_tp
             df_strat['Active_SL'] = f_sl
             
-            eq_curve, divs, cap_act, t_log, pos_ab = simular_visual(df_strat, capital_inicial, st.session_state.get('gen_reinv', 50.0), comision_pct)
+            eq_curve, divs, cap_act, t_log, pos_ab = simular_visual(df_strat, capital_inicial, st.session_state.get('gen_reinv', 100.0), comision_pct)
 
         # --- BLOQUES NORMALES (TRINITY/JUGG/DEFCON) ---
         else:
@@ -616,14 +597,14 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
                 
                 mac_sh, atr_sh, d_buy, d_sell = True, True, True, True
                 if s_id == "TRINITY":
-                    st.session_state[f'sld_reinv_{s_id}'] = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'sld_reinv_{s_id}', 50.0)), step=5.0)
+                    st.session_state[f'sld_reinv_{s_id}'] = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'sld_reinv_{s_id}', 100.0)), step=5.0)
                     st.session_state[f'sld_wh_{s_id}'] = c4.slider("🐋 Factor Ballena", 1.0, 5.0, value=float(st.session_state.get(f'sld_wh_{s_id}', 2.5)), step=0.1)
                 elif s_id == "JUGGERNAUT":
-                    st.session_state[f'sld_reinv_{s_id}'] = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'sld_reinv_{s_id}', 50.0)), step=5.0)
+                    st.session_state[f'sld_reinv_{s_id}'] = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'sld_reinv_{s_id}', 100.0)), step=5.0)
                     st.session_state[f'sld_wh_{s_id}'] = c4.slider("🐋 Factor", 1.0, 5.0, value=float(st.session_state.get(f'sld_wh_{s_id}', 2.5)), step=0.1)
                     mac_sh = st.checkbox("Bloqueo Macro (EMA)", value=True)
                 else:
-                    st.session_state[f'sld_reinv_{s_id}'] = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'sld_reinv_{s_id}', 50.0)), step=5.0)
+                    st.session_state[f'sld_reinv_{s_id}'] = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'sld_reinv_{s_id}', 100.0)), step=5.0)
                     d_buy = st.checkbox("Squeeze Up", value=True)
                     
                 if st.form_submit_button("⚡ Aplicar"): st.rerun()
@@ -648,7 +629,7 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
 
                 h_arr, l_arr, c_arr, o_arr = df_precalc['High'].values, df_precalc['Low'].values, df_precalc['Close'].values, df_precalc['Open'].values
                 b_c, s_c = b_cond.values, s_cond.values
-                reinv_q = st.session_state.get(f'sld_reinv_{s_id}', 50.0)
+                reinv_q = st.session_state.get(f'sld_reinv_{s_id}', 100.0)
                 
                 for _ in range(1000): 
                     rtp = round(random.uniform(1.2, 8.0), 1)
@@ -659,7 +640,7 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
                     t_arr, sl_arr = np.full(len(df_precalc), rtp), np.full(len(df_precalc), rsl)
                     net, pf, nt, mdd = simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr, sl_arr, capital_inicial, comision_pct, reinv_q)
                     
-                    actual_ado = nt / dias_analizados if dias_analizados > 0 else 0
+                    actual_ado = nt / dias_reales if dias_reales > 0 else 0
                     target_ado = st.session_state.get(f'ado_{s_id}', 0.0)
                     ado_multiplier = 1.0
                     if target_ado > 0 and actual_ado < target_ado: ado_multiplier = (actual_ado / target_ado) ** 2  
@@ -674,7 +655,7 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
                     st.session_state[f'update_pending_{s_id}'] = True
                     st.session_state[f'pending_bp_{s_id}'] = bp
                     st.rerun()
-                else: st.error("❌ El mercado carece de fractalidad operable para esta estrategia.")
+                else: st.error("❌ El mercado carece de fractalidad operable.")
             
             df_strat = inyectar_adn(df_base.copy(), st.session_state.get(f'sld_rd_{s_id}', 1.5), st.session_state.get(f'sld_wh_{s_id}', 2.5))
             if s_id == "TRINITY":
@@ -692,7 +673,7 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
                 df_strat['Signal_Sell'] = df_strat['Defcon_Sell'] if d_sell else False
                 df_strat['Active_TP'], df_strat['Active_SL'] = st.session_state[f'sld_tp_{s_id}'], st.session_state[f'sld_sl_{s_id}']
                 
-            eq_curve, divs, cap_act, t_log, pos_ab = simular_visual(df_strat, capital_inicial, st.session_state.get(f'sld_reinv_{s_id}', 50.0), comision_pct)
+            eq_curve, divs, cap_act, t_log, pos_ab = simular_visual(df_strat, capital_inicial, st.session_state.get(f'sld_reinv_{s_id}', 100.0), comision_pct)
 
         # --- SECCIÓN COMÚN (MÉTRICAS Y GRÁFICO TRANSPARENTE) ---
         df_strat['Total_Portfolio'] = eq_curve
@@ -706,7 +687,7 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
         if not dftr.empty:
             exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
             tt = len(exs)
-            ado_act = tt / dias_analizados if dias_analizados > 0 else 0
+            ado_act = tt / dias_reales if dias_reales > 0 else 0
             if tt > 0:
                 ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
                 wr = (ws / tt) * 100
@@ -717,15 +698,16 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
         mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
 
         st.markdown(f"### 📊 Auditoría: {s_id}")
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
         c1.metric("Portafolio Neto", f"${eq_curve[-1]:,.2f}", f"{ret_pct:.2f}%")
-        
         c2.metric("ALPHA (vs Hold)", f"{alpha_pct:.2f}%", f"Hold: {buy_hold_ret:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
         
-        c3.metric("Win Rate", f"{wr:.1f}%")
-        c4.metric("Profit Factor", f"{pf_val:.2f}x")
-        c5.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
-        c6.metric("ADO ⚡", f"{ado_act:.2f}")
+        # 🔥 EL NUEVO CONTADOR DE TRADES
+        c3.metric("Trades Totales", f"{tt}")
+        c4.metric("Win Rate", f"{wr:.1f}%")
+        c5.metric("Profit Factor", f"{pf_val:.2f}x")
+        c6.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
+        c7.metric("ADO ⚡", f"{ado_act:.2f}")
 
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
         fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
