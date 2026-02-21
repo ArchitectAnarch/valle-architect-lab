@@ -51,8 +51,9 @@ if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=Tr
     gc.collect()
 
 st.sidebar.markdown("---")
-st.sidebar.info("⚡ ARRANQUE SEGURO: Binance + BTC/USDT. Cámbielo a Coinbase y HNT/USD para extraer el ADN de Helium, pero use un 'Scope Histórico' menor (Ej: 365 días).")
-exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["binance", "coinbase", "kraken", "kucoin"], index=0)
+# 🔥 KUCOIN POR DEFECTO: Bypassea el Error 451 de Binance y descarga a máxima velocidad.
+st.sidebar.info("⚡ GEO-BYPASS ACTIVO: Usando KuCoin (BTC/USDT) para evitar bloqueos geográficos de servidores de USA.")
+exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["kucoin", "kraken", "binanceus", "binance", "coinbase"], index=0)
 ticker = st.sidebar.text_input("Símbolo Exacto", value="BTC/USDT")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
 
@@ -75,7 +76,7 @@ dias_analizados = max((end_date - start_date).days, 1)
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
-# --- 2. EXTRACCIÓN MAESTRA (WARP DRIVE) ---
+# --- 2. EXTRACCIÓN MAESTRA (WARP DRIVE GEO-BYPASS) ---
 @st.cache_data(ttl=3600, show_spinner="📡 WARP DRIVE: Descargando y ensamblando miles de velas. Por favor espere...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
     try:
@@ -85,7 +86,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
         
         all_ohlcv, current_ts = [], start_ts
         while current_ts < end_ts:
-            ohlcv = ex_class.fetch_ohlcv(sym, iv_down, since=current_ts, limit=1000)
+            ohlcv = ex_class.fetch_ohlcv(sym, iv_down, since=current_ts, limit=1500)
             if not ohlcv: break
             all_ohlcv.extend(ohlcv)
             current_ts = ohlcv[-1][0] + 1
@@ -167,8 +168,10 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
         return pd.DataFrame(), str(e)
 
 df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
+
 if df_global.empty:
-    st.error(f"🚨 ERROR API: No hay datos suficientes. Detalles del servidor CCXT: {status_api}. Use BINANCE y BTC/USDT para historial profundo, o acorte las fechas si usa altcoins recientes.")
+    st.error(f"🚨 ERROR API: {status_api}")
+    st.warning("Consejo: Si Binance le bloquea (Error 451), use KUCOIN con BTC/USDT o KRAKEN con BTC/USD.")
 
 # --- 3. MOTOR PRE-CÁLCULO TOPOLÓGICO ---
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
