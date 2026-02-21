@@ -50,6 +50,7 @@ if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=Tr
     gc.collect()
 
 st.sidebar.markdown("---")
+st.sidebar.info("⚡ Para buscar tendencias Macro, use Temporalidades de 1 Hora o 4 Horas.")
 exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["coinbase", "kucoin", "kraken", "binance"], index=0)
 ticker = st.sidebar.text_input("Símbolo Exacto", value="HNT/USD")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
@@ -383,7 +384,7 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
 st.title("🛡️ The Alpha Quant Terminal")
-tab_tri, tab_jug, tab_def, tab_gen, tab_mon, tab_lev = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🌌 GÉNESIS", "🦍 MONSTER", "🐋 THE LEVIATHAN"])
+tab_tri, tab_jug, tab_def, tab_gen, tab_mon, tab_lev = st.tabs(["💠 TRINITY", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🌌 GÉNESIS (HUD REPARADO)", "🦍 MONSTER", "🐋 LEVIATHAN"])
 
 def renderizar_estrategia(strat_name, tab_obj, df_base):
     with tab_obj:
@@ -392,7 +393,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         
         if st.session_state.get(f'update_pending_{s_id}', False):
             bp = st.session_state[f'pending_bp_{s_id}']
-            if s_id == "GENESIS":
+            if s_id == "GÉNESIS":
                 for r_idx in range(1, 5):
                     st.session_state[f'gen_r{r_idx}_b'] = bp[f'b{r_idx}']
                     st.session_state[f'gen_r{r_idx}_s'] = bp[f's{r_idx}']
@@ -404,9 +405,9 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 st.session_state[f'sld_reinv_{s_id}'] = float(bp['reinv'])
             st.session_state[f'update_pending_{s_id}'] = False
 
-        if s_id == "GENESIS":
-            st.markdown("### 🌌 The Truth Engine")
-            st.info("Matriz sin censura. Muestra la verdad del mercado.")
+        if s_id == "GÉNESIS":
+            st.markdown("### 🌌 The Truth Engine (HUD Restaurado)")
+            st.info("Presione Extracción. El panel de notas le devolverá la configuración exacta ganadora para copiar a TradingView.")
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state['gen_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get('gen_ado', 5.0)), step=0.5, key="ui_gen_ado")
             st.session_state['gen_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get('gen_reinv', 100.0)), step=5.0, key="ui_gen_reinv")
@@ -458,7 +459,39 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 if bp: 
                     st.session_state[f'update_pending_{s_id}'] = True
                     st.session_state[f'pending_bp_{s_id}'] = bp
+                    
+                    # 🔥 ESTE ES EL BLOQUE QUE HABÍA BORRADO 🔥
+                    status_msg = f"🏆 SUPERÓ AL HOLD POR +${bp['alpha']:,.2f}" if bp['alpha'] > 0 else f"🛡️ RIESGO CONTROLADO. Hold = +${buy_hold_money:,.2f}" if bp['net'] > 0 else "❌ ESTRATEGIA EN PÉRDIDA. El mercado desangró el capital."
+                    dna_str = f"""🌌 THE TRUTH MATRIX
+Net Profit: ${bp['net']:,.2f} | PF: {bp['pf']:.2f}x | Trades: {bp['nt']} | Comisiones Pagadas: ${bp['comms']:,.2f}
+{status_msg}
+
+// 🟢 QUAD 1: BULL TREND
+Compras = {bp['b1']}
+Cierres = {bp['s1']}
+TP = {bp['tp1']:.1f}% | SL = {bp['sl1']:.1f}%
+
+// 🟡 QUAD 2: BULL CHOP
+Compras = {bp['b2']}
+Cierres = {bp['s2']}
+TP = {bp['tp2']:.1f}% | SL = {bp['sl2']:.1f}%
+
+// 🔴 QUAD 3: BEAR TREND
+Compras = {bp['b3']}
+Cierres = {bp['s3']}
+TP = {bp['tp3']:.1f}% | SL = {bp['sl3']:.1f}%
+
+// 🟠 QUAD 4: BEAR CHOP
+Compras = {bp['b4']}
+Cierres = {bp['s4']}
+TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
+                    
+                    st.session_state['winning_dna'] = dna_str
                     st.rerun() 
+
+            if st.session_state.get('winning_dna') != "":
+                st.success("¡ADN Extraído Exitosamente!")
+                st.code(st.session_state['winning_dna'], language="text")
 
             df_strat = inyectar_adn(df_base.copy(), 1.5, 2.5)
             f_buy, f_sell = np.zeros(len(df_strat), dtype=bool), np.zeros(len(df_strat), dtype=bool)
@@ -491,26 +524,15 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 if st.form_submit_button("🐋 Desatar al Leviatán"): st.rerun()
 
             df_strat = df_base.copy()
-            
-            # 🔥 LÓGICA LEVIATHAN AJUSTADA (V46.1)
-            # 1. Macro Trend intacto
             macro_bull = df_strat['Close'] > df_strat['EMA_200']
-            
-            # 2. Gatillo de Entrada: Compra cuando el RSI cruza su MA hacia arriba, 
-            # pero confirmando que veníamos de una zona enfriada (RSI anterior estaba por debajo de 50)
             rsi_rebound = df_strat['RSI_Cross_Up'] & (df_strat['RSI'].shift(1).fillna(50) < 50)
-            
             df_strat['Signal_Buy'] = macro_bull & rsi_rebound
-            
-            # Cierre por Pánico Macro (Si rompe la EMA 200 hacia abajo, huimos)
             df_strat['Signal_Sell'] = (df_strat['Close'] < df_strat['EMA_200']) 
-            
             df_strat['Active_TP'] = lab_tp
             df_strat['Active_SL'] = lab_sl
-            
             eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, lab_reinv, comision_pct)
 
-        # --- BLOQUES NORMALES (TRINITY/JUGG/DEFCON) ---
+        # --- BLOQUES NORMALES ---
         elif s_id != "MONSTER":
             with st.form(f"form_{s_id}"):
                 c1, c2, c3, c4 = st.columns(4)
@@ -586,5 +608,5 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 renderizar_estrategia("TRINITY", tab_tri, df_global)
 renderizar_estrategia("JUGGERNAUT", tab_jug, df_global)
 renderizar_estrategia("DEFCON", tab_def, df_global)
-renderizar_estrategia("GENESIS", tab_gen, df_global)
+renderizar_estrategia("GÉNESIS", tab_gen, df_global)
 renderizar_estrategia("LEVIATHAN", tab_lev, df_global)
