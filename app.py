@@ -54,7 +54,7 @@ css_spinner = """
 """
 ph_holograma = st.empty()
 
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL LAB</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL V54.1</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     gc.collect()
@@ -125,13 +125,11 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             df['Vela_Verde'] = df['Close'] > df['Open']
             df['Vela_Roja'] = df['Close'] < df['Open']
             
-            # FÍSICA CORRECTA DE MECHAS (PREVIENE KEYERRORS)
             df['body_size'] = abs(df['Close'] - df['Open']).replace(0, 0.0001)
             df['Cuerpo_Vela'] = df['body_size']
             df['upper_wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
             df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
             
-            # PIVOTES FÍSICOS SIN LOOKAHEAD
             df['PL30'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
             df['PH30'] = df['High'].shift(1).rolling(30, min_periods=1).max()
             df['PL100'] = df['Low'].shift(1).rolling(100, min_periods=1).min()
@@ -210,7 +208,6 @@ else:
     dias_reales = 1
     st.error(f"🚨 ERROR API: {status_api}")
 
-# --- INYECCIÓN ULTRA RÁPIDA (Muta Radar, Ballena y Clímax) ---
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     df_sim['Flash_Vol'] = (df_sim['RVol'] > (w_factor * 0.8)) & df_sim['Whale_Cond']
     df_sim['Lock_Break'] = (df_sim['Close'] > df_sim['Target_Lock_Res']) & (df_sim['Open'] <= df_sim['Target_Lock_Res']) & df_sim['Flash_Vol'] & df_sim['Vela_Verde']
@@ -251,31 +248,22 @@ def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     df_sim['Ping_Pong_Buy'] = (df_sim['PP_Slope'] > 0) & (df_sim['PP_Slope'].shift(1).fillna(0) <= 0) & df_sim['Radar_Activo']
     df_sim['Ping_Pong_Sell'] = (df_sim['PP_Slope'] < 0) & (df_sim['PP_Slope'].shift(1).fillna(0) >= 0) & df_sim['Radar_Activo']
 
-    # --- DEFINICIÓN DE LOS SOLDADOS (Para el Rocket Protocol) ---
     df_sim['Trinity_Buy'] = df_sim['Pink_Whale_Buy'] | df_sim['Lock_Bounce'] | df_sim['Defcon_Buy']
     df_sim['Trinity_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell']
-    
     df_sim['Jugg_Buy'] = df_sim['Pink_Whale_Buy'] | ((df_sim['Lock_Bounce'] | df_sim['Defcon_Buy']) & df_sim['Macro_Bull'])
     df_sim['Jugg_Sell'] = df_sim['Defcon_Sell'] | df_sim['Therm_Wall_Sell']
-    
     df_sim['Defcon_Buy_Sig'] = df_sim['Defcon_Buy']
     df_sim['Defcon_Sell_Sig'] = df_sim['Defcon_Sell']
-    
     df_sim['Lock_Buy'] = df_sim['Lock_Bounce'] | df_sim['Lock_Break']
     df_sim['Lock_Sell'] = df_sim['Lock_Reject'] | df_sim['Lock_Breakd']
-    
     df_sim['Thermal_Buy'] = df_sim['Therm_Bounce'] | df_sim['Therm_Vacuum']
     df_sim['Thermal_Sell'] = df_sim['Therm_Wall_Sell'] | df_sim['Therm_Panic_Sell']
-    
     df_sim['Climax_Buy'] = df_sim['Pink_Climax_Buy']
     df_sim['Climax_Sell'] = df_sim['Pink_Climax_Sell']
-    
     df_sim['Ping_Buy'] = df_sim['Ping_Pong_Buy']
     df_sim['Ping_Sell'] = df_sim['Ping_Pong_Sell']
-    
     df_sim['Squeeze_Buy'] = df_sim['Neon_Up']
     df_sim['Squeeze_Sell'] = df_sim['Neon_Dn']
-    
     df_sim['Lev_Buy'] = df_sim['Macro_Bull'] & df_sim['RSI_Cross_Up'] & (df_sim['RSI'].shift(1).fillna(50) < 50)
     df_sim['Lev_Sell'] = (df_sim['Close'] < df_sim['EMA_200'])
 
@@ -547,7 +535,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
         # --- MÓDULO ROCKET PROTOCOL (META-ALGORITMO) ---
         if s_id == "ROCKET":
             st.markdown("### 👑 ROCKET PROTOCOL (El Comandante Supremo)")
-            st.info("La Inteligencia Artificial asigna Estrategias Completas (Soldados) a cada cuadrante del mercado.")
+            st.info("La Inteligencia Artificial asigna Estrategias Completas a cada cuadrante del mercado.")
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state['ado_ROCKET'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get('ado_ROCKET', 5.0)), step=0.5, key="ui_ado_roc")
             st.session_state['sld_reinv_ROCKET'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get('sld_reinv_ROCKET', 100.0)), step=5.0, key="ui_reinv_roc")
@@ -581,7 +569,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
             if c_ia3.button("🚀 INICIAR ENSAMBLAJE ROCKET", type="primary", key="btn_roc"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
-                buy_hold_ret = ((df_base['Close'].iloc[-1] - df_base['Open'].iloc[0]) / df_base['Open'].iloc[0]) * 100
+                buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
                 
                 best_fit = -float('inf')
@@ -592,7 +580,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 for _ in range(2000): 
                     rwh = round(random.uniform(1.5, 4.0), 1)
                     rrd = round(random.uniform(0.5, 3.0), 1)
-                    df_p = inyectar_adn(df_base.copy(), r_sens=rrd, w_factor=rwh)
+                    df_p = inyectar_adn(df_global.copy(), r_sens=rrd, w_factor=rwh)
                     h_a, l_a, c_a, o_a = df_p['High'].values, df_p['Low'].values, df_p['Close'].values, df_p['Open'].values
                     regime_arr = df_p['Regime'].values
                     
@@ -643,7 +631,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             if st.session_state.get(f'dna_{s_id}') != "":
                 st.code(st.session_state[f'dna_{s_id}'], language="text")
 
-            df_strat = inyectar_adn(df_base.copy(), st.session_state.get('gen_rd', 1.5), st.session_state.get('gen_wh', 2.5))
+            df_strat = inyectar_adn(df_global.copy(), st.session_state.get('gen_rd', 1.5), st.session_state.get('gen_wh', 2.5))
             f_buy, f_sell = np.zeros(len(df_strat), dtype=bool), np.zeros(len(df_strat), dtype=bool)
             f_tp, f_sl = np.zeros(len(df_strat)), np.zeros(len(df_strat))
             for idx in range(1, 5):
@@ -664,6 +652,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
         # --- MÓDULO GÉNESIS (REGLAS SIMPLES) ---
         elif s_id == "GENESIS":
             st.markdown("### 🌌 GÉNESIS (Omni-Brain)")
+            st.info("La IA halla la combinación perfecta por Cuadrante.")
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state['gen_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get('gen_ado', 5.0)), step=0.5, key="ui_gen_ado")
             st.session_state['gen_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get('gen_reinv', 100.0)), step=5.0, key="ui_gen_reinv")
@@ -702,8 +691,9 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
             if c_ia3.button("🚀 EXTRACCIÓN CUÁNTICA", type="primary", key="btn_gen"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
-                buy_hold_ret = ((df_base['Close'].iloc[-1] - df_base['Open'].iloc[0]) / df_base['Open'].iloc[0]) * 100
+                buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
+                
                 best_fit = -float('inf')
                 bp = None
                 reinv_q = st.session_state.get('gen_reinv', 100.0)
@@ -712,7 +702,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 for _ in range(2000): 
                     rwh = round(random.uniform(1.5, 4.0), 1)
                     rrd = round(random.uniform(0.5, 3.0), 1)
-                    df_p = inyectar_adn(df_base.copy(), r_sens=rrd, w_factor=rwh)
+                    df_p = inyectar_adn(df_global.copy(), r_sens=rrd, w_factor=rwh)
                     h_a, l_a, c_a, o_a = df_p['High'].values, df_p['Low'].values, df_p['Close'].values, df_p['Open'].values
                     regime_arr = df_p['Regime'].values
                     b_mat = {r: df_p[r].values for r in buy_rules}
@@ -762,7 +752,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             if st.session_state.get(f'dna_{s_id}') != "":
                 st.code(st.session_state[f'dna_{s_id}'], language="text")
 
-            df_strat = inyectar_adn(df_base.copy(), st.session_state.get('gen_rd', 1.5), st.session_state.get('gen_wh', 2.5))
+            df_strat = inyectar_adn(df_global.copy(), st.session_state.get('gen_rd', 1.5), st.session_state.get('gen_wh', 2.5))
             f_buy, f_sell = np.zeros(len(df_strat), dtype=bool), np.zeros(len(df_strat), dtype=bool)
             f_tp, f_sl = np.zeros(len(df_strat)), np.zeros(len(df_strat))
             for idx in range(1, 5):
@@ -789,12 +779,12 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
             if c_ia3.button(f"🚀 OPTIMIZACIÓN ABSOLUTA ({s_id})", type="primary", key=f"btn_ai_{s_id}"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
-                buy_hold_ret = ((df_base['Close'].iloc[-1] - df_base['Open'].iloc[0]) / df_base['Open'].iloc[0]) * 100
+                buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
                 reinv_q = st.session_state.get(f'sld_reinv_{s_id}', 100.0)
                 t_ado = st.session_state.get(f'ado_{s_id}', 5.0)
                 
-                bp = optimizar_ia(s_id, df_base, capital_inicial, comision_pct, reinv_q, t_ado, dias_reales, buy_hold_money)
+                bp = optimizar_ia(s_id, df_global, capital_inicial, comision_pct, reinv_q, t_ado, dias_reales, buy_hold_money)
                 
                 ph_holograma.empty()
                 if bp:
@@ -820,7 +810,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             current_wh = st.session_state.get(f'sld_wh_{s_id}', 2.5) 
             current_rd = st.session_state.get(f'sld_rd_{s_id}', 1.5) 
             
-            df_strat = inyectar_adn(df_base.copy(), current_rd, current_wh)
+            df_strat = inyectar_adn(df_global.copy(), current_rd, current_wh)
             if s_id == "TARGET_LOCK":
                 df_strat['Signal_Buy'] = df_strat['Lock_Buy']
                 df_strat['Signal_Sell'] = df_strat['Lock_Sell']
@@ -884,7 +874,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
         fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200', line=dict(color='orange', width=2)), row=1, col=1)
-        
+
         if not dftr.empty:
             ents = dftr[dftr['Tipo'] == 'ENTRY']
             fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white')), hovertemplate="COMPRA<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
