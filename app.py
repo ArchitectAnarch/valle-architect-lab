@@ -18,13 +18,12 @@ st.set_page_config(page_title="ROCKET PROTOCOL | Alpha Quant", layout="wide", in
 buy_rules = ['Pink_Whale_Buy', 'Lock_Bounce', 'Lock_Break', 'Defcon_Buy', 'Neon_Up', 'Therm_Bounce', 'Therm_Vacuum', 'Nuclear_Buy', 'Early_Buy', 'Rebound_Buy', 'Pink_Climax_Buy', 'Ping_Pong_Buy']
 sell_rules = ['Defcon_Sell', 'Neon_Dn', 'Therm_Wall_Sell', 'Therm_Panic_Sell', 'Lock_Reject', 'Lock_Breakd', 'Nuclear_Sell', 'Early_Sell', 'Pink_Climax_Sell', 'Ping_Pong_Sell']
 
-# EL ARSENAL DEL ROCKET PROTOCOL (Las 9 estrategias completas)
 rocket_b = ['Trinity_Buy', 'Jugg_Buy', 'Defcon_Buy_Sig', 'Lock_Buy', 'Thermal_Buy', 'Climax_Buy', 'Ping_Buy', 'Squeeze_Buy', 'Lev_Buy']
 rocket_s = ['Trinity_Sell', 'Jugg_Sell', 'Defcon_Sell_Sig', 'Lock_Sell', 'Thermal_Sell', 'Climax_Sell', 'Ping_Sell', 'Squeeze_Sell', 'Lev_Sell']
 
-estrategias = ["TRINITY", "JUGGERNAUT", "DEFCON", "TARGET_LOCK", "THERMAL", "PINK_CLIMAX", "PING_PONG", "NEON_SQUEEZE", "GENESIS", "ROCKET"]
+# 🔥 AGREGADA LA PESTAÑA "NUEVA_ESTRATEGIA" 🔥
+estrategias = ["TRINITY", "JUGGERNAUT", "DEFCON", "TARGET_LOCK", "THERMAL", "PINK_CLIMAX", "PING_PONG", "NEON_SQUEEZE", "NUEVA_ESTRATEGIA", "GENESIS", "ROCKET"]
 
-# INICIALIZACIÓN ESTRICTA Y AISLADA
 for r_idx in range(1, 5):
     if f'gen_r{r_idx}_b' not in st.session_state: st.session_state[f'gen_r{r_idx}_b'] = ['Neon_Up']
     if f'gen_r{r_idx}_s' not in st.session_state: st.session_state[f'gen_r{r_idx}_s'] = ['Neon_Dn']
@@ -55,7 +54,7 @@ css_spinner = """
 """
 ph_holograma = st.empty()
 
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL V61</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL V62</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     gc.collect()
@@ -65,38 +64,43 @@ exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["coinbase", "kucoin", "kra
 ticker = st.sidebar.text_input("Símbolo Exacto", value="HNT/USD")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
 
-intervalos = {"1 Minuto": "1m", "5 Minutos": "5m", "15 Minutos": "15m", "30 Minutos": "30m", "1 Hora": "1h", "4 Horas": "4h", "1 Día": "1d"}
-intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=5) 
+# 🔥 LIBRERÍA DE TEMPORALIDADES EXÓTICAS 🔥
+intervalos = {
+    "1 Minuto": "1m", "5 Minutos": "5m", "7 Minutos": "7m", "13 Minutos": "13m", 
+    "15 Minutos": "15m", "23 Minutos": "23m", "30 Minutos": "30m", "45 Minutos": "45m", 
+    "1 Hora": "1h", "4 Horas": "4h", "1 Día": "1d"
+}
+intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=9) 
 iv_download = intervalos[intervalo_sel]
 
 hoy = datetime.today().date()
-limite_dias = 30 if iv_download == "1m" else 1500
+is_micro = iv_download in ["1m", "5m", "7m", "13m", "23m"]
+limite_dias = 30 if is_micro else 1500
 start_date, end_date = st.sidebar.slider("📅 Scope Histórico", min_value=hoy - timedelta(days=limite_dias), max_value=hoy, value=(hoy - timedelta(days=min(1500, limite_dias)), hoy), format="YYYY-MM-DD")
 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Nodos a Máxima Velocidad...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Velas Cuánticas...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
         
-        # 🔥 1. LIBRERÍA DE TEMPORALIDADES: VERIFICACIÓN NATIVA 🔥
-        try:
-            ex_class.load_markets()
-            if hasattr(ex_class, 'timeframes') and ex_class.timeframes:
-                if iv_down not in ex_class.timeframes:
-                    tfs_soportadas = ", ".join(list(ex_class.timeframes.keys()))
-                    return pd.DataFrame(), f"❌ El exchange {exchange_id.upper()} NO soporta velas de '{iv_down}'. Temporalidades permitidas: {tfs_soportadas}"
-        except Exception:
-            pass # Si la API falla al cargar los mercados, ignoramos la verificación y lo intentamos a la fuerza bruta.
+        # 🔥 MOTOR DE RESAMPLING (SÍNTESIS DE VELAS) 🔥
+        base_tf = iv_down
+        resample_rule = None
+        
+        if iv_down == '7m': base_tf, resample_rule = '1m', '7T'
+        elif iv_down == '13m': base_tf, resample_rule = '1m', '13T'
+        elif iv_down == '23m': base_tf, resample_rule = '1m', '23T'
+        elif iv_down == '45m': base_tf, resample_rule = '15m', '45T'
+        elif iv_down == '4h' and exchange_id.lower() == 'coinbase': base_tf, resample_rule = '1h', '4H'
 
         start_ts = int(datetime.combine(start, datetime.min.time()).timestamp() * 1000)
         end_ts = int((datetime.combine(end, datetime.min.time()) + timedelta(days=1)).timestamp() * 1000)
         all_ohlcv = []
         current_ts = start_ts
         
-        # 🔥 2. VELOCIDAD EXTREMA: LÍMITES DINÁMICOS POR EXCHANGE 🔥
         fetch_limit = 1000
         if exchange_id == 'kraken': fetch_limit = 720
         elif exchange_id == 'coinbase': fetch_limit = 300
@@ -104,20 +108,14 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         
         while current_ts < end_ts:
             try:
-                ohlcv = ex_class.fetch_ohlcv(sym, iv_down, since=current_ts, limit=fetch_limit)
-            except ccxt.RateLimitExceeded:
-                time.sleep(1.5) # Pausa estratégica de emergencia anti-ban
-                continue
-            except ccxt.NetworkError:
-                time.sleep(1.5)
-                continue
+                ohlcv = ex_class.fetch_ohlcv(sym, base_tf, since=current_ts, limit=fetch_limit)
             except Exception as e:
-                break
+                time.sleep(1)
+                continue
                 
             if not ohlcv or len(ohlcv) == 0: 
                 break
             
-            # Prevenir duplicados en las costuras del paginado
             if all_ohlcv and ohlcv[0][0] <= all_ohlcv[-1][0]:
                 ohlcv = [candle for candle in ohlcv if candle[0] > all_ohlcv[-1][0]]
                 if not ohlcv: break
@@ -125,17 +123,20 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             all_ohlcv.extend(ohlcv)
             
             last_ts = ohlcv[-1][0]
-            if last_ts <= current_ts: 
-                break 
-                
+            if last_ts <= current_ts: break 
             current_ts = last_ts + 1
-            if len(all_ohlcv) > 100000: break # Seguro de RAM (100k velas es suficiente histórico)
+            if len(all_ohlcv) > 100000: break
             
-        if not all_ohlcv: return pd.DataFrame(), f"El Exchange devolvió 0 velas para {sym}. Revise el par de monedas o seleccione una fecha más reciente."
+        if not all_ohlcv: return pd.DataFrame(), f"El Exchange devolvió 0 velas."
         
         df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
+        
+        # SÍNTESIS: Construye las velas exóticas
+        if resample_rule:
+            df = df.resample(resample_rule).agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+            
         df.index = df.index + timedelta(hours=offset)
         df = df[~df.index.duplicated(keep='first')]
         
@@ -184,10 +185,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             df['Target_Lock_Sup'] = df[['PL30', 'PL100', 'PL300']].max(axis=1)
             df['Target_Lock_Res'] = df[['PH30', 'PH100', 'PH300']].min(axis=1)
             df['tol'] = df['ATR'] * 0.5
-            
-            df['Lock_Bounce'] = (df['Low'] <= (df['Target_Lock_Sup'] + df['tol'])) & (df['Close'] > df['Target_Lock_Sup']) & df['Vela_Verde']
-            df['Lock_Reject'] = (df['High'] >= (df['Target_Lock_Res'] - df['tol'])) & (df['Close'] < df['Target_Lock_Res']) & df['Vela_Roja']
-            df['Lock_Breakd'] = (df['Close'] < df['Target_Lock_Sup']) & (df['Open'] >= df['Target_Lock_Sup']) & df['Vela_Roja']
             
             df['dist_sup'] = (abs(df['Close'] - df['PL30']) / df['Close']) * 100
             df['dist_res'] = (abs(df['Close'] - df['PH30']) / df['Close']) * 100
@@ -246,14 +243,18 @@ df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date
 
 if not df_global.empty:
     dias_reales = max((df_global.index[-1] - df_global.index[0]).days, 1)
-    st.sidebar.success(f"📥 API Realidad: {len(df_global)} velas ({dias_reales} días).")
+    st.sidebar.success(f"📥 MATRIZ LISTA: {len(df_global)} velas sintetizadas ({dias_reales} días).")
 else:
     dias_reales = 1
     st.error(f"🚨 ERROR API: {status_api}")
 
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     df_sim['Flash_Vol'] = (df_sim['RVol'] > (w_factor * 0.8)) & df_sim['Whale_Cond']
+    df_sim['Lock_Bounce'] = (df_sim['Low'] <= (df_sim['Target_Lock_Sup'] + df_sim['tol'])) & (df_sim['Close'] > df_sim['Target_Lock_Sup']) & df_sim['Vela_Verde']
     df_sim['Lock_Break'] = (df_sim['Close'] > df_sim['Target_Lock_Res']) & (df_sim['Open'] <= df_sim['Target_Lock_Res']) & df_sim['Flash_Vol'] & df_sim['Vela_Verde']
+    df_sim['Lock_Reject'] = (df_sim['High'] >= (df_sim['Target_Lock_Res'] - df_sim['tol'])) & (df_sim['Close'] < df_sim['Target_Lock_Res']) & df_sim['Vela_Roja']
+    df_sim['Lock_Breakd'] = (df_sim['Close'] < df_sim['Target_Lock_Sup']) & (df_sim['Open'] >= df_sim['Target_Lock_Sup']) & df_sim['Vela_Roja']
+    
     df_sim['Radar_Activo'] = (df_sim['dist_sup'] <= r_sens) | (df_sim['dist_res'] <= r_sens)
 
     buy_score = np.where(df_sim['Retro_Peak'] | df_sim['RSI_Cross_Up'], 30, 0)
@@ -476,12 +477,13 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
 st.title("🛡️ The Omni-Brain Lab")
-tabs = st.tabs(["💠 TRINITY", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🎯 TARGET_LOCK", "🌡️ THERMAL", "🌸 PINK_CLIMAX", "🏓 PING_PONG", "🐛 NEON_SQUEEZE", "🌌 GENESIS", "👑 ROCKET_PROTOCOL"])
+tabs = st.tabs(["💠 TRINITY", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🎯 TARGET_LOCK", "🌡️ THERMAL", "🌸 PINK_CLIMAX", "🏓 PING_PONG", "🐛 NEON_SQUEEZE", "🔥 NUEVA_ESTRATEGIA", "🌌 GENESIS", "👑 ROCKET"])
 
 tab_id_map = {
     "💠 TRINITY": "TRINITY", "⚔️ JUGGERNAUT": "JUGGERNAUT", "🚀 DEFCON": "DEFCON",
     "🎯 TARGET_LOCK": "TARGET_LOCK", "🌡️ THERMAL": "THERMAL", "🌸 PINK_CLIMAX": "PINK_CLIMAX",
-    "🏓 PING_PONG": "PING_PONG", "🐛 NEON_SQUEEZE": "NEON_SQUEEZE", "🌌 GENESIS": "GENESIS", "👑 ROCKET_PROTOCOL": "ROCKET"
+    "🏓 PING_PONG": "PING_PONG", "🐛 NEON_SQUEEZE": "NEON_SQUEEZE", "🔥 NUEVA_ESTRATEGIA": "NUEVA_ESTRATEGIA",
+    "🌌 GENESIS": "GENESIS", "👑 ROCKET": "ROCKET"
 }
 
 def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money):
@@ -499,29 +501,24 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
         h_a, l_a, c_a, o_a = df_precalc['High'].values, df_precalc['Low'].values, df_precalc['Close'].values, df_precalc['Open'].values
         
         if s_id == "TRINITY":
-            b_c = df_precalc['Trinity_Buy']
-            s_c = df_precalc['Trinity_Sell']
+            b_c, s_c = df_precalc['Trinity_Buy'], df_precalc['Trinity_Sell']
         elif s_id == "JUGGERNAUT":
-            b_c = df_precalc['Jugg_Buy']
-            s_c = df_precalc['Jugg_Sell']
+            b_c, s_c = df_precalc['Jugg_Buy'], df_precalc['Jugg_Sell']
         elif s_id == "DEFCON":
-            b_c = df_precalc['Defcon_Buy_Sig']
-            s_c = df_precalc['Defcon_Sell_Sig']
+            b_c, s_c = df_precalc['Defcon_Buy_Sig'], df_precalc['Defcon_Sell_Sig']
         elif s_id == "TARGET_LOCK":
-            b_c = df_precalc['Lock_Buy']
-            s_c = df_precalc['Lock_Sell']
+            b_c, s_c = df_precalc['Lock_Buy'], df_precalc['Lock_Sell']
         elif s_id == "THERMAL":
-            b_c = df_precalc['Thermal_Buy']
-            s_c = df_precalc['Thermal_Sell']
+            b_c, s_c = df_precalc['Thermal_Buy'], df_precalc['Thermal_Sell']
         elif s_id == "PINK_CLIMAX":
-            b_c = df_precalc['Climax_Buy']
-            s_c = df_precalc['Climax_Sell']
+            b_c, s_c = df_precalc['Climax_Buy'], df_precalc['Climax_Sell']
         elif s_id == "PING_PONG":
-            b_c = df_precalc['Ping_Buy']
-            s_c = df_precalc['Ping_Sell']
+            b_c, s_c = df_precalc['Ping_Buy'], df_precalc['Ping_Sell']
         elif s_id == "NEON_SQUEEZE":
-            b_c = df_precalc['Squeeze_Buy']
-            s_c = df_precalc['Squeeze_Sell']
+            b_c, s_c = df_precalc['Squeeze_Buy'], df_precalc['Squeeze_Sell']
+        elif s_id == "NUEVA_ESTRATEGIA":
+            # Espacio reservado para inyectar su próxima lógica
+            b_c, s_c = np.zeros(len(df_precalc), dtype=bool), np.zeros(len(df_precalc), dtype=bool) 
             
         t_arr, sl_arr = np.full(len(df_precalc), rtp), np.full(len(df_precalc), rsl)
         net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c.values, s_c.values, t_arr, sl_arr, cap_ini, com_pct, reinv_q)
@@ -695,12 +692,11 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
         elif s_id == "GENESIS":
             st.markdown("### 🌌 GÉNESIS (Omni-Brain)")
-            st.info("La IA halla la combinación perfecta por Cuadrante.")
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state['gen_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get('gen_ado', 5.0)), step=0.5, key="ui_gen_ado")
             st.session_state['gen_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get('gen_reinv', 100.0)), step=5.0, key="ui_gen_reinv")
 
-            with st.expander("⚙️ Calibración Global (Puede ser mutada por la IA)"):
+            with st.expander("⚙️ Calibración Global"):
                 c_adv1, c_adv2 = st.columns(2)
                 st.session_state['gen_wh'] = c_adv1.slider("🐋 Factor Ballena", 1.0, 5.0, value=float(st.session_state.get('gen_wh', 2.5)), step=0.1)
                 st.session_state['gen_rd'] = c_adv2.slider("📡 Radar Sens.", 0.5, 5.0, value=float(st.session_state.get('gen_rd', 1.5)), step=0.1)
@@ -789,7 +785,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 if bp: 
                     st.session_state[f'update_pending_{s_id}'] = True
                     st.session_state[f'pending_bp_{s_id}'] = bp
-                    status_msg = f"🏆 ALPHA CREADO: +${bp['alpha']:,.2f}" if bp['alpha'] > 0 else f"🛡️ RIESGO CONTROLADO. Hold: +${buy_hold_money:,.2f}" if bp['net'] > 0 else f"❌ PÉRDIDA. Aún la mejor pierde (Hold = +${buy_hold_money:,.2f})"
+                    status_msg = f"🏆 ALPHA CREADO: +${bp['alpha']:,.2f}" if bp['alpha'] > 0 else f"🛡️ RIESGO CONTROLADO. Hold: +${buy_hold_money:,.2f}" if bp['net'] > 0 else f"❌ PÉRDIDA."
                     dna_str = f"🌌 GENESIS OMNI-BRAIN\nNet Profit: ${bp['net']:,.2f} | PF: {bp['pf']:.2f}x | Trades: {bp['nt']} | Comisiones: ${bp['comms']:,.2f}\n{status_msg}\n\n⚙️ Factor Ballena: {bp['wh']}x | Radar: {bp['rd']}%\n\n// 🟢 QUAD 1: BULL TREND\nCompras = {bp['b1']}\nCierres = {bp['s1']}\nTP = {bp['tp1']:.1f}% | SL = {bp['sl1']:.1f}%\n// 🟡 QUAD 2: BULL CHOP\nCompras = {bp['b2']}\nCierres = {bp['s2']}\nTP = {bp['tp2']:.1f}% | SL = {bp['sl2']:.1f}%\n// 🔴 QUAD 3: BEAR TREND\nCompras = {bp['b3']}\nCierres = {bp['s3']}\nTP = {bp['tp3']:.1f}% | SL = {bp['sl3']:.1f}%\n// 🟠 QUAD 4: BEAR CHOP\nCompras = {bp['b4']}\nCierres = {bp['s4']}\nTP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"
                     st.session_state[f'dna_{s_id}'] = dna_str
                     st.rerun() 
@@ -815,6 +811,11 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
             eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state.get('gen_reinv', 100.0), comision_pct)
 
+        # --- PESTAÑA PARA LA NUEVA ESTRATEGIA (En blanco) ---
+        elif s_id == "NUEVA_ESTRATEGIA":
+            st.markdown("### 🔥 SU NUEVO SOLDADO")
+            st.warning("Estoy esperando que me pase el código de su nueva estrategia para inyectarlo aquí. Por ahora, los gatillos están apagados, pero el motor está listo.")
+            
         # --- BLOQUES ESTRATÉGICOS INDIVIDUALES ---
         else:
             st.markdown(f"### ⚙️ {s_id} (Truth Engine)")
@@ -835,12 +836,12 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 if bp:
                     st.session_state[f'update_pending_{s_id}'] = True
                     st.session_state[f'pending_bp_{s_id}'] = bp
-                    status_msg = f"🏆 ALPHA CREADO: +${bp['alpha']:,.2f}" if bp['alpha'] > 0 else f"🛡️ RIESGO CONTROLADO. Hold: +${buy_hold_money:,.2f}" if bp['net'] > 0 else f"❌ PÉRDIDA. Aún la mejor opción pierde (Hold = +${buy_hold_money:,.2f})"
+                    status_msg = f"🏆 ALPHA CREADO: +${bp['alpha']:,.2f}" if bp['alpha'] > 0 else f"🛡️ RIESGO CONTROLADO. Hold: +${buy_hold_money:,.2f}" if bp['net'] > 0 else f"❌ PÉRDIDA."
                     
                     dna_str = f"⚙️ {s_id} OMNI-BRAIN\nNet Profit: ${bp['net']:,.2f} | PF: {bp['pf']:.2f}x | Trades: {bp['nt']} | Comisiones: ${bp['comms']:,.2f}\n{status_msg}\n\n⚙️ Factor Ballena: {bp['wh']}x | Radar: {bp['rd']}%\nTP = {bp['tp']:.1f}% | SL = {bp['sl']:.1f}%"
                     st.session_state[f'dna_{s_id}'] = dna_str
                     st.rerun()
-                else: st.error("❌ El motor no pudo encontrar ni 1 solo trade. Pruebe una temporalidad mayor o revise la conectividad del API.")
+                else: st.error("❌ El motor no pudo encontrar ni 1 solo trade.")
 
             if st.session_state.get(f'dna_{s_id}') != "":
                 st.code(st.session_state[f'dna_{s_id}'], language="text")
@@ -878,49 +879,50 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state.get(f'sld_reinv_{s_id}', 100.0), comision_pct)
 
         # --- SECCIÓN COMÚN (MÉTRICAS) ---
-        df_strat['Total_Portfolio'] = eq_curve
-        ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
-        buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
-        alpha_pct = ret_pct - buy_hold_ret
+        if s_id != "NUEVA_ESTRATEGIA":
+            df_strat['Total_Portfolio'] = eq_curve
+            ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
+            buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
+            alpha_pct = ret_pct - buy_hold_ret
 
-        dftr = pd.DataFrame(t_log)
-        tt, wr, pf_val, ado_act = 0, 0.0, 0.0, 0.0
-        if not dftr.empty:
-            exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
-            tt = len(exs)
-            ado_act = tt / dias_reales if dias_reales > 0 else 0
-            if tt > 0:
-                ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
-                wr = (ws / tt) * 100
-                gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum()
-                gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
-                pf_val = gpp / gll if gll > 0 else float('inf')
-        
-        mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
+            dftr = pd.DataFrame(t_log)
+            tt, wr, pf_val, ado_act = 0, 0.0, 0.0, 0.0
+            if not dftr.empty:
+                exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
+                tt = len(exs)
+                ado_act = tt / dias_reales if dias_reales > 0 else 0
+                if tt > 0:
+                    ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
+                    wr = (ws / tt) * 100
+                    gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum()
+                    gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
+                    pf_val = gpp / gll if gll > 0 else float('inf')
+            
+            mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
 
-        st.markdown(f"### 📊 Auditoría: {s_id}")
-        c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-        c1.metric("Portafolio Neto", f"${eq_curve[-1]:,.2f}", f"{ret_pct:.2f}%")
-        c2.metric("ALPHA (vs Hold)", f"{alpha_pct:.2f}%", f"Hold: {buy_hold_ret:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
-        c3.metric("Trades Totales", f"{tt}")
-        c4.metric("Win Rate", f"{wr:.1f}%")
-        c5.metric("Profit Factor", f"{pf_val:.2f}x")
-        c6.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
-        c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
+            st.markdown(f"### 📊 Auditoría: {s_id}")
+            c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+            c1.metric("Portafolio Neto", f"${eq_curve[-1]:,.2f}", f"{ret_pct:.2f}%")
+            c2.metric("ALPHA (vs Hold)", f"{alpha_pct:.2f}%", f"Hold: {buy_hold_ret:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
+            c3.metric("Trades Totales", f"{tt}")
+            c4.metric("Win Rate", f"{wr:.1f}%")
+            c5.metric("Profit Factor", f"{pf_val:.2f}x")
+            c6.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
+            c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
 
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
-        fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200', line=dict(color='orange', width=2)), row=1, col=1)
+            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+            fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
+            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200', line=dict(color='orange', width=2)), row=1, col=1)
 
-        if not dftr.empty:
-            ents = dftr[dftr['Tipo'] == 'ENTRY']
-            fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white')), hovertemplate="COMPRA<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
-            wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
-            fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white')), text=wins['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
-            loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
-            fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white')), text=loss['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
+            if not dftr.empty:
+                ents = dftr[dftr['Tipo'] == 'ENTRY']
+                fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white')), hovertemplate="COMPRA<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
+                wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
+                fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white')), text=wins['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
+                loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
+                fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white')), text=loss['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
 
-        fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
-        fig.update_yaxes(side="right")
-        fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan")
-        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True}, key=f"chart_{s_id}")
+            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
+            fig.update_yaxes(side="right")
+            fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan")
+            st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True}, key=f"chart_{s_id}")
