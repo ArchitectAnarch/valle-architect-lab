@@ -32,7 +32,7 @@ for s in ["TRINITY", "JUGGERNAUT", "DEFCON"]:
     if f'sld_sl_{s}' not in st.session_state: st.session_state[f'sld_sl_{s}'] = 1.5
     if f'sld_wh_{s}' not in st.session_state: st.session_state[f'sld_wh_{s}'] = 2.5
     if f'sld_rd_{s}' not in st.session_state: st.session_state[f'sld_rd_{s}'] = 1.5
-    if f'sld_reinv_{s}' not in st.session_state: st.session_state[f'sld_reinv_{s}'] = 100.0 # Por defecto compuesto
+    if f'sld_reinv_{s}' not in st.session_state: st.session_state[f'sld_reinv_{s}'] = 100.0
 
 # --- 1. PANEL LATERAL ---
 css_spinner = """
@@ -51,8 +51,10 @@ if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=Tr
     gc.collect()
 
 st.sidebar.markdown("---")
-exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["coinbase", "binance", "kraken", "kucoin"], index=0)
-ticker = st.sidebar.text_input("Símbolo Exacto", value="HNT/USD")
+# 🔥 BINANCE POR DEFECTO: 100 VECES MÁS RÁPIDO QUE COINBASE PARA DESCARGAR DATOS
+st.sidebar.info("⚡ Use Binance para extraer el ADN rápido. Luego úselo en Coinbase dentro de TradingView.")
+exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["binance", "coinbase", "kraken", "kucoin"], index=0)
+ticker = st.sidebar.text_input("Símbolo Exacto", value="BTC/USDT")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
 
 intervalos = {
@@ -63,19 +65,19 @@ intervalos = {
     "2 Horas": ("1h", "2h"), "4 Horas": ("4h", "4h"), 
     "1 Día": ("1d", "1D"), "1 Semana": ("1d", "1W")
 }
-intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=2) 
+intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=1) 
 iv_download, iv_resample = intervalos[intervalo_sel]
 
 hoy = datetime.today().date()
-limite_dias = 7 if iv_download == "1m" else 180 if iv_download == "1h" else 1800
-start_date, end_date = st.sidebar.slider("📅 Time Frame Global", min_value=hoy - timedelta(days=1500), max_value=hoy, value=(hoy - timedelta(days=min(365, limite_dias)), hoy), format="YYYY-MM-DD")
+limite_dias = 30 if iv_download == "1m" else 180 if iv_download == "5m" else 1500
+start_date, end_date = st.sidebar.slider(f"📅 Time Frame Global (Máx {limite_dias} días para no colapsar la RAM)", min_value=hoy - timedelta(days=limite_dias), max_value=hoy, value=(hoy - timedelta(days=min(60, limite_dias)), hoy), format="YYYY-MM-DD")
 dias_analizados = max((end_date - start_date).days, 1)
 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
-# --- 2. EXTRACCIÓN MAESTRA (SIN PUNTOS CIEGOS) ---
-@st.cache_data(ttl=3600, show_spinner="📡 Descargando datos del Exchange...")
+# --- 2. EXTRACCIÓN MAESTRA (WARP DRIVE) ---
+@st.cache_data(ttl=3600, show_spinner="📡 WARP DRIVE: Descargando y ensamblando miles de velas. Por favor espere unos segundos...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -88,7 +90,8 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
             if not ohlcv: break
             all_ohlcv.extend(ohlcv)
             current_ts = ohlcv[-1][0] + 1
-            if len(all_ohlcv) > 1000000: break
+            # 🔥 LÍMITE DE PROTECCIÓN RAM: 150,000 Velas (Suficiente para un Backtest HFT Letal)
+            if len(all_ohlcv) > 150000: break
             
         if not all_ohlcv: return pd.DataFrame()
         df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
@@ -105,7 +108,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
             df['Vol_MA_100'] = df['Volume'].rolling(window=100, min_periods=1).mean()
             df['RVol'] = df['Volume'] / df['Vol_MA_100'].replace(0, 1)
             
-            # Cálculo de ATR tipo RMA (Igual a TradingView)
             high_low = df['High'] - df['Low']
             high_close = np.abs(df['High'] - df['Close'].shift())
             low_close = np.abs(df['Low'] - df['Close'].shift())
@@ -167,7 +169,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, iv_res, offset):
 
 df_global = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, iv_resample, utc_offset)
 if df_global.empty:
-    st.error(f"🚨 ERROR API: No hay datos para {ticker} en {exchange_sel.upper()}.")
+    st.error(f"🚨 ERROR API: No hay datos suficientes o el par no existe. Use BINANCE y BTC/USDT para mayor velocidad y profundidad.")
 
 # --- 3. MOTOR PRE-CÁLCULO TOPOLÓGICO ---
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
@@ -225,7 +227,7 @@ def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     
     return df_sim
 
-# --- NÚCLEO FÍSICO C++ (CLON EXACTO DE TRADINGVIEW) ---
+# --- NÚCLEO FÍSICO C++ CÁLCULO DE INTERÉS COMPUESTO (TV CLONE) ---
 def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr, sl_arr, cap_ini, com_pct):
     cap_act = cap_ini
     en_pos = False
@@ -237,7 +239,6 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
             tp_p = p_ent * (1 + tp_act/100)
             sl_p = p_ent * (1 - sl_act/100)
             
-            # 🔥 PRIORIDAD SL: Para ser crueles y realistas en la simulación
             if l_arr[i] <= sl_p:
                 gross = pos_size * (1 - sl_act/100)
                 net = gross * (1 - com_pct)
@@ -273,7 +274,6 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
             if cap_act <= 0: break
             
         if not en_pos and b_c[i] and i+1 < len(h_arr):
-            # 🔥 CORRECCIÓN DE COMISIÓN: Solo cobra 1 vez al entrar y 1 al salir
             invest_amt = cap_act
             pos_size = invest_amt * (1 - com_pct) 
             p_ent = o_arr[i+1]
@@ -284,7 +284,7 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
     pf = g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0)
     return cap_act - cap_ini, pf, num_trades, max_dd
 
-# NÚCLEO VISUAL PARA DIBUJAR (CLON DE TRADINGVIEW)
+# NÚCLEO VISUAL PARA DIBUJAR
 def simular_visual(df_sim, cap_ini, reinvest, com_pct):
     registro_trades = []
     n = len(df_sim)
@@ -403,7 +403,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         # --- MÓDULO GÉNESIS (MATRIX ARSENAL) ---
         if s_id == "GENESIS":
             st.markdown("### 🌌 Alpha Extractor (Anti Buy & Hold)")
-            st.info(f"El Motor Financiero ha sido ajustado a la perfección. La IA ahora calcula el interés compuesto y las comisiones idéntico a TradingView.")
+            st.info(f"Matriz analizando {dias_analizados} días reales. La IA DESTRUIRÁ cualquier ADN que gane menos dinero que simplemente 'Holdear' la moneda en este mismo periodo de tiempo.")
             
             c_ia1, c_ia2 = st.columns([1, 3])
             st.session_state['gen_ado'] = c_ia1.slider("🎯 Target ADO (Trades/Día)", 0.0, 100.0, value=float(st.session_state.get('gen_ado', 5.0)), step=0.5, key="ui_gen_ado")
@@ -415,28 +415,28 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 st.markdown("<h5 style='color:lime;'>🟢 Bull Trend (Fuerte)</h5>", unsafe_allow_html=True)
                 st.multiselect("Compras", buy_rules, key="gen_r1_b")
                 st.multiselect("Cierres", sell_rules, key="gen_r1_s")
-                st.slider("TP %", 0.5, 20.0, step=0.5, key="gen_r1_tp")
+                st.slider("TP %", 0.5, 30.0, step=0.5, key="gen_r1_tp")
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r1_sl")
 
             with c2:
                 st.markdown("<h5 style='color:yellow;'>🟡 Bull Chop (Rango)</h5>", unsafe_allow_html=True)
                 st.multiselect("Compras", buy_rules, key="gen_r2_b")
                 st.multiselect("Cierres", sell_rules, key="gen_r2_s")
-                st.slider("TP %", 0.5, 20.0, step=0.5, key="gen_r2_tp")
+                st.slider("TP %", 0.5, 30.0, step=0.5, key="gen_r2_tp")
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r2_sl")
 
             with c3:
                 st.markdown("<h5 style='color:red;'>🔴 Bear Trend (Fuerte)</h5>", unsafe_allow_html=True)
                 st.multiselect("Compras", buy_rules, key="gen_r3_b")
                 st.multiselect("Cierres", sell_rules, key="gen_r3_s")
-                st.slider("TP %", 0.5, 20.0, step=0.5, key="gen_r3_tp")
+                st.slider("TP %", 0.5, 30.0, step=0.5, key="gen_r3_tp")
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r3_sl")
 
             with c4:
                 st.markdown("<h5 style='color:orange;'>🟠 Bear Chop (Rango)</h5>", unsafe_allow_html=True)
                 st.multiselect("Compras", buy_rules, key="gen_r4_b")
                 st.multiselect("Cierres", sell_rules, key="gen_r4_s")
-                st.slider("TP %", 0.5, 20.0, step=0.5, key="gen_r4_tp")
+                st.slider("TP %", 0.5, 30.0, step=0.5, key="gen_r4_tp")
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r4_sl")
 
             st.markdown("---")
@@ -460,7 +460,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 for _ in range(3000): 
                     dna_b = [random.sample(buy_rules, random.randint(1, 5)) for _ in range(4)]
                     dna_s = [random.sample(sell_rules, random.randint(1, 5)) for _ in range(4)]
-                    dna_tp = [random.uniform(2.0, 15.0) for _ in range(4)]
+                    dna_tp = [random.uniform(2.0, 25.0) for _ in range(4)]
                     dna_sl = [random.uniform(1.0, 6.0) for _ in range(4)]
                     
                     f_buy, f_sell = np.zeros(len(df_p), dtype=bool), np.zeros(len(df_p), dtype=bool)
