@@ -24,14 +24,13 @@ for r_idx in range(1, 5):
     if f'gen_r{r_idx}_tp' not in st.session_state: st.session_state[f'gen_r{r_idx}_tp'] = 5.0
     if f'gen_r{r_idx}_sl' not in st.session_state: st.session_state[f'gen_r{r_idx}_sl'] = 2.0
 
-# NUESTRAS NUEVAS ESTRATEGIAS
-estrategias = ["TARGET_LOCK", "THERMAL", "APEX", "LEVIATHAN", "GENESIS"]
+estrategias = ["TRINITY", "JUGGERNAUT", "DEFCON", "TARGET_LOCK", "THERMAL", "GENESIS"]
 
 for s in estrategias:
     if f'dna_{s}' not in st.session_state: st.session_state[f'dna_{s}'] = ""
-    if f'ado_{s}' not in st.session_state: st.session_state[f'ado_{s}'] = 5.0 if s != "LEVIATHAN" else 0.2
-    if f'sld_tp_{s}' not in st.session_state: st.session_state[f'sld_tp_{s}'] = 25.0 if s == "LEVIATHAN" else 3.0
-    if f'sld_sl_{s}' not in st.session_state: st.session_state[f'sld_sl_{s}'] = 7.0 if s == "LEVIATHAN" else 1.5
+    if f'ado_{s}' not in st.session_state: st.session_state[f'ado_{s}'] = 5.0 
+    if f'sld_tp_{s}' not in st.session_state: st.session_state[f'sld_tp_{s}'] = 3.0
+    if f'sld_sl_{s}' not in st.session_state: st.session_state[f'sld_sl_{s}'] = 1.5
     if f'sld_wh_{s}' not in st.session_state: st.session_state[f'sld_wh_{s}'] = 2.5
     if f'sld_rd_{s}' not in st.session_state: st.session_state[f'sld_rd_{s}'] = 1.5
     if f'sld_reinv_{s}' not in st.session_state: st.session_state[f'sld_reinv_{s}'] = 100.0
@@ -93,7 +92,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         
         if len(df) > 50:
             df['EMA_200'] = df['Close'].ewm(span=200, min_periods=1, adjust=False).mean()
-            df['EMA_50'] = df['Close'].ewm(span=50, min_periods=1, adjust=False).mean()
             df['Vol_MA_100'] = df['Volume'].rolling(window=100, min_periods=1).mean()
             df['RVol'] = df['Volume'] / df['Vol_MA_100'].replace(0, 1)
             
@@ -121,7 +119,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             df['Vela_Roja'] = df['Close'] < df['Open']
             df['Cuerpo_Vela'] = abs(df['Close'] - df['Open'])
             
-            # PIVOTES FÍSICOS SIN LOOKAHEAD
             df['PL30'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
             df['PH30'] = df['High'].shift(1).rolling(30, min_periods=1).max()
             df['PL100'] = df['Low'].shift(1).rolling(100, min_periods=1).min()
@@ -129,7 +126,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             df['PL300'] = df['Low'].shift(1).rolling(300, min_periods=1).min()
             df['PH300'] = df['High'].shift(1).rolling(300, min_periods=1).max()
             
-            # --- CÁLCULOS QUE ANTES ERAN LENTOS AHORA PRE-PROCESADOS ---
             df['Whale_Cond'] = df['Cuerpo_Vela'] > (df['ATR'] * 0.3)
             df['Target_Lock_Sup'] = df[['PL30', 'PL100', 'PL300']].max(axis=1)
             df['Target_Lock_Res'] = df[['PH30', 'PH100', 'PH300']].min(axis=1)
@@ -142,7 +138,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             df['dist_sup'] = (abs(df['Close'] - df['PL30']) / df['Close']) * 100
             df['dist_res'] = (abs(df['Close'] - df['PH30']) / df['Close']) * 100
             
-            # TERMÓMETRO (Matemática Vectorial)
             scan_range = df['ATR'] * 2.0
             c_val = df['Close'].values
             sr_val = scan_range.values
@@ -199,7 +194,7 @@ else:
     dias_reales = 1
     st.error(f"🚨 ERROR API: {status_api}")
 
-# --- 3. INYECCIÓN ULTRA RÁPIDA (Solo muta Radar y Ballena) ---
+# --- INYECCIÓN RÁPIDA (MUTA RADAR Y BALLENA) ---
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     df_sim['Flash_Vol'] = (df_sim['RVol'] > (w_factor * 0.8)) & df_sim['Whale_Cond']
     df_sim['Lock_Break'] = (df_sim['Close'] > df_sim['Target_Lock_Res']) & (df_sim['Open'] <= df_sim['Target_Lock_Res']) & df_sim['Flash_Vol'] & df_sim['Vela_Verde']
@@ -386,39 +381,40 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
 st.title("🛡️ The Omni-Brain Lab")
-# 🔥 SUS OBRAS MAESTRAS HAN SIDO AGREGADAS 🔥
-tab_loc, tab_the, tab_ape, tab_lev, tab_gen = st.tabs(["🎯 TARGET LOCK", "🌡️ THERMAL", "👑 APEX", "🐋 LEVIATHAN", "🌌 GÉNESIS"])
+# 🔥 RESTAURACIÓN ABSOLUTA DE LAS OBRAS MAESTRAS 🔥
+tab_tri, tab_jug, tab_def, tab_loc, tab_the, tab_gen = st.tabs(["💠 TRINITY", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🎯 TARGET LOCK", "🌡️ THERMAL / TERMÓMETRO", "🌌 GÉNESIS"])
 
 def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money):
     best_fit = -float('inf')
     bp = None
     tp_min, tp_max = (0.5, 15.0) if target_ado > 2 else (2.0, 30.0)
-    if s_id == "LEVIATHAN": tp_min, tp_max = 10.0, 50.0
     
     for _ in range(2000): 
         rtp = round(random.uniform(tp_min, tp_max), 1)
         rsl = round(random.uniform(0.5, 10.0), 1)
-        if s_id == "LEVIATHAN": rsl = round(random.uniform(3.0, 20.0), 1)
         
-        # 🔥 LA IA MUTA FACTOR BALLENA Y RADAR EN CADA ITERACIÓN 🔥
+        # Muta Factor Ballena y Radar
         rwh = round(random.uniform(1.5, 4.0), 1)
         rrd = round(random.uniform(0.5, 3.0), 1)
         
         df_precalc = inyectar_adn(df_base.copy(), r_sens=rrd, w_factor=rwh)
         h_a, l_a, c_a, o_a = df_precalc['High'].values, df_precalc['Low'].values, df_precalc['Close'].values, df_precalc['Open'].values
         
-        if s_id == "TARGET_LOCK":
+        if s_id == "TRINITY":
+            b_c = df_precalc['Pink_Whale_Buy'] | df_precalc['Lock_Bounce'] | df_precalc['Defcon_Buy']
+            s_c = df_precalc['Defcon_Sell'] | df_precalc['Therm_Wall_Sell']
+        elif s_id == "JUGGERNAUT":
+            b_c = df_precalc['Pink_Whale_Buy'] | ((df_precalc['Lock_Bounce'] | df_precalc['Defcon_Buy']) & df_precalc['Macro_Bull'])
+            s_c = df_precalc['Defcon_Sell'] | df_precalc['Therm_Wall_Sell']
+        elif s_id == "DEFCON":
+            b_c = df_precalc['Defcon_Buy'] 
+            s_c = df_precalc['Defcon_Sell']
+        elif s_id == "TARGET_LOCK":
             b_c = df_precalc['Lock_Bounce'] | df_precalc['Lock_Break']
             s_c = df_precalc['Lock_Reject'] | df_precalc['Lock_Breakd']
         elif s_id == "THERMAL":
             b_c = df_precalc['Therm_Bounce'] | df_precalc['Therm_Vacuum']
             s_c = df_precalc['Therm_Wall_Sell'] | df_precalc['Therm_Panic_Sell']
-        elif s_id == "APEX":
-            b_c = df_precalc['Pink_Whale_Buy'] | df_precalc['Lock_Bounce'] | df_precalc['Defcon_Buy']
-            s_c = df_precalc['Lock_Reject'] | df_precalc['Defcon_Sell']
-        elif s_id == "LEVIATHAN":
-            b_c = df_precalc['Macro_Bull'] & df_precalc['RSI_Cross_Up'] & (df_precalc['RSI'].shift(1).fillna(50) < 50)
-            s_c = (df_precalc['Close'] < df_precalc['EMA_200']) 
             
         t_arr, sl_arr = np.full(len(df_precalc), rtp), np.full(len(df_precalc), rsl)
         net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c.values, s_c.values, t_arr, sl_arr, cap_ini, com_pct, reinv_q)
@@ -429,7 +425,6 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
 
         alpha_money = net - buy_hold_money
         
-        # 🔥 LA IA YA NO SE RINDE NUNCA. Si hace al menos 1 trade, lo evalúa. 🔥
         if nt >= 1: 
             if net > 0: fit = (net * (pf**2) * np.sqrt(nt)) / ((mdd ** 1.5) + 1.0) * ado_multiplier
             else: fit = net * ((mdd ** 1.5) + 1.0) / (pf + 0.001)
@@ -444,7 +439,9 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
 def renderizar_estrategia(strat_name, tab_obj, df_base):
     with tab_obj:
         if df_base.empty: return
-        s_id = strat_name
+        
+        # Filtro de nombres exactos para la sesión
+        s_id = "TARGET_LOCK" if "TARGET" in strat_name else "THERMAL" if "THERMAL" in strat_name else "GENESIS" if "GÉNESIS" in strat_name else strat_name.split()[1] if strat_name.startswith("THE") else strat_name.split()[1] if " " in strat_name else strat_name
         
         if st.session_state.get(f'update_pending_{s_id}', False):
             bp = st.session_state[f'pending_bp_{s_id}']
@@ -460,9 +457,8 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 st.session_state[f'sld_tp_{s_id}'] = float(round(bp['tp'], 1))
                 st.session_state[f'sld_sl_{s_id}'] = float(round(bp['sl'], 1))
                 st.session_state[f'sld_reinv_{s_id}'] = float(bp['reinv'])
-                if s_id != "LEVIATHAN":
-                    st.session_state[f'sld_wh_{s_id}'] = float(round(bp['wh'], 1))
-                    st.session_state[f'sld_rd_{s_id}'] = float(round(bp['rd'], 1))
+                st.session_state[f'sld_wh_{s_id}'] = float(round(bp['wh'], 1))
+                st.session_state[f'sld_rd_{s_id}'] = float(round(bp['rd'], 1))
             st.session_state[f'update_pending_{s_id}'] = False
 
         if s_id == "GENESIS":
@@ -546,7 +542,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     ado_multiplier = 1.0
                     if t_ado > 0 and actual_ado < t_ado: ado_multiplier = (actual_ado / t_ado) ** 2  
 
-                    if nt >= 1: # Cero excusas, siempre arroja el mejor aunque sea pérdida
+                    if nt >= 1:
                         if net > 0: fit = (net * (pf**2) * np.sqrt(nt)) / ((mdd ** 1.5) + 1.0) * ado_multiplier
                         else: fit = net * ((mdd ** 1.5) + 1.0) / (pf + 0.001)
 
@@ -558,7 +554,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 if bp: 
                     st.session_state[f'update_pending_{s_id}'] = True
                     st.session_state[f'pending_bp_{s_id}'] = bp
-                    status_msg = f"🏆 ALPHA CREADO: +${bp['alpha']:,.2f}" if bp['alpha'] > 0 else f"🛡️ RIESGO CONTROLADO. Hold: +${buy_hold_money:,.2f}" if bp['net'] > 0 else f"❌ PÉRDIDA. Aún la mejor opción pierde (Hold = +${buy_hold_money:,.2f})"
+                    status_msg = f"🏆 ALPHA CREADO: +${bp['alpha']:,.2f}" if bp['alpha'] > 0 else f"🛡️ RIESGO CONTROLADO. Hold: +${buy_hold_money:,.2f}" if bp['net'] > 0 else f"❌ PÉRDIDA. Aún la mejor pierde (Hold = +${buy_hold_money:,.2f})"
                     dna_str = f"🌌 GENESIS OMNI-BRAIN\nNet Profit: ${bp['net']:,.2f} | PF: {bp['pf']:.2f}x | Trades: {bp['nt']} | Comisiones: ${bp['comms']:,.2f}\n{status_msg}\n\n⚙️ Factor Ballena: {bp['wh']}x | Radar: {bp['rd']}%\n\n// 🟢 QUAD 1: BULL TREND\nCompras = {bp['b1']}\nCierres = {bp['s1']}\nTP = {bp['tp1']:.1f}% | SL = {bp['sl1']:.1f}%\n// 🟡 QUAD 2: BULL CHOP\nCompras = {bp['b2']}\nCierres = {bp['s2']}\nTP = {bp['tp2']:.1f}% | SL = {bp['sl2']:.1f}%\n// 🔴 QUAD 3: BEAR TREND\nCompras = {bp['b3']}\nCierres = {bp['s3']}\nTP = {bp['tp3']:.1f}% | SL = {bp['sl3']:.1f}%\n// 🟠 QUAD 4: BEAR CHOP\nCompras = {bp['b4']}\nCierres = {bp['s4']}\nTP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"
                     st.session_state[f'dna_{s_id}'] = dna_str
                     st.rerun() 
@@ -584,7 +580,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
             eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state.get('gen_reinv', 100.0), comision_pct)
 
-        # --- BLOQUES UNIVERSALES (LOCK, THERMAL, APEX, LEVIATHAN) ---
+        # --- BLOQUES UNIVERSALES (TRINITY, JUGG, DEFCON, LOCK, THERMAL) ---
         else:
             st.markdown(f"### ⚙️ {s_id} (Truth Engine)")
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
@@ -606,14 +602,10 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                     st.session_state[f'pending_bp_{s_id}'] = bp
                     status_msg = f"🏆 ALPHA CREADO: +${bp['alpha']:,.2f}" if bp['alpha'] > 0 else f"🛡️ RIESGO CONTROLADO. Hold: +${buy_hold_money:,.2f}" if bp['net'] > 0 else f"❌ PÉRDIDA. Aún la mejor opción pierde (Hold = +${buy_hold_money:,.2f})"
                     
-                    if s_id == "LEVIATHAN":
-                        dna_str = f"⚙️ {s_id} OMNI-BRAIN\nNet Profit: ${bp['net']:,.2f} | PF: {bp['pf']:.2f}x | Trades: {bp['nt']} | Comisiones: ${bp['comms']:,.2f}\n{status_msg}\n\nTP = {bp['tp']:.1f}% | SL = {bp['sl']:.1f}%"
-                    else:
-                        dna_str = f"⚙️ {s_id} OMNI-BRAIN\nNet Profit: ${bp['net']:,.2f} | PF: {bp['pf']:.2f}x | Trades: {bp['nt']} | Comisiones: ${bp['comms']:,.2f}\n{status_msg}\n\n⚙️ Factor Ballena: {bp['wh']}x | Radar: {bp['rd']}%\nTP = {bp['tp']:.1f}% | SL = {bp['sl']:.1f}%"
-                        
+                    dna_str = f"⚙️ {s_id} OMNI-BRAIN\nNet Profit: ${bp['net']:,.2f} | PF: {bp['pf']:.2f}x | Trades: {bp['nt']} | Comisiones: ${bp['comms']:,.2f}\n{status_msg}\n\n⚙️ Factor Ballena: {bp['wh']}x | Radar: {bp['rd']}%\nTP = {bp['tp']:.1f}% | SL = {bp['sl']:.1f}%"
                     st.session_state[f'dna_{s_id}'] = dna_str
                     st.rerun()
-                else: st.error("❌ El motor no pudo encontrar ni 1 solo trade. Cambie de moneda o temporalidad.")
+                else: st.error("❌ El motor no pudo encontrar ni 1 solo trade.")
 
             if st.session_state.get(f'dna_{s_id}') != "":
                 st.code(st.session_state[f'dna_{s_id}'], language="text")
@@ -622,12 +614,11 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 c1, c2, c3, c4 = st.columns(4)
                 st.session_state[f'sld_tp_{s_id}'] = c1.slider("🎯 TP Base (%)", 0.5, 50.0, value=float(st.session_state.get(f'sld_tp_{s_id}', 3.0)), step=0.1, key=f"man_tp_{s_id}")
                 st.session_state[f'sld_sl_{s_id}'] = c2.slider("🛑 SL (%)", 0.5, 20.0, value=float(st.session_state.get(f'sld_sl_{s_id}', 1.5)), step=0.1, key=f"man_sl_{s_id}")
-                if s_id != "LEVIATHAN":
-                    st.session_state[f'sld_wh_{s_id}'] = c3.slider("🐋 Factor Ballena", 1.0, 5.0, value=float(st.session_state.get(f'sld_wh_{s_id}', 2.5)), step=0.1, key=f"man_wh_{s_id}")
-                    st.session_state[f'sld_rd_{s_id}'] = c4.slider("📡 Radar Sens.", 0.5, 5.0, value=float(st.session_state.get(f'sld_rd_{s_id}', 1.5)), step=0.1, key=f"man_rd_{s_id}")
+                st.session_state[f'sld_wh_{s_id}'] = c3.slider("🐋 Factor Ballena", 1.0, 5.0, value=float(st.session_state.get(f'sld_wh_{s_id}', 2.5)), step=0.1, key=f"man_wh_{s_id}")
+                st.session_state[f'sld_rd_{s_id}'] = c4.slider("📡 Radar Sens.", 0.5, 5.0, value=float(st.session_state.get(f'sld_rd_{s_id}', 1.5)), step=0.1, key=f"man_rd_{s_id}")
 
-            current_wh = st.session_state.get(f'sld_wh_{s_id}', 2.5) if s_id != "LEVIATHAN" else 2.5
-            current_rd = st.session_state.get(f'sld_rd_{s_id}', 1.5) if s_id != "LEVIATHAN" else 1.5
+            current_wh = st.session_state.get(f'sld_wh_{s_id}', 2.5) 
+            current_rd = st.session_state.get(f'sld_rd_{s_id}', 1.5) 
             
             df_strat = inyectar_adn(df_base.copy(), current_rd, current_wh)
             if s_id == "TARGET_LOCK":
@@ -636,12 +627,15 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             elif s_id == "THERMAL":
                 df_strat['Signal_Buy'] = df_strat['Therm_Bounce'] | df_strat['Therm_Vacuum']
                 df_strat['Signal_Sell'] = df_strat['Therm_Wall_Sell'] | df_strat['Therm_Panic_Sell']
-            elif s_id == "APEX":
+            elif s_id == "TRINITY":
                 df_strat['Signal_Buy'] = df_strat['Pink_Whale_Buy'] | df_strat['Lock_Bounce'] | df_strat['Defcon_Buy']
-                df_strat['Signal_Sell'] = df_strat['Lock_Reject'] | df_strat['Defcon_Sell']
-            elif s_id == "LEVIATHAN":
-                df_strat['Signal_Buy'] = df_strat['Macro_Bull'] & df_strat['RSI_Cross_Up'] & (df_strat['RSI'].shift(1).fillna(50) < 50)
-                df_strat['Signal_Sell'] = (df_strat['Close'] < df_strat['EMA_200'])
+                df_strat['Signal_Sell'] = df_strat['Defcon_Sell'] | df_strat['Therm_Wall_Sell']
+            elif s_id == "JUGGERNAUT":
+                df_strat['Signal_Buy'] = df_strat['Pink_Whale_Buy'] | ((df_strat['Lock_Bounce'] | df_strat['Defcon_Buy']) & df_strat['Macro_Bull'])
+                df_strat['Signal_Sell'] = df_strat['Defcon_Sell'] | df_strat['Therm_Wall_Sell']
+            elif s_id == "DEFCON":
+                df_strat['Signal_Buy'] = df_strat['Defcon_Buy']
+                df_strat['Signal_Sell'] = df_strat['Defcon_Sell']
                 
             df_strat['Active_TP'] = st.session_state[f'sld_tp_{s_id}']
             df_strat['Active_SL'] = st.session_state[f'sld_sl_{s_id}']
@@ -681,9 +675,6 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
         fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200', line=dict(color='orange', width=2)), row=1, col=1)
-        
-        if s_id == "LEVIATHAN":
-            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='EMA 50', line=dict(color='#FF9800', width=1)), row=1, col=1)
 
         if not dftr.empty:
             ents = dftr[dftr['Tipo'] == 'ENTRY']
@@ -698,8 +689,9 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan")
         st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True}, key=f"chart_{s_id}")
 
-renderizar_estrategia("TARGET_LOCK", tab_loc, df_global)
-renderizar_estrategia("THERMAL", tab_the, df_global)
-renderizar_estrategia("APEX", tab_ape, df_global)
-renderizar_estrategia("LEVIATHAN", tab_lev, df_global)
-renderizar_estrategia("GENESIS", tab_gen, df_global)
+renderizar_estrategia("💠 TRINITY", tab_tri, df_global)
+renderizar_estrategia("⚔️ JUGGERNAUT", tab_jug, df_global)
+renderizar_estrategia("🚀 DEFCON", tab_def, df_global)
+renderizar_estrategia("🎯 TARGET_LOCK", tab_loc, df_global)
+renderizar_estrategia("🌡️ THERMAL", tab_the, df_global)
+renderizar_estrategia("🌌 GENESIS", tab_gen, df_global)
