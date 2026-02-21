@@ -50,7 +50,6 @@ if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=Tr
     gc.collect()
 
 st.sidebar.markdown("---")
-st.sidebar.info("⚡ Para buscar tendencias Macro, use Temporalidades de 1 Hora o 4 Horas.")
 exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["coinbase", "kucoin", "kraken", "binance"], index=0)
 ticker = st.sidebar.text_input("Símbolo Exacto", value="HNT/USD")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
@@ -90,7 +89,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df = df[~df.index.duplicated(keep='first')]
         
         if len(df) > 50:
-            # 🔥 INYECCIÓN MACRO: EMA 200 y EMA 50
             df['EMA_200'] = df['Close'].ewm(span=200, min_periods=1, adjust=False).mean()
             df['EMA_50'] = df['Close'].ewm(span=50, min_periods=1, adjust=False).mean()
             
@@ -118,7 +116,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10, min_periods=1).mean().fillna(0)
             df['Vela_Verde'] = df['Close'] > df['Open']
             df['Vela_Roja'] = df['Close'] < df['Open']
-            df['body_size'] = abs(df['Close'] - df['Open']).replace(0, 0.0001)
+            df['Cuerpo_Vela'] = abs(df['Close'] - df['Open'])
             
             df['PL30'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
             df['PH30'] = df['High'].shift(1).rolling(30, min_periods=1).max()
@@ -165,7 +163,7 @@ else:
     st.error(f"🚨 ERROR API: {status_api}")
 
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
-    df_sim['Whale_Cond'] = df_sim['body_size'] > (df_sim['ATR'] * 0.3)
+    df_sim['Whale_Cond'] = df_sim['Cuerpo_Vela'] > (df_sim['ATR'] * 0.3)
     df_sim['Flash_Vol'] = (df_sim['RVol'] > (w_factor * 0.8)) & df_sim['Whale_Cond']
     
     df_sim['Target_Lock_Sup'] = df_sim[['PL30', 'PL100', 'PL300']].max(axis=1)
@@ -385,7 +383,6 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
 st.title("🛡️ The Alpha Quant Terminal")
-# 🔥 HEMOS AÑADIDO LA PESTAÑA "LEVIATHAN" 
 tab_tri, tab_jug, tab_def, tab_gen, tab_mon, tab_lev = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🌌 GÉNESIS", "🦍 MONSTER", "🐋 THE LEVIATHAN"])
 
 def renderizar_estrategia(strat_name, tab_obj, df_base):
@@ -481,37 +478,10 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
             eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state.get('gen_reinv', 100.0), comision_pct)
 
-        # --- MÓDULO: EL MONSTRUO PRAGMÁTICO ---
-        elif s_id == "MONSTER":
-            st.markdown("### 🦍 EL MONSTRUO PRAGMÁTICO")
-            st.info("Evolución del algoritmo tonto. Usa la materia prima de Génesis (Squeeze, RSI, Reversión) sin IA, sin cuadrantes, sin trampas de futuro (Causal 100%).")
-            
-            with st.form("form_monster"):
-                c1, c2, c3 = st.columns(3)
-                lab_tp = c1.slider("🎯 Take Profit Base (%)", 1.0, 30.0, value=15.0, step=0.5)
-                lab_sl = c2.slider("🛑 Stop Loss (%)", 1.0, 15.0, value=5.0, step=0.5)
-                lab_reinv = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=100.0, step=5.0)
-                if st.form_submit_button("🦍 Desatar al Monstruo"): st.rerun()
-
-            df_strat = inyectar_adn(df_base.copy(), 1.5, 2.5)
-            
-            extremo_buy = (df_strat['RSI'] < 30) & (df_strat['Close'] < df_strat['BBL']) & df_strat['Vela_Verde']
-            squeeze_buy = df_strat['Neon_Up'] & (df_strat['ADX'] > 20)
-            
-            extremo_sell = (df_strat['RSI'] > 70) & (df_strat['Close'] > df_strat['BBU']) & df_strat['Vela_Roja']
-            squeeze_sell = df_strat['Neon_Dn'] & (df_strat['ADX'] > 20)
-            
-            df_strat['Signal_Buy'] = extremo_buy | squeeze_buy
-            df_strat['Signal_Sell'] = extremo_sell | squeeze_sell
-            df_strat['Active_TP'] = lab_tp
-            df_strat['Active_SL'] = lab_sl
-            
-            eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, lab_reinv, comision_pct)
-
         # --- MÓDULO: THE LEVIATHAN (MACRO SWING) ---
         elif s_id == "LEVIATHAN":
             st.markdown("### 🐋 THE LEVIATHAN (Macro Swing Trader)")
-            st.info("Baja frecuencia, alta asimetría. Ignora el ruido y busca cazar las olas macro con 0% de Repainting. (Recomendado: 4 Horas o 1 Día)")
+            st.info("Baja frecuencia, alta asimetría. La lógica ha sido ajustada para buscar verdaderos Pullbacks dentro de tendencias alcistas.")
             
             with st.form("form_leviathan"):
                 c1, c2, c3 = st.columns(3)
@@ -520,17 +490,20 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 lab_reinv = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get('sld_reinv_LEVIATHAN', 100.0)), step=5.0)
                 if st.form_submit_button("🐋 Desatar al Leviatán"): st.rerun()
 
-            df_strat = inyectar_adn(df_base.copy(), 1.5, 2.5) 
+            df_strat = df_base.copy()
             
-            # 🔥 LÓGICA LEVIATHAN (Causal)
-            macro_bull = (df_strat['Close'] > df_strat['EMA_200']) & (df_strat['EMA_50'] > df_strat['EMA_200'])
-            pullback_zone = df_strat['RSI'] < 40
-            fuerza_alcista = df_strat['Vela_Verde'] & (df_strat['body_size'] > (df_strat['ATR'] * 0.8))
+            # 🔥 LÓGICA LEVIATHAN AJUSTADA (V46.1)
+            # 1. Macro Trend intacto
+            macro_bull = df_strat['Close'] > df_strat['EMA_200']
             
-            df_strat['Signal_Buy'] = macro_bull & pullback_zone & fuerza_alcista
+            # 2. Gatillo de Entrada: Compra cuando el RSI cruza su MA hacia arriba, 
+            # pero confirmando que veníamos de una zona enfriada (RSI anterior estaba por debajo de 50)
+            rsi_rebound = df_strat['RSI_Cross_Up'] & (df_strat['RSI'].shift(1).fillna(50) < 50)
             
-            # Cierre por Pánico Macro (Cruza la EMA 200 hacia abajo)
-            df_strat['Signal_Sell'] = (df_strat['Close'] < df_strat['EMA_200']) & (df_strat['Close'].shift(1) >= df_strat['EMA_200'].shift(1))
+            df_strat['Signal_Buy'] = macro_bull & rsi_rebound
+            
+            # Cierre por Pánico Macro (Si rompe la EMA 200 hacia abajo, huimos)
+            df_strat['Signal_Sell'] = (df_strat['Close'] < df_strat['EMA_200']) 
             
             df_strat['Active_TP'] = lab_tp
             df_strat['Active_SL'] = lab_sl
@@ -538,7 +511,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, lab_reinv, comision_pct)
 
         # --- BLOQUES NORMALES (TRINITY/JUGG/DEFCON) ---
-        else:
+        elif s_id != "MONSTER":
             with st.form(f"form_{s_id}"):
                 c1, c2, c3, c4 = st.columns(4)
                 st.session_state[f'sld_tp_{s_id}'] = c1.slider(f"🎯 TP Base (%)", 0.5, 15.0, value=float(st.session_state.get(f'sld_tp_{s_id}', 3.0)), step=0.1)
@@ -559,59 +532,59 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state.get(f'sld_reinv_{s_id}', 100.0), comision_pct)
 
         # --- SECCIÓN COMÚN (MÉTRICAS) ---
-        df_strat['Total_Portfolio'] = eq_curve
-        ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
-        buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
-        alpha_pct = ret_pct - buy_hold_ret
+        if s_id != "MONSTER":
+            df_strat['Total_Portfolio'] = eq_curve
+            ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
+            buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
+            alpha_pct = ret_pct - buy_hold_ret
 
-        dftr = pd.DataFrame(t_log)
-        tt, wr, pf_val, ado_act = 0, 0.0, 0.0, 0.0
-        if not dftr.empty:
-            exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
-            tt = len(exs)
-            ado_act = tt / dias_reales if dias_reales > 0 else 0
-            if tt > 0:
-                ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
-                wr = (ws / tt) * 100
-                gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum()
-                gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
-                pf_val = gpp / gll if gll > 0 else float('inf')
-        
-        mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
+            dftr = pd.DataFrame(t_log)
+            tt, wr, pf_val, ado_act = 0, 0.0, 0.0, 0.0
+            if not dftr.empty:
+                exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
+                tt = len(exs)
+                ado_act = tt / dias_reales if dias_reales > 0 else 0
+                if tt > 0:
+                    ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
+                    wr = (ws / tt) * 100
+                    gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum()
+                    gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
+                    pf_val = gpp / gll if gll > 0 else float('inf')
+            
+            mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
 
-        st.markdown(f"### 📊 Auditoría: {s_id}")
-        c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-        c1.metric("Portafolio Neto", f"${eq_curve[-1]:,.2f}", f"{ret_pct:.2f}%")
-        c2.metric("ALPHA (vs Hold)", f"{alpha_pct:.2f}%", f"Hold: {buy_hold_ret:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
-        c3.metric("Trades Totales", f"{tt}")
-        c4.metric("Win Rate", f"{wr:.1f}%")
-        c5.metric("Profit Factor", f"{pf_val:.2f}x")
-        c6.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
-        c7.metric("Comisiones Pagadas", f"${total_comms:,.2f}", delta_color="inverse")
+            st.markdown(f"### 📊 Auditoría: {s_id}")
+            c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+            c1.metric("Portafolio Neto", f"${eq_curve[-1]:,.2f}", f"{ret_pct:.2f}%")
+            c2.metric("ALPHA (vs Hold)", f"{alpha_pct:.2f}%", f"Hold: {buy_hold_ret:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
+            c3.metric("Trades Totales", f"{tt}")
+            c4.metric("Win Rate", f"{wr:.1f}%")
+            c5.metric("Profit Factor", f"{pf_val:.2f}x")
+            c6.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
+            c7.metric("Comisiones Pagadas", f"${total_comms:,.2f}", delta_color="inverse")
 
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
-        fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200', line=dict(color='orange', width=2)), row=1, col=1)
-        
-        if s_id == "LEVIATHAN":
-            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='EMA 50', line=dict(color='#FF9800', width=1)), row=1, col=1)
+            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+            fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
+            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200', line=dict(color='orange', width=2)), row=1, col=1)
+            
+            if s_id == "LEVIATHAN":
+                fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='EMA 50', line=dict(color='#FF9800', width=1)), row=1, col=1)
 
-        if not dftr.empty:
-            ents = dftr[dftr['Tipo'] == 'ENTRY']
-            fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white')), hovertemplate="COMPRA<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
-            wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
-            fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white')), text=wins['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
-            loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
-            fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white')), text=loss['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
+            if not dftr.empty:
+                ents = dftr[dftr['Tipo'] == 'ENTRY']
+                fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white')), hovertemplate="COMPRA<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
+                wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
+                fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white')), text=wins['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
+                loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
+                fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white')), text=loss['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
 
-        fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
-        fig.update_yaxes(side="right")
-        fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan")
-        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True}, key=f"chart_{s_id}")
+            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
+            fig.update_yaxes(side="right")
+            fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan")
+            st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True}, key=f"chart_{s_id}")
 
 renderizar_estrategia("TRINITY", tab_tri, df_global)
 renderizar_estrategia("JUGGERNAUT", tab_jug, df_global)
 renderizar_estrategia("DEFCON", tab_def, df_global)
 renderizar_estrategia("GENESIS", tab_gen, df_global)
-renderizar_estrategia("MONSTER", tab_mon, df_global)
-renderizar_estrategia("THE LEVIATHAN", tab_lev, df_global)
+renderizar_estrategia("LEVIATHAN", tab_lev, df_global)
