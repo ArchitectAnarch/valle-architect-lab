@@ -17,13 +17,22 @@ st.set_page_config(page_title="ROCKET PROTOCOL | Alpha Quant", layout="wide", in
 buy_rules = ['Pink_Whale_Buy', 'Lock_Bounce', 'Lock_Break', 'Defcon_Buy', 'Neon_Up', 'Therm_Bounce', 'Therm_Vacuum', 'Nuclear_Buy', 'Early_Buy', 'Rebound_Buy']
 sell_rules = ['Defcon_Sell', 'Neon_Dn', 'Therm_Wall_Sell', 'Therm_Panic_Sell', 'Lock_Reject', 'Lock_Breakd', 'Nuclear_Sell', 'Early_Sell']
 
-# INICIALIZACIÓN ESTRICTA Y AISLADA POR PESTAÑA
+# INICIALIZACIÓN ESTRICTA Y AISLADA POR PESTAÑA (SIN TILDES)
+for r_idx in range(1, 5):
+    if f'gen_r{r_idx}_b' not in st.session_state: st.session_state[f'gen_r{r_idx}_b'] = ['Nuclear_Buy']
+    if f'gen_r{r_idx}_s' not in st.session_state: st.session_state[f'gen_r{r_idx}_s'] = ['Nuclear_Sell']
+    if f'gen_r{r_idx}_tp' not in st.session_state: st.session_state[f'gen_r{r_idx}_tp'] = 5.0
+    if f'gen_r{r_idx}_sl' not in st.session_state: st.session_state[f'gen_r{r_idx}_sl'] = 2.0
+
 for s in ["TRINITY", "JUGGERNAUT", "DEFCON", "MONSTER", "LEVIATHAN", "GENESIS"]:
     if f'dna_{s}' not in st.session_state: st.session_state[f'dna_{s}'] = ""
     if f'ado_{s}' not in st.session_state: st.session_state[f'ado_{s}'] = 5.0 if s != "LEVIATHAN" else 0.2
     if f'sld_tp_{s}' not in st.session_state: st.session_state[f'sld_tp_{s}'] = 25.0 if s == "LEVIATHAN" else 3.0
     if f'sld_sl_{s}' not in st.session_state: st.session_state[f'sld_sl_{s}'] = 7.0 if s == "LEVIATHAN" else 1.5
     if f'sld_reinv_{s}' not in st.session_state: st.session_state[f'sld_reinv_{s}'] = 100.0
+
+if 'gen_ado' not in st.session_state: st.session_state['gen_ado'] = 5.0  
+if 'gen_reinv' not in st.session_state: st.session_state['gen_reinv'] = 100.0  
 
 css_spinner = """
 <style>
@@ -351,14 +360,13 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
 st.title("🛡️ The Omni-Brain Lab")
-tab_tri, tab_jug, tab_def, tab_gen, tab_mon, tab_lev = st.tabs(["💠 TRINITY", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🌌 GÉNESIS", "🦍 MONSTER", "🐋 LEVIATHAN"])
+tab_tri, tab_jug, tab_def, tab_gen, tab_mon, tab_lev = st.tabs(["💠 TRINITY", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🌌 GENESIS", "🦍 MONSTER", "🐋 LEVIATHAN"])
 
 def optimizar_ia(s_id, df_precalc, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money):
     h_a, l_a, c_a, o_a = df_precalc['High'].values, df_precalc['Low'].values, df_precalc['Close'].values, df_precalc['Open'].values
     best_fit = -float('inf')
     bp = None
     
-    # Rango de TP flexible: Si buscamos operaciones rápidas, permitimos TPs más pequeños.
     tp_min, tp_max = (0.5, 15.0) if target_ado > 2 else (2.0, 30.0)
     if s_id == "LEVIATHAN": tp_min, tp_max = 10.0, 50.0
     
@@ -367,7 +375,6 @@ def optimizar_ia(s_id, df_precalc, cap_ini, com_pct, reinv_q, target_ado, dias_r
         rsl = round(random.uniform(0.5, 10.0), 1)
         if s_id == "LEVIATHAN": rsl = round(random.uniform(3.0, 20.0), 1)
         
-        # Selección de gatillos por estrategia
         if s_id == "TRINITY":
             b_c = df_precalc['Pink_Whale_Buy'] | df_precalc['Lock_Bounce'] | df_precalc['Defcon_Buy']
             s_c = df_precalc['Defcon_Sell'] | df_precalc['Therm_Wall_Sell']
@@ -397,7 +404,6 @@ def optimizar_ia(s_id, df_precalc, cap_ini, com_pct, reinv_q, target_ado, dias_r
 
         alpha_money = net - buy_hold_money
         
-        # Flexibilidad para operar más: solo exigimos un mínimo de 2 trades
         if nt >= max(2, int(dias_reales * (target_ado * 0.1))): 
             if net > 0: fit = (net * (pf**2) * np.sqrt(nt)) / ((mdd ** 1.5) + 1.0) * ado_multiplier
             else: fit = net * ((mdd ** 1.5) + 1.0) / (pf + 0.001)
@@ -416,7 +422,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         
         if st.session_state.get(f'update_pending_{s_id}', False):
             bp = st.session_state[f'pending_bp_{s_id}']
-            if s_id == "GÉNESIS":
+            if s_id == "GENESIS":
                 for r_idx in range(1, 5):
                     st.session_state[f'gen_r{r_idx}_b'] = bp[f'b{r_idx}']
                     st.session_state[f'gen_r{r_idx}_s'] = bp[f's{r_idx}']
@@ -428,11 +434,41 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
                 st.session_state[f'sld_reinv_{s_id}'] = float(bp['reinv'])
             st.session_state[f'update_pending_{s_id}'] = False
 
-        if s_id == "GÉNESIS":
+        # --- MÓDULO GÉNESIS (UI RESTAURADA CON MULTISELECTS) ---
+        if s_id == "GENESIS":
             st.markdown("### 🌌 GÉNESIS (Omni-Brain)")
+            st.info("Personalice manualmente o use la IA para hallar la combinación perfecta por Cuadrante.")
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state['gen_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get('gen_ado', 5.0)), step=0.5, key="ui_gen_ado")
             st.session_state['gen_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get('gen_reinv', 100.0)), step=5.0, key="ui_gen_reinv")
+
+            # 🔥 LOS 4 CUADRANTES VUELVEN A LA VIDA 🔥
+            st.markdown("---")
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                st.markdown("<h5 style='color:lime;'>🟢 Bull Trend</h5>", unsafe_allow_html=True)
+                st.multiselect("Compras", buy_rules, key="gen_r1_b")
+                st.multiselect("Cierres", sell_rules, key="gen_r1_s")
+                st.slider("TP %", 0.5, 30.0, step=0.5, key="gen_r1_tp")
+                st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r1_sl")
+            with c2:
+                st.markdown("<h5 style='color:yellow;'>🟡 Bull Chop</h5>", unsafe_allow_html=True)
+                st.multiselect("Compras", buy_rules, key="gen_r2_b")
+                st.multiselect("Cierres", sell_rules, key="gen_r2_s")
+                st.slider("TP %", 0.5, 30.0, step=0.5, key="gen_r2_tp")
+                st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r2_sl")
+            with c3:
+                st.markdown("<h5 style='color:red;'>🔴 Bear Trend</h5>", unsafe_allow_html=True)
+                st.multiselect("Compras", buy_rules, key="gen_r3_b")
+                st.multiselect("Cierres", sell_rules, key="gen_r3_s")
+                st.slider("TP %", 0.5, 30.0, step=0.5, key="gen_r3_tp")
+                st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r3_sl")
+            with c4:
+                st.markdown("<h5 style='color:orange;'>🟠 Bear Chop</h5>", unsafe_allow_html=True)
+                st.multiselect("Compras", buy_rules, key="gen_r4_b")
+                st.multiselect("Cierres", sell_rules, key="gen_r4_s")
+                st.slider("TP %", 0.5, 30.0, step=0.5, key="gen_r4_tp")
+                st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r4_sl")
 
             if c_ia3.button("🚀 EXTRACCIÓN CUÁNTICA", type="primary", key="btn_gen"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
@@ -630,6 +666,6 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 renderizar_estrategia("TRINITY", tab_tri, df_global)
 renderizar_estrategia("JUGGERNAUT", tab_jug, df_global)
 renderizar_estrategia("DEFCON", tab_def, df_global)
-renderizar_estrategia("GÉNESIS", tab_gen, df_global)
+renderizar_estrategia("GENESIS", tab_gen, df_global)
 renderizar_estrategia("MONSTER", tab_mon, df_global)
-renderizar_estrategia("THE LEVIATHAN", tab_lev, df_global)
+renderizar_estrategia("LEVIATHAN", tab_lev, df_global)
