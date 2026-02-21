@@ -14,17 +14,17 @@ from datetime import datetime, timedelta
 st.set_page_config(page_title="ROCKET PROTOCOL | Alpha Quant", layout="wide", initial_sidebar_state="expanded")
 
 # --- MEMORIA IA INSTITUCIONAL ---
-buy_rules = ['Pink_Whale_Buy', 'Lock_Bounce', 'Lock_Break', 'Defcon_Buy', 'Neon_Up', 'Therm_Bounce', 'Therm_Vacuum', 'Nuclear_Buy', 'Early_Buy', 'Rebound_Buy']
-sell_rules = ['Defcon_Sell', 'Neon_Dn', 'Therm_Wall_Sell', 'Therm_Panic_Sell', 'Lock_Reject', 'Lock_Breakd', 'Nuclear_Sell', 'Early_Sell']
+buy_rules = ['Pink_Whale_Buy', 'Lock_Bounce', 'Lock_Break', 'Defcon_Buy', 'Neon_Up', 'Therm_Bounce', 'Therm_Vacuum', 'Nuclear_Buy', 'Early_Buy', 'Rebound_Buy', 'Pink_Climax_Buy', 'Ping_Pong_Buy']
+sell_rules = ['Defcon_Sell', 'Neon_Dn', 'Therm_Wall_Sell', 'Therm_Panic_Sell', 'Lock_Reject', 'Lock_Breakd', 'Nuclear_Sell', 'Early_Sell', 'Pink_Climax_Sell', 'Ping_Pong_Sell']
 
 # INICIALIZACIÓN ESTRICTA Y AISLADA
 for r_idx in range(1, 5):
-    if f'gen_r{r_idx}_b' not in st.session_state: st.session_state[f'gen_r{r_idx}_b'] = ['Nuclear_Buy']
-    if f'gen_r{r_idx}_s' not in st.session_state: st.session_state[f'gen_r{r_idx}_s'] = ['Nuclear_Sell']
+    if f'gen_r{r_idx}_b' not in st.session_state: st.session_state[f'gen_r{r_idx}_b'] = ['Pink_Climax_Buy']
+    if f'gen_r{r_idx}_s' not in st.session_state: st.session_state[f'gen_r{r_idx}_s'] = ['Pink_Climax_Sell']
     if f'gen_r{r_idx}_tp' not in st.session_state: st.session_state[f'gen_r{r_idx}_tp'] = 5.0
     if f'gen_r{r_idx}_sl' not in st.session_state: st.session_state[f'gen_r{r_idx}_sl'] = 2.0
 
-estrategias = ["TRINITY", "JUGGERNAUT", "DEFCON", "TARGET_LOCK", "THERMAL", "GENESIS"]
+estrategias = ["TRINITY", "JUGGERNAUT", "DEFCON", "TARGET_LOCK", "THERMAL", "PINK_CLIMAX", "PING_PONG", "GENESIS"]
 
 for s in estrategias:
     if f'dna_{s}' not in st.session_state: st.session_state[f'dna_{s}'] = ""
@@ -48,7 +48,7 @@ css_spinner = """
 """
 ph_holograma = st.empty()
 
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE LAB</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE LAB V52</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     gc.collect()
@@ -92,6 +92,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         
         if len(df) > 50:
             df['EMA_200'] = df['Close'].ewm(span=200, min_periods=1, adjust=False).mean()
+            df['EMA_50'] = df['Close'].ewm(span=50, min_periods=1, adjust=False).mean()
             df['Vol_MA_100'] = df['Volume'].rolling(window=100, min_periods=1).mean()
             df['RVol'] = df['Volume'] / df['Vol_MA_100'].replace(0, 1)
             
@@ -118,7 +119,10 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             df['Vela_Verde'] = df['Close'] > df['Open']
             df['Vela_Roja'] = df['Close'] < df['Open']
             df['Cuerpo_Vela'] = abs(df['Close'] - df['Open'])
+            df['upper_wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
+            df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
             
+            # PIVOTES FÍSICOS SIN LOOKAHEAD
             df['PL30'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
             df['PH30'] = df['High'].shift(1).rolling(30, min_periods=1).max()
             df['PL100'] = df['Low'].shift(1).rolling(100, min_periods=1).min()
@@ -130,10 +134,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             df['Target_Lock_Sup'] = df[['PL30', 'PL100', 'PL300']].max(axis=1)
             df['Target_Lock_Res'] = df[['PH30', 'PH100', 'PH300']].min(axis=1)
             df['tol'] = df['ATR'] * 0.5
-            
-            df['Lock_Bounce'] = (df['Low'] <= (df['Target_Lock_Sup'] + df['tol'])) & (df['Close'] > df['Target_Lock_Sup']) & df['Vela_Verde']
-            df['Lock_Reject'] = (df['High'] >= (df['Target_Lock_Res'] - df['tol'])) & (df['Close'] < df['Target_Lock_Res']) & df['Vela_Roja']
-            df['Lock_Breakd'] = (df['Close'] < df['Target_Lock_Sup']) & (df['Open'] >= df['Target_Lock_Sup']) & df['Vela_Roja']
             
             df['dist_sup'] = (abs(df['Close'] - df['PL30']) / df['Close']) * 100
             df['dist_res'] = (abs(df['Close'] - df['PH30']) / df['Close']) * 100
@@ -154,6 +154,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             df['RSI_Cross_Up'] = (df['RSI'] > rsi_ma) & (df['RSI'].shift(1).fillna(50) <= rsi_ma.shift(1).fillna(50))
             df['RSI_Cross_Dn'] = (df['RSI'] < rsi_ma) & (df['RSI'].shift(1).fillna(50) >= rsi_ma.shift(1).fillna(50))
             df['Retro_Peak'] = (df['RSI'] < 30) & (df['Close'] < df['BBL'])
+            df['Retro_Peak_Sell'] = (df['RSI'] > 70) & (df['Close'] > df['BBU'])
             
             df['Neon_Up'] = df['Squeeze_On'] & (df['Close'] >= df['BBU'] * 0.999) & df['Vela_Verde']
             df['Neon_Dn'] = df['Squeeze_On'] & (df['Close'] <= df['BBL'] * 1.001) & df['Vela_Roja']
@@ -164,6 +165,11 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             df['Therm_Vacuum'] = (df['ceil_w'] <= 3) & df['Neon_Up'] & ~(df['floor_w'] == 0)
             df['Therm_Wall_Sell'] = (df['ceil_w'] >= 4) & df['RSI_Cross_Dn']
             df['Therm_Panic_Sell'] = (df['floor_w'] == 0) & df['Vela_Roja']
+            
+            # --- FÍSICA PING PONG (REGRESIÓN LINEAL) ---
+            df['PP_Slope'] = ta.linreg(df['Close'], 5, 0) - ta.linreg(df['Close'], 5, 1)
+            df['Ping_Pong_Buy'] = (df['PP_Slope'] > 0) & (df['PP_Slope'].shift(1).fillna(0) <= 0) & df['Radar_Activo']
+            df['Ping_Pong_Sell'] = (df['PP_Slope'] < 0) & (df['PP_Slope'].shift(1).fillna(0) >= 0) & df['Radar_Activo']
             
             ap = (df['High'] + df['Low'] + df['Close']) / 3
             esa = ap.ewm(span=10, min_periods=1).mean()
@@ -194,26 +200,49 @@ else:
     dias_reales = 1
     st.error(f"🚨 ERROR API: {status_api}")
 
-# --- INYECCIÓN RÁPIDA (MUTA RADAR Y BALLENA) ---
+# --- 3. INYECCIÓN ULTRA RÁPIDA (Muta Radar, Ballena y Clímax) ---
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     df_sim['Flash_Vol'] = (df_sim['RVol'] > (w_factor * 0.8)) & df_sim['Whale_Cond']
+    df_sim['Lock_Bounce'] = (df_sim['Low'] <= (df_sim['Target_Lock_Sup'] + df_sim['tol'])) & (df_sim['Close'] > df_sim['Target_Lock_Sup']) & df_sim['Vela_Verde']
     df_sim['Lock_Break'] = (df_sim['Close'] > df_sim['Target_Lock_Res']) & (df_sim['Open'] <= df_sim['Target_Lock_Res']) & df_sim['Flash_Vol'] & df_sim['Vela_Verde']
+    df_sim['Lock_Reject'] = (df_sim['High'] >= (df_sim['Target_Lock_Res'] - df_sim['tol'])) & (df_sim['Close'] < df_sim['Target_Lock_Res']) & df_sim['Vela_Roja']
+    df_sim['Lock_Breakd'] = (df_sim['Close'] < df_sim['Target_Lock_Sup']) & (df_sim['Open'] >= df_sim['Target_Lock_Sup']) & df_sim['Vela_Roja']
+    
     df_sim['Radar_Activo'] = (df_sim['dist_sup'] <= r_sens) | (df_sim['dist_res'] <= r_sens)
 
+    # --- SCORE V320 PARA EL PINK CLIMAX ---
     buy_score = np.where(df_sim['Retro_Peak'] | df_sim['RSI_Cross_Up'], 30, 0)
     buy_score = np.where(df_sim['Retro_Peak'], 50, buy_score)
     buy_score = np.where((buy_score > 0) & df_sim['Radar_Activo'], buy_score + 25, buy_score)
     buy_score = np.where((buy_score > 0) & (df_sim['Z_Score'] < -2.0), buy_score + 15, buy_score)
     
-    is_magenta = (buy_score >= 70) | df_sim['Retro_Peak']
+    sell_score = np.where(df_sim['Retro_Peak_Sell'] | df_sim['RSI_Cross_Dn'], 30, 0)
+    sell_score = np.where(df_sim['Retro_Peak_Sell'], 50, sell_score)
+    sell_score = np.where((sell_score > 0) & df_sim['Radar_Activo'], sell_score + 25, sell_score)
+    sell_score = np.where((sell_score > 0) & (df_sim['Z_Score'] > 2.0), sell_score + 15, sell_score)
+    
+    is_magenta_buy = (buy_score >= 70) | df_sim['Retro_Peak']
+    is_magenta_sell = (sell_score >= 70) | df_sim['Retro_Peak_Sell']
+    
+    # --- LA NUEVA ESTRATEGIA: PINK CLIMAX ---
+    final_wick_req = np.where(df_sim['Radar_Activo'], 0.15, 0.4)
+    final_vol_req = np.where(df_sim['Radar_Activo'], 1.2, 1.5)
+    
+    wick_rej_buy = df_sim['lower_wick'] > (df_sim['body_size'] * final_wick_req)
+    wick_rej_sell = df_sim['upper_wick'] > (df_sim['body_size'] * final_wick_req)
+    vol_stop_chk = df_sim['RVol'] > final_vol_req
+    
+    df_sim['Pink_Climax_Buy'] = is_magenta_buy & (wick_rej_buy | vol_stop_chk)
+    df_sim['Pink_Climax_Sell'] = is_magenta_sell & (wick_rej_sell | vol_stop_chk)
+    
     is_whale_icon = df_sim['Flash_Vol'] & df_sim['Vela_Verde'] & (~df_sim['Flash_Vol'].shift(1).fillna(False))
     
-    df_sim['Pink_Whale_Buy'] = is_magenta & is_whale_icon
-    df_sim['Nuclear_Buy'] = is_magenta & (df_sim['WT_Oversold'] | df_sim['WT_Cross_Up'])
-    df_sim['Early_Buy'] = is_magenta
+    df_sim['Pink_Whale_Buy'] = is_magenta_buy & is_whale_icon
+    df_sim['Nuclear_Buy'] = is_magenta_buy & (df_sim['WT_Oversold'] | df_sim['WT_Cross_Up'])
+    df_sim['Early_Buy'] = is_magenta_buy
     df_sim['Nuclear_Sell'] = (df_sim['RSI'] > 70) & (df_sim['WT_Overbought'] | df_sim['WT_Cross_Dn'])
     df_sim['Early_Sell'] = (df_sim['RSI'] > 70) & df_sim['Vela_Roja']
-    df_sim['Rebound_Buy'] = df_sim['RSI_Cross_Up'] & ~is_magenta
+    df_sim['Rebound_Buy'] = df_sim['RSI_Cross_Up'] & ~is_magenta_buy
     
     return df_sim
 
@@ -381,8 +410,8 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
 st.title("🛡️ The Omni-Brain Lab")
-# 🔥 RESTAURACIÓN ABSOLUTA DE LAS OBRAS MAESTRAS 🔥
-tab_tri, tab_jug, tab_def, tab_loc, tab_the, tab_gen = st.tabs(["💠 TRINITY", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🎯 TARGET LOCK", "🌡️ THERMAL / TERMÓMETRO", "🌌 GÉNESIS"])
+# 🔥 EL ARSENAL COMPLETO 🔥
+tab_tri, tab_jug, tab_def, tab_loc, tab_the, tab_pnk, tab_png, tab_gen = st.tabs(["💠 TRINITY", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🎯 TARGET_LOCK", "🌡️ THERMAL", "🌸 PINK_CLIMAX", "🏓 PING_PONG", "🌌 GENESIS"])
 
 def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money):
     best_fit = -float('inf')
@@ -415,6 +444,12 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
         elif s_id == "THERMAL":
             b_c = df_precalc['Therm_Bounce'] | df_precalc['Therm_Vacuum']
             s_c = df_precalc['Therm_Wall_Sell'] | df_precalc['Therm_Panic_Sell']
+        elif s_id == "PINK_CLIMAX":
+            b_c = df_precalc['Pink_Climax_Buy']
+            s_c = df_precalc['Pink_Climax_Sell']
+        elif s_id == "PING_PONG":
+            b_c = df_precalc['Ping_Pong_Buy']
+            s_c = df_precalc['Ping_Pong_Sell']
             
         t_arr, sl_arr = np.full(len(df_precalc), rtp), np.full(len(df_precalc), rsl)
         net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c.values, s_c.values, t_arr, sl_arr, cap_ini, com_pct, reinv_q)
@@ -441,7 +476,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         if df_base.empty: return
         
         # Filtro de nombres exactos para la sesión
-        s_id = "TARGET_LOCK" if "TARGET" in strat_name else "THERMAL" if "THERMAL" in strat_name else "GENESIS" if "GÉNESIS" in strat_name else strat_name.split()[1] if strat_name.startswith("THE") else strat_name.split()[1] if " " in strat_name else strat_name
+        s_id = strat_name.replace(" ", "").replace("💠", "").replace("⚔️", "").replace("🚀", "").replace("🎯", "").replace("🌡️", "").replace("🌸", "").replace("🏓", "").replace("🌌", "")
         
         if st.session_state.get(f'update_pending_{s_id}', False):
             bp = st.session_state[f'pending_bp_{s_id}']
@@ -580,9 +615,9 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
             eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state.get('gen_reinv', 100.0), comision_pct)
 
-        # --- BLOQUES UNIVERSALES (TRINITY, JUGG, DEFCON, LOCK, THERMAL) ---
+        # --- BLOQUES UNIVERSALES ---
         else:
-            st.markdown(f"### ⚙️ {s_id} (Truth Engine)")
+            st.markdown(f"### ⚙️ {strat_name} (Truth Engine)")
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state[f'ado_{s_id}'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get(f'ado_{s_id}', 5.0)), step=0.5, key=f"ui_ado_{s_id}")
             st.session_state[f'sld_reinv_{s_id}'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'sld_reinv_{s_id}', 100.0)), step=5.0, key=f"ui_reinv_{s_id}")
@@ -636,6 +671,12 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             elif s_id == "DEFCON":
                 df_strat['Signal_Buy'] = df_strat['Defcon_Buy']
                 df_strat['Signal_Sell'] = df_strat['Defcon_Sell']
+            elif s_id == "PINK_CLIMAX":
+                df_strat['Signal_Buy'] = df_strat['Pink_Climax_Buy']
+                df_strat['Signal_Sell'] = df_strat['Pink_Climax_Sell']
+            elif s_id == "PING_PONG":
+                df_strat['Signal_Buy'] = df_strat['Ping_Pong_Buy']
+                df_strat['Signal_Sell'] = df_strat['Ping_Pong_Sell']
                 
             df_strat['Active_TP'] = st.session_state[f'sld_tp_{s_id}']
             df_strat['Active_SL'] = st.session_state[f'sld_sl_{s_id}']
@@ -694,4 +735,6 @@ renderizar_estrategia("⚔️ JUGGERNAUT", tab_jug, df_global)
 renderizar_estrategia("🚀 DEFCON", tab_def, df_global)
 renderizar_estrategia("🎯 TARGET_LOCK", tab_loc, df_global)
 renderizar_estrategia("🌡️ THERMAL", tab_the, df_global)
+renderizar_estrategia("🌸 PINK_CLIMAX", tab_pnk, df_global)
+renderizar_estrategia("🏓 PING_PONG", tab_png, df_global)
 renderizar_estrategia("🌌 GENESIS", tab_gen, df_global)
