@@ -230,7 +230,7 @@ def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     
     return df_sim
 
-# --- NÚCLEO FÍSICO C++ CÁLCULO DE INTERÉS COMPUESTO (INCLUYE COMISIONES PAGADAS) ---
+# --- NÚCLEO FÍSICO C++ CÁLCULO DE INTERÉS COMPUESTO ---
 def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr, sl_arr, cap_ini, com_pct, reinvest_pct):
     cap_act = cap_ini
     divs = 0.0
@@ -414,7 +414,6 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
 
 # --- 4. TERMINAL RENDER ---
 st.title("🛡️ The Alpha Quant Terminal")
-# 🔥 HEMOS AÑADIDO LA PESTAÑA "LAB BASE" PARA COMPROBAR LA LÓGICA PURA
 tab_tri, tab_jug, tab_def, tab_gen, tab_base = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT V356", "🚀 DEFCON V329", "🌌 GÉNESIS V320", "🧪 LAB BASE (TEST)"])
 
 def renderizar_estrategia(strat_name, tab_obj, df_base):
@@ -614,7 +613,7 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
         # --- MÓDULO DE PRUEBA (LAB BASE) ---
         elif s_id == "LAB":
             st.markdown("### 🧪 Laboratorio de Control Básico")
-            st.info("Este es un algoritmo "tonto" (RSI Básico) para probar que el motor lee correctamente las velas, los precios y genera los trades sin IA de por medio.")
+            st.info("Este es un algoritmo 'tonto' (RSI Básico) para probar que el motor lee correctamente las velas, los precios y genera los trades sin IA de por medio.")
             
             with st.form("form_lab"):
                 c1, c2, c3 = st.columns(3)
@@ -624,7 +623,6 @@ TP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"""
                 if st.form_submit_button("🧪 Disparar Prueba"): st.rerun()
 
             df_strat = df_base.copy()
-            # Lógica tonta de prueba: Compra cuando RSI cruza 30 hacia arriba, vende dinámicamente si cruza 70 hacia abajo
             rsi_cross_up = (df_strat['RSI'] > 30) & (df_strat['RSI'].shift(1).fillna(50) <= 30)
             rsi_cross_dn = (df_strat['RSI'] < 70) & (df_strat['RSI'].shift(1).fillna(50) >= 70)
             
