@@ -4,3 +4,4 @@ plotly
 pandas-ta
 pandas
 numpy
+numba==0.58.1
