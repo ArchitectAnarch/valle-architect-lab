@@ -3,5 +3,3 @@ ccxt
 plotly
 pandas
 pandas-ta
-numpy<2.0.0
-numba==0.59.1
