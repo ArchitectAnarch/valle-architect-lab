@@ -19,12 +19,12 @@ sell_rules = ['Defcon_Sell', 'Neon_Dn', 'Therm_Wall_Sell', 'Therm_Panic_Sell', '
 
 # INICIALIZACIÓN ESTRICTA Y AISLADA
 for r_idx in range(1, 5):
-    if f'gen_r{r_idx}_b' not in st.session_state: st.session_state[f'gen_r{r_idx}_b'] = ['Pink_Climax_Buy']
-    if f'gen_r{r_idx}_s' not in st.session_state: st.session_state[f'gen_r{r_idx}_s'] = ['Pink_Climax_Sell']
+    if f'gen_r{r_idx}_b' not in st.session_state: st.session_state[f'gen_r{r_idx}_b'] = ['Neon_Up']
+    if f'gen_r{r_idx}_s' not in st.session_state: st.session_state[f'gen_r{r_idx}_s'] = ['Neon_Dn']
     if f'gen_r{r_idx}_tp' not in st.session_state: st.session_state[f'gen_r{r_idx}_tp'] = 5.0
     if f'gen_r{r_idx}_sl' not in st.session_state: st.session_state[f'gen_r{r_idx}_sl'] = 2.0
 
-estrategias = ["TRINITY", "JUGGERNAUT", "DEFCON", "TARGET_LOCK", "THERMAL", "PINK_CLIMAX", "PING_PONG", "GENESIS"]
+estrategias = ["TRINITY", "JUGGERNAUT", "DEFCON", "TARGET_LOCK", "THERMAL", "PINK_CLIMAX", "PING_PONG", "NEON_SQUEEZE", "GENESIS"]
 
 for s in estrategias:
     if f'dna_{s}' not in st.session_state: st.session_state[f'dna_{s}'] = ""
@@ -48,7 +48,7 @@ css_spinner = """
 """
 ph_holograma = st.empty()
 
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE LAB V52</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V53</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     gc.collect()
@@ -166,10 +166,8 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             df['Therm_Wall_Sell'] = (df['ceil_w'] >= 4) & df['RSI_Cross_Dn']
             df['Therm_Panic_Sell'] = (df['floor_w'] == 0) & df['Vela_Roja']
             
-            # --- FÍSICA PING PONG (REGRESIÓN LINEAL) ---
+            # 🔥 REGRESIÓN LINEAL (PING PONG BASE) 🔥
             df['PP_Slope'] = ta.linreg(df['Close'], 5, 0) - ta.linreg(df['Close'], 5, 1)
-            df['Ping_Pong_Buy'] = (df['PP_Slope'] > 0) & (df['PP_Slope'].shift(1).fillna(0) <= 0) & df['Radar_Activo']
-            df['Ping_Pong_Sell'] = (df['PP_Slope'] < 0) & (df['PP_Slope'].shift(1).fillna(0) >= 0) & df['Radar_Activo']
             
             ap = (df['High'] + df['Low'] + df['Close']) / 3
             esa = ap.ewm(span=10, min_periods=1).mean()
@@ -224,7 +222,6 @@ def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     is_magenta_buy = (buy_score >= 70) | df_sim['Retro_Peak']
     is_magenta_sell = (sell_score >= 70) | df_sim['Retro_Peak_Sell']
     
-    # --- LA NUEVA ESTRATEGIA: PINK CLIMAX ---
     final_wick_req = np.where(df_sim['Radar_Activo'], 0.15, 0.4)
     final_vol_req = np.where(df_sim['Radar_Activo'], 1.2, 1.5)
     
@@ -236,13 +233,17 @@ def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     df_sim['Pink_Climax_Sell'] = is_magenta_sell & (wick_rej_sell | vol_stop_chk)
     
     is_whale_icon = df_sim['Flash_Vol'] & df_sim['Vela_Verde'] & (~df_sim['Flash_Vol'].shift(1).fillna(False))
-    
     df_sim['Pink_Whale_Buy'] = is_magenta_buy & is_whale_icon
+    
     df_sim['Nuclear_Buy'] = is_magenta_buy & (df_sim['WT_Oversold'] | df_sim['WT_Cross_Up'])
     df_sim['Early_Buy'] = is_magenta_buy
     df_sim['Nuclear_Sell'] = (df_sim['RSI'] > 70) & (df_sim['WT_Overbought'] | df_sim['WT_Cross_Dn'])
     df_sim['Early_Sell'] = (df_sim['RSI'] > 70) & df_sim['Vela_Roja']
     df_sim['Rebound_Buy'] = df_sim['RSI_Cross_Up'] & ~is_magenta_buy
+    
+    # 🔥 PING PONG (AHORA SÍ FUNCIONA PERFECTO) 🔥
+    df_sim['Ping_Pong_Buy'] = (df_sim['PP_Slope'] > 0) & (df_sim['PP_Slope'].shift(1).fillna(0) <= 0) & df_sim['Radar_Activo']
+    df_sim['Ping_Pong_Sell'] = (df_sim['PP_Slope'] < 0) & (df_sim['PP_Slope'].shift(1).fillna(0) >= 0) & df_sim['Radar_Activo']
     
     return df_sim
 
@@ -410,8 +411,8 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
 st.title("🛡️ The Omni-Brain Lab")
-# 🔥 EL ARSENAL COMPLETO 🔥
-tab_tri, tab_jug, tab_def, tab_loc, tab_the, tab_pnk, tab_png, tab_gen = st.tabs(["💠 TRINITY", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🎯 TARGET_LOCK", "🌡️ THERMAL", "🌸 PINK_CLIMAX", "🏓 PING_PONG", "🌌 GENESIS"])
+# 🔥 EL PENTÁGONO CUÁNTICO (9 CABEZAS) 🔥
+tab_tri, tab_jug, tab_def, tab_loc, tab_the, tab_pnk, tab_png, tab_neo, tab_gen = st.tabs(["💠 TRINITY", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🎯 TARGET_LOCK", "🌡️ THERMAL", "🌸 PINK_CLIMAX", "🏓 PING_PONG", "🐛 NEON_SQUEEZE", "🌌 GENESIS"])
 
 def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money):
     best_fit = -float('inf')
@@ -422,7 +423,6 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
         rtp = round(random.uniform(tp_min, tp_max), 1)
         rsl = round(random.uniform(0.5, 10.0), 1)
         
-        # Muta Factor Ballena y Radar
         rwh = round(random.uniform(1.5, 4.0), 1)
         rrd = round(random.uniform(0.5, 3.0), 1)
         
@@ -450,6 +450,9 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
         elif s_id == "PING_PONG":
             b_c = df_precalc['Ping_Pong_Buy']
             s_c = df_precalc['Ping_Pong_Sell']
+        elif s_id == "NEON_SQUEEZE":
+            b_c = df_precalc['Neon_Up']
+            s_c = df_precalc['Neon_Dn']
             
         t_arr, sl_arr = np.full(len(df_precalc), rtp), np.full(len(df_precalc), rsl)
         net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c.values, s_c.values, t_arr, sl_arr, cap_ini, com_pct, reinv_q)
@@ -475,8 +478,8 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
     with tab_obj:
         if df_base.empty: return
         
-        # Filtro de nombres exactos para la sesión
-        s_id = strat_name.replace(" ", "").replace("💠", "").replace("⚔️", "").replace("🚀", "").replace("🎯", "").replace("🌡️", "").replace("🌸", "").replace("🏓", "").replace("🌌", "")
+        # Limpieza robusta del nombre de la pestaña
+        s_id = strat_name.replace("💠 ", "").replace("⚔️ ", "").replace("🚀 ", "").replace("🎯 ", "").replace("🌡️ ", "").replace("🌸 ", "").replace("🏓 ", "").replace("🐛 ", "").replace("🌌 ", "")
         
         if st.session_state.get(f'update_pending_{s_id}', False):
             bp = st.session_state[f'pending_bp_{s_id}']
@@ -617,7 +620,7 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 
         # --- BLOQUES UNIVERSALES ---
         else:
-            st.markdown(f"### ⚙️ {strat_name} (Truth Engine)")
+            st.markdown(f"### ⚙️ {s_id} (Truth Engine)")
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state[f'ado_{s_id}'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get(f'ado_{s_id}', 5.0)), step=0.5, key=f"ui_ado_{s_id}")
             st.session_state[f'sld_reinv_{s_id}'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'sld_reinv_{s_id}', 100.0)), step=5.0, key=f"ui_reinv_{s_id}")
@@ -677,6 +680,9 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             elif s_id == "PING_PONG":
                 df_strat['Signal_Buy'] = df_strat['Ping_Pong_Buy']
                 df_strat['Signal_Sell'] = df_strat['Ping_Pong_Sell']
+            elif s_id == "NEON_SQUEEZE":
+                df_strat['Signal_Buy'] = df_strat['Neon_Up']
+                df_strat['Signal_Sell'] = df_strat['Neon_Dn']
                 
             df_strat['Active_TP'] = st.session_state[f'sld_tp_{s_id}']
             df_strat['Active_SL'] = st.session_state[f'sld_sl_{s_id}']
@@ -737,4 +743,5 @@ renderizar_estrategia("🎯 TARGET_LOCK", tab_loc, df_global)
 renderizar_estrategia("🌡️ THERMAL", tab_the, df_global)
 renderizar_estrategia("🌸 PINK_CLIMAX", tab_pnk, df_global)
 renderizar_estrategia("🏓 PING_PONG", tab_png, df_global)
+renderizar_estrategia("🐛 NEON_SQUEEZE", tab_neo, df_global)
 renderizar_estrategia("🌌 GENESIS", tab_gen, df_global)
