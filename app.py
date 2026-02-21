@@ -27,9 +27,9 @@ if 'gen_ado' not in st.session_state: st.session_state['gen_ado'] = 5.0
 if 'gen_reinv' not in st.session_state: st.session_state['gen_reinv'] = 100.0  
 if 'winning_dna' not in st.session_state: st.session_state['winning_dna'] = ""
 
-for s in ["TRINITY", "JUGGERNAUT", "DEFCON", "MONSTER"]:
-    if f'sld_tp_{s}' not in st.session_state: st.session_state[f'sld_tp_{s}'] = 3.0
-    if f'sld_sl_{s}' not in st.session_state: st.session_state[f'sld_sl_{s}'] = 1.5
+for s in ["TRINITY", "JUGGERNAUT", "DEFCON", "MONSTER", "LEVIATHAN"]:
+    if f'sld_tp_{s}' not in st.session_state: st.session_state[f'sld_tp_{s}'] = 25.0 if s == "LEVIATHAN" else 3.0
+    if f'sld_sl_{s}' not in st.session_state: st.session_state[f'sld_sl_{s}'] = 7.0 if s == "LEVIATHAN" else 1.5
     if f'sld_wh_{s}' not in st.session_state: st.session_state[f'sld_wh_{s}'] = 2.5
     if f'sld_rd_{s}' not in st.session_state: st.session_state[f'sld_rd_{s}'] = 1.5
     if f'sld_reinv_{s}' not in st.session_state: st.session_state[f'sld_reinv_{s}'] = 100.0
@@ -50,13 +50,13 @@ if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=Tr
     gc.collect()
 
 st.sidebar.markdown("---")
-st.sidebar.info("⚡ Nota: Use KuCoin o Kraken para evitar bloqueos de API. Use USDT para KuCoin (Ej: BTC/USDT).")
+st.sidebar.info("⚡ Para buscar tendencias Macro, use Temporalidades de 1 Hora o 4 Horas.")
 exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["coinbase", "kucoin", "kraken", "binance"], index=0)
 ticker = st.sidebar.text_input("Símbolo Exacto", value="HNT/USD")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
 
 intervalos = {"1 Minuto": "1m", "5 Minutos": "5m", "15 Minutos": "15m", "30 Minutos": "30m", "1 Hora": "1h", "4 Horas": "4h", "1 Día": "1d"}
-intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=6) 
+intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=5) 
 iv_download = intervalos[intervalo_sel]
 
 hoy = datetime.today().date()
@@ -90,7 +90,10 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df = df[~df.index.duplicated(keep='first')]
         
         if len(df) > 50:
+            # 🔥 INYECCIÓN MACRO: EMA 200 y EMA 50
             df['EMA_200'] = df['Close'].ewm(span=200, min_periods=1, adjust=False).mean()
+            df['EMA_50'] = df['Close'].ewm(span=50, min_periods=1, adjust=False).mean()
+            
             df['Vol_MA_100'] = df['Volume'].rolling(window=100, min_periods=1).mean()
             df['RVol'] = df['Volume'] / df['Vol_MA_100'].replace(0, 1)
             
@@ -115,9 +118,8 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10, min_periods=1).mean().fillna(0)
             df['Vela_Verde'] = df['Close'] > df['Open']
             df['Vela_Roja'] = df['Close'] < df['Open']
-            df['Cuerpo_Vela'] = abs(df['Close'] - df['Open'])
+            df['body_size'] = abs(df['Close'] - df['Open']).replace(0, 0.0001)
             
-            # MATRIZ SIN LOOKAHEAD (Desfasamos el cálculo 1 vela al pasado)
             df['PL30'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
             df['PH30'] = df['High'].shift(1).rolling(30, min_periods=1).max()
             df['PL100'] = df['Low'].shift(1).rolling(100, min_periods=1).min()
@@ -163,7 +165,7 @@ else:
     st.error(f"🚨 ERROR API: {status_api}")
 
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
-    df_sim['Whale_Cond'] = df_sim['Cuerpo_Vela'] > (df_sim['ATR'] * 0.3)
+    df_sim['Whale_Cond'] = df_sim['body_size'] > (df_sim['ATR'] * 0.3)
     df_sim['Flash_Vol'] = (df_sim['RVol'] > (w_factor * 0.8)) & df_sim['Whale_Cond']
     
     df_sim['Target_Lock_Sup'] = df_sim[['PL30', 'PL100', 'PL300']].max(axis=1)
@@ -383,12 +385,13 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
 st.title("🛡️ The Alpha Quant Terminal")
-tab_tri, tab_jug, tab_def, tab_gen, tab_mon = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🌌 GÉNESIS", "🦍 EL MONSTRUO PRAGMÁTICO"])
+# 🔥 HEMOS AÑADIDO LA PESTAÑA "LEVIATHAN" 
+tab_tri, tab_jug, tab_def, tab_gen, tab_mon, tab_lev = st.tabs(["💠 TRINITY V357", "⚔️ JUGGERNAUT", "🚀 DEFCON", "🌌 GÉNESIS", "🦍 MONSTER", "🐋 THE LEVIATHAN"])
 
 def renderizar_estrategia(strat_name, tab_obj, df_base):
     with tab_obj:
         if df_base.empty: return
-        s_id = strat_name.split()[0]
+        s_id = strat_name.split()[1] if strat_name.startswith("THE") else strat_name.split()[0]
         
         if st.session_state.get(f'update_pending_{s_id}', False):
             bp = st.session_state[f'pending_bp_{s_id}']
@@ -492,7 +495,6 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
 
             df_strat = inyectar_adn(df_base.copy(), 1.5, 2.5)
             
-            # 🔥 LÓGICA PRAGMÁTICA CRUDA (Cero Repainting) 🔥
             extremo_buy = (df_strat['RSI'] < 30) & (df_strat['Close'] < df_strat['BBL']) & df_strat['Vela_Verde']
             squeeze_buy = df_strat['Neon_Up'] & (df_strat['ADX'] > 20)
             
@@ -501,6 +503,35 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
             
             df_strat['Signal_Buy'] = extremo_buy | squeeze_buy
             df_strat['Signal_Sell'] = extremo_sell | squeeze_sell
+            df_strat['Active_TP'] = lab_tp
+            df_strat['Active_SL'] = lab_sl
+            
+            eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, lab_reinv, comision_pct)
+
+        # --- MÓDULO: THE LEVIATHAN (MACRO SWING) ---
+        elif s_id == "LEVIATHAN":
+            st.markdown("### 🐋 THE LEVIATHAN (Macro Swing Trader)")
+            st.info("Baja frecuencia, alta asimetría. Ignora el ruido y busca cazar las olas macro con 0% de Repainting. (Recomendado: 4 Horas o 1 Día)")
+            
+            with st.form("form_leviathan"):
+                c1, c2, c3 = st.columns(3)
+                lab_tp = c1.slider("🎯 Gran Take Profit (%)", 5.0, 50.0, value=float(st.session_state.get('sld_tp_LEVIATHAN', 25.0)), step=1.0)
+                lab_sl = c2.slider("🛑 Macro Stop Loss (%)", 2.0, 20.0, value=float(st.session_state.get('sld_sl_LEVIATHAN', 7.0)), step=0.5)
+                lab_reinv = c3.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get('sld_reinv_LEVIATHAN', 100.0)), step=5.0)
+                if st.form_submit_button("🐋 Desatar al Leviatán"): st.rerun()
+
+            df_strat = inyectar_adn(df_base.copy(), 1.5, 2.5) 
+            
+            # 🔥 LÓGICA LEVIATHAN (Causal)
+            macro_bull = (df_strat['Close'] > df_strat['EMA_200']) & (df_strat['EMA_50'] > df_strat['EMA_200'])
+            pullback_zone = df_strat['RSI'] < 40
+            fuerza_alcista = df_strat['Vela_Verde'] & (df_strat['body_size'] > (df_strat['ATR'] * 0.8))
+            
+            df_strat['Signal_Buy'] = macro_bull & pullback_zone & fuerza_alcista
+            
+            # Cierre por Pánico Macro (Cruza la EMA 200 hacia abajo)
+            df_strat['Signal_Sell'] = (df_strat['Close'] < df_strat['EMA_200']) & (df_strat['Close'].shift(1) >= df_strat['EMA_200'].shift(1))
+            
             df_strat['Active_TP'] = lab_tp
             df_strat['Active_SL'] = lab_sl
             
@@ -561,6 +592,9 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
         fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200', line=dict(color='orange', width=2)), row=1, col=1)
+        
+        if s_id == "LEVIATHAN":
+            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='EMA 50', line=dict(color='#FF9800', width=1)), row=1, col=1)
 
         if not dftr.empty:
             ents = dftr[dftr['Tipo'] == 'ENTRY']
@@ -575,8 +609,9 @@ def renderizar_estrategia(strat_name, tab_obj, df_base):
         fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan")
         st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True}, key=f"chart_{s_id}")
 
-renderizar_estrategia("TRINITY V357", tab_tri, df_global)
-renderizar_estrategia("JUGGERNAUT V356", tab_jug, df_global)
-renderizar_estrategia("DEFCON V329", tab_def, df_global)
-renderizar_estrategia("GENESIS V320", tab_gen, df_global)
+renderizar_estrategia("TRINITY", tab_tri, df_global)
+renderizar_estrategia("JUGGERNAUT", tab_jug, df_global)
+renderizar_estrategia("DEFCON", tab_def, df_global)
+renderizar_estrategia("GENESIS", tab_gen, df_global)
 renderizar_estrategia("MONSTER", tab_mon, df_global)
+renderizar_estrategia("THE LEVIATHAN", tab_lev, df_global)
