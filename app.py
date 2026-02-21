@@ -12,6 +12,15 @@ import gc
 import time
 from datetime import datetime, timedelta
 
+# --- MOTOR DE HIPER-VELOCIDAD (NUMBA JIT COMPILER) ---
+try:
+    from numba import njit
+except ImportError:
+    def njit(*args, **kwargs):
+        def decorator(func): return func
+        if len(args) == 1 and callable(args[0]): return args[0]
+        return decorator
+
 st.set_page_config(page_title="ROCKET PROTOCOL | Alpha Quant", layout="wide", initial_sidebar_state="expanded")
 
 # --- MEMORIA IA INSTITUCIONAL ---
@@ -21,7 +30,6 @@ sell_rules = ['Defcon_Sell', 'Neon_Dn', 'Therm_Wall_Sell', 'Therm_Panic_Sell', '
 rocket_b = ['Trinity_Buy', 'Jugg_Buy', 'Defcon_Buy_Sig', 'Lock_Buy', 'Thermal_Buy', 'Climax_Buy', 'Ping_Buy', 'Squeeze_Buy', 'Lev_Buy']
 rocket_s = ['Trinity_Sell', 'Jugg_Sell', 'Defcon_Sell_Sig', 'Lock_Sell', 'Thermal_Sell', 'Climax_Sell', 'Ping_Sell', 'Squeeze_Sell', 'Lev_Sell']
 
-# 🔥 AGREGADA LA PESTAÑA "NUEVA_ESTRATEGIA" 🔥
 estrategias = ["TRINITY", "JUGGERNAUT", "DEFCON", "TARGET_LOCK", "THERMAL", "PINK_CLIMAX", "PING_PONG", "NEON_SQUEEZE", "NUEVA_ESTRATEGIA", "GENESIS", "ROCKET"]
 
 for r_idx in range(1, 5):
@@ -54,7 +62,7 @@ css_spinner = """
 """
 ph_holograma = st.empty()
 
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL V62</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL V62.1</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     gc.collect()
@@ -64,18 +72,17 @@ exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["coinbase", "kucoin", "kra
 ticker = st.sidebar.text_input("Símbolo Exacto", value="HNT/USD")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
 
-# 🔥 LIBRERÍA DE TEMPORALIDADES EXÓTICAS 🔥
 intervalos = {
     "1 Minuto": "1m", "5 Minutos": "5m", "7 Minutos": "7m", "13 Minutos": "13m", 
     "15 Minutos": "15m", "23 Minutos": "23m", "30 Minutos": "30m", "45 Minutos": "45m", 
     "1 Hora": "1h", "4 Horas": "4h", "1 Día": "1d"
 }
-intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=9) 
+intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=5) 
 iv_download = intervalos[intervalo_sel]
 
 hoy = datetime.today().date()
-is_micro = iv_download in ["1m", "5m", "7m", "13m", "23m"]
-limite_dias = 30 if is_micro else 1500
+is_micro = iv_download in ["1m", "5m", "7m", "13m", "23m", "45m"]
+limite_dias = 45 if is_micro else 1500
 start_date, end_date = st.sidebar.slider("📅 Scope Histórico", min_value=hoy - timedelta(days=limite_dias), max_value=hoy, value=(hoy - timedelta(days=min(1500, limite_dias)), hoy), format="YYYY-MM-DD")
 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
@@ -86,7 +93,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
         
-        # 🔥 MOTOR DE RESAMPLING (SÍNTESIS DE VELAS) 🔥
         base_tf = iv_down
         resample_rule = None
         
@@ -133,107 +139,109 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
         
-        # SÍNTESIS: Construye las velas exóticas
         if resample_rule:
             df = df.resample(resample_rule).agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
             
         df.index = df.index + timedelta(hours=offset)
         df = df[~df.index.duplicated(keep='first')]
         
-        if len(df) > 50:
-            df['EMA_200'] = df['Close'].ewm(span=200, min_periods=1, adjust=False).mean()
-            df['EMA_50'] = df['Close'].ewm(span=50, min_periods=1, adjust=False).mean()
-            df['Vol_MA_100'] = df['Volume'].rolling(window=100, min_periods=1).mean()
-            df['RVol'] = df['Volume'] / df['Vol_MA_100'].replace(0, 1)
+        # 🔥 EL ESCUDO CONTRA EL KEYERROR DE LAS VELAS SINTÉTICAS 🔥
+        if len(df) < 50:
+            return pd.DataFrame(), f"❌ El proceso sintetizó solo {len(df)} velas de {iv_down}. La IA requiere mínimo 50. Amplíe los días en el 'Scope Histórico'."
             
-            high_low = df['High'] - df['Low']
-            tr = df[['High', 'Low']].max(axis=1) - df[['High', 'Low']].min(axis=1)
-            df['ATR'] = tr.ewm(alpha=1/14, min_periods=1, adjust=False).mean().fillna(high_low).replace(0, 0.001)
-            
-            df['RSI'] = ta.rsi(df['Close'], length=14).fillna(50.0)
-            df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
-            
-            kc_basis = df['Close'].rolling(20, min_periods=1).mean()
-            df['KC_Upper'] = kc_basis + (df['ATR'] * 1.5)
-            df['KC_Lower'] = kc_basis - (df['ATR'] * 1.5)
-            
-            basis = df['Close'].rolling(20, min_periods=1).mean()
-            dev = df['Close'].rolling(20, min_periods=1).std(ddof=0).replace(0, 1) 
-            df['BBU'] = basis + (2.0 * dev)
-            df['BBL'] = basis - (2.0 * dev)
-            
-            df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
-            df['BB_Delta'] = (df['BBU'] - df['BBL']).diff().fillna(0)
-            df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10, min_periods=1).mean().fillna(0)
-            
-            df['Vela_Verde'] = df['Close'] > df['Open']
-            df['Vela_Roja'] = df['Close'] < df['Open']
-            
-            df['body_size'] = abs(df['Close'] - df['Open']).replace(0, 0.0001)
-            df['Cuerpo_Vela'] = df['body_size']
-            df['upper_wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
-            df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
-            
-            df['PL30'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
-            df['PH30'] = df['High'].shift(1).rolling(30, min_periods=1).max()
-            df['PL100'] = df['Low'].shift(1).rolling(100, min_periods=1).min()
-            df['PH100'] = df['High'].shift(1).rolling(100, min_periods=1).max()
-            df['PL300'] = df['Low'].shift(1).rolling(300, min_periods=1).min()
-            df['PH300'] = df['High'].shift(1).rolling(300, min_periods=1).max()
-            
-            df['Whale_Cond'] = df['body_size'] > (df['ATR'] * 0.3)
-            df['Target_Lock_Sup'] = df[['PL30', 'PL100', 'PL300']].max(axis=1)
-            df['Target_Lock_Res'] = df[['PH30', 'PH100', 'PH300']].min(axis=1)
-            df['tol'] = df['ATR'] * 0.5
-            
-            df['dist_sup'] = (abs(df['Close'] - df['PL30']) / df['Close']) * 100
-            df['dist_res'] = (abs(df['Close'] - df['PH30']) / df['Close']) * 100
-            
-            scan_range = df['ATR'] * 2.0
-            c_val = df['Close'].values
-            sr_val = scan_range.values
-            ceil_w, floor_w = np.zeros(len(df)), np.zeros(len(df))
-            for p_col, w in [('PL30', 1), ('PH30', 1), ('PL100', 3), ('PH100', 3), ('PL300', 5), ('PH300', 5)]:
-                p_val = df[p_col].values
-                ceil_w += np.where((p_val > c_val) & (p_val <= c_val + sr_val), w, 0)
-                floor_w += np.where((p_val < c_val) & (p_val >= c_val - sr_val), w, 0)
-            df['ceil_w'] = ceil_w
-            df['floor_w'] = floor_w
-            
-            df['Z_Score'] = (df['Close'] - basis) / dev
-            rsi_ma = df['RSI'].rolling(14, min_periods=1).mean()
-            df['RSI_Cross_Up'] = (df['RSI'] > rsi_ma) & (df['RSI'].shift(1).fillna(50) <= rsi_ma.shift(1).fillna(50))
-            df['RSI_Cross_Dn'] = (df['RSI'] < rsi_ma) & (df['RSI'].shift(1).fillna(50) >= rsi_ma.shift(1).fillna(50))
-            df['Retro_Peak'] = (df['RSI'] < 30) & (df['Close'] < df['BBL'])
-            df['Retro_Peak_Sell'] = (df['RSI'] > 70) & (df['Close'] > df['BBU'])
-            
-            df['Neon_Up'] = df['Squeeze_On'] & (df['Close'] >= df['BBU'] * 0.999) & df['Vela_Verde']
-            df['Neon_Dn'] = df['Squeeze_On'] & (df['Close'] <= df['BBL'] * 1.001) & df['Vela_Roja']
-            df['Defcon_Buy'] = df['Neon_Up'] & (df['BB_Delta'] > df['BB_Delta_Avg']) & (df['ADX'] > 20)
-            df['Defcon_Sell'] = df['Neon_Dn'] & (df['BB_Delta'] > df['BB_Delta_Avg']) & (df['ADX'] > 20)
-            
-            df['Therm_Bounce'] = (df['floor_w'] >= 4) & df['RSI_Cross_Up'] & ~(df['ceil_w'] >= 4)
-            df['Therm_Vacuum'] = (df['ceil_w'] <= 3) & df['Neon_Up'] & ~(df['floor_w'] == 0)
-            df['Therm_Wall_Sell'] = (df['ceil_w'] >= 4) & df['RSI_Cross_Dn']
-            df['Therm_Panic_Sell'] = (df['floor_w'] == 0) & df['Vela_Roja']
-            
-            df['PP_Slope'] = ta.linreg(df['Close'], 5, 0) - ta.linreg(df['Close'], 5, 1)
-            
-            ap = (df['High'] + df['Low'] + df['Close']) / 3
-            esa = ap.ewm(span=10, min_periods=1).mean()
-            d_wt = abs(ap - esa).ewm(span=10, min_periods=1).mean().replace(0, 1)
-            ci = (ap - esa) / (0.015 * d_wt)
-            wt1 = ci.ewm(span=21, min_periods=1).mean()
-            wt2 = wt1.rolling(4, min_periods=1).mean()
-            df['WT_Cross_Up'] = (wt1 > wt2) & (wt1.shift(1).fillna(0) <= wt2.shift(1).fillna(0))
-            df['WT_Cross_Dn'] = (wt1 < wt2) & (wt1.shift(1).fillna(0) >= wt2.shift(1).fillna(0))
-            df['WT_Oversold'] = wt1 < -60
-            df['WT_Overbought'] = wt1 > 60
-            
-            df['Macro_Bull'] = df['Close'] >= df['EMA_200']
-            is_trend = df['ADX'] >= 25
-            df['Regime'] = np.where(df['Macro_Bull'] & is_trend, 1, np.where(df['Macro_Bull'] & ~is_trend, 2, np.where(~df['Macro_Bull'] & is_trend, 3, 4)))
-            gc.collect()
+        df['EMA_200'] = df['Close'].ewm(span=200, min_periods=1, adjust=False).mean()
+        df['EMA_50'] = df['Close'].ewm(span=50, min_periods=1, adjust=False).mean()
+        df['Vol_MA_100'] = df['Volume'].rolling(window=100, min_periods=1).mean()
+        df['RVol'] = df['Volume'] / df['Vol_MA_100'].replace(0, 1)
+        
+        high_low = df['High'] - df['Low']
+        tr = df[['High', 'Low']].max(axis=1) - df[['High', 'Low']].min(axis=1)
+        df['ATR'] = tr.ewm(alpha=1/14, min_periods=1, adjust=False).mean().fillna(high_low).replace(0, 0.001)
+        
+        df['RSI'] = ta.rsi(df['Close'], length=14).fillna(50.0)
+        df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
+        
+        kc_basis = df['Close'].rolling(20, min_periods=1).mean()
+        df['KC_Upper'] = kc_basis + (df['ATR'] * 1.5)
+        df['KC_Lower'] = kc_basis - (df['ATR'] * 1.5)
+        
+        basis = df['Close'].rolling(20, min_periods=1).mean()
+        dev = df['Close'].rolling(20, min_periods=1).std(ddof=0).replace(0, 1) 
+        df['BBU'] = basis + (2.0 * dev)
+        df['BBL'] = basis - (2.0 * dev)
+        
+        df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
+        df['BB_Delta'] = (df['BBU'] - df['BBL']).diff().fillna(0)
+        df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10, min_periods=1).mean().fillna(0)
+        
+        df['Vela_Verde'] = df['Close'] > df['Open']
+        df['Vela_Roja'] = df['Close'] < df['Open']
+        
+        df['body_size'] = abs(df['Close'] - df['Open']).replace(0, 0.0001)
+        df['Cuerpo_Vela'] = df['body_size']
+        df['upper_wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
+        df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
+        
+        df['PL30'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
+        df['PH30'] = df['High'].shift(1).rolling(30, min_periods=1).max()
+        df['PL100'] = df['Low'].shift(1).rolling(100, min_periods=1).min()
+        df['PH100'] = df['High'].shift(1).rolling(100, min_periods=1).max()
+        df['PL300'] = df['Low'].shift(1).rolling(300, min_periods=1).min()
+        df['PH300'] = df['High'].shift(1).rolling(300, min_periods=1).max()
+        
+        df['Whale_Cond'] = df['body_size'] > (df['ATR'] * 0.3)
+        df['Target_Lock_Sup'] = df[['PL30', 'PL100', 'PL300']].max(axis=1)
+        df['Target_Lock_Res'] = df[['PH30', 'PH100', 'PH300']].min(axis=1)
+        df['tol'] = df['ATR'] * 0.5
+        
+        df['dist_sup'] = (abs(df['Close'] - df['PL30']) / df['Close']) * 100
+        df['dist_res'] = (abs(df['Close'] - df['PH30']) / df['Close']) * 100
+        
+        scan_range = df['ATR'] * 2.0
+        c_val = df['Close'].values
+        sr_val = scan_range.values
+        ceil_w, floor_w = np.zeros(len(df)), np.zeros(len(df))
+        for p_col, w in [('PL30', 1), ('PH30', 1), ('PL100', 3), ('PH100', 3), ('PL300', 5), ('PH300', 5)]:
+            p_val = df[p_col].values
+            ceil_w += np.where((p_val > c_val) & (p_val <= c_val + sr_val), w, 0)
+            floor_w += np.where((p_val < c_val) & (p_val >= c_val - sr_val), w, 0)
+        df['ceil_w'] = ceil_w
+        df['floor_w'] = floor_w
+        
+        df['Z_Score'] = (df['Close'] - basis) / dev
+        rsi_ma = df['RSI'].rolling(14, min_periods=1).mean()
+        df['RSI_Cross_Up'] = (df['RSI'] > rsi_ma) & (df['RSI'].shift(1).fillna(50) <= rsi_ma.shift(1).fillna(50))
+        df['RSI_Cross_Dn'] = (df['RSI'] < rsi_ma) & (df['RSI'].shift(1).fillna(50) >= rsi_ma.shift(1).fillna(50))
+        df['Retro_Peak'] = (df['RSI'] < 30) & (df['Close'] < df['BBL'])
+        df['Retro_Peak_Sell'] = (df['RSI'] > 70) & (df['Close'] > df['BBU'])
+        
+        df['Neon_Up'] = df['Squeeze_On'] & (df['Close'] >= df['BBU'] * 0.999) & df['Vela_Verde']
+        df['Neon_Dn'] = df['Squeeze_On'] & (df['Close'] <= df['BBL'] * 1.001) & df['Vela_Roja']
+        df['Defcon_Buy'] = df['Neon_Up'] & (df['BB_Delta'] > df['BB_Delta_Avg']) & (df['ADX'] > 20)
+        df['Defcon_Sell'] = df['Neon_Dn'] & (df['BB_Delta'] > df['BB_Delta_Avg']) & (df['ADX'] > 20)
+        
+        df['Therm_Bounce'] = (df['floor_w'] >= 4) & df['RSI_Cross_Up'] & ~(df['ceil_w'] >= 4)
+        df['Therm_Vacuum'] = (df['ceil_w'] <= 3) & df['Neon_Up'] & ~(df['floor_w'] == 0)
+        df['Therm_Wall_Sell'] = (df['ceil_w'] >= 4) & df['RSI_Cross_Dn']
+        df['Therm_Panic_Sell'] = (df['floor_w'] == 0) & df['Vela_Roja']
+        
+        df['PP_Slope'] = ta.linreg(df['Close'], 5, 0) - ta.linreg(df['Close'], 5, 1)
+        
+        ap = (df['High'] + df['Low'] + df['Close']) / 3
+        esa = ap.ewm(span=10, min_periods=1).mean()
+        d_wt = abs(ap - esa).ewm(span=10, min_periods=1).mean().replace(0, 1)
+        ci = (ap - esa) / (0.015 * d_wt)
+        wt1 = ci.ewm(span=21, min_periods=1).mean()
+        wt2 = wt1.rolling(4, min_periods=1).mean()
+        df['WT_Cross_Up'] = (wt1 > wt2) & (wt1.shift(1).fillna(0) <= wt2.shift(1).fillna(0))
+        df['WT_Cross_Dn'] = (wt1 < wt2) & (wt1.shift(1).fillna(0) >= wt2.shift(1).fillna(0))
+        df['WT_Oversold'] = wt1 < -60
+        df['WT_Overbought'] = wt1 > 60
+        
+        df['Macro_Bull'] = df['Close'] >= df['EMA_200']
+        is_trend = df['ADX'] >= 25
+        df['Regime'] = np.where(df['Macro_Bull'] & is_trend, 1, np.where(df['Macro_Bull'] & ~is_trend, 2, np.where(~df['Macro_Bull'] & is_trend, 3, 4)))
+        gc.collect()
 
         return df, "OK"
     except Exception as e: 
@@ -245,8 +253,9 @@ if not df_global.empty:
     dias_reales = max((df_global.index[-1] - df_global.index[0]).days, 1)
     st.sidebar.success(f"📥 MATRIZ LISTA: {len(df_global)} velas sintetizadas ({dias_reales} días).")
 else:
-    dias_reales = 1
-    st.error(f"🚨 ERROR API: {status_api}")
+    # 🔥 DETENEMOS LA APP ELEGANTEMENTE ANTES DEL KEYERROR 🔥
+    st.error(status_api)
+    st.stop()
 
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     df_sim['Flash_Vol'] = (df_sim['RVol'] > (w_factor * 0.8)) & df_sim['Whale_Cond']
@@ -313,21 +322,30 @@ def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
 
     return df_sim
 
+@njit(fastmath=True)
 def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr, sl_arr, cap_ini, com_pct, reinvest_pct):
     cap_act = cap_ini
     divs = 0.0
     en_pos = False
-    p_ent, tp_act, sl_act, pos_size, invest_amt = 0.0, 0.0, 0.0, 0.0, 0.0
-    g_profit, g_loss, num_trades, max_dd, peak = 0.0, 0.0, 0, cap_ini, 0.0
+    p_ent = 0.0
+    tp_act = 0.0
+    sl_act = 0.0
+    pos_size = 0.0
+    invest_amt = 0.0
+    g_profit = 0.0
+    g_loss = 0.0
+    num_trades = 0
+    max_dd = 0.0
+    peak = cap_ini
     total_comms = 0.0
     
     for i in range(len(h_arr)):
         if en_pos:
-            tp_p = p_ent * (1 + tp_act/100)
-            sl_p = p_ent * (1 - sl_act/100)
+            tp_p = p_ent * (1.0 + tp_act/100.0)
+            sl_p = p_ent * (1.0 - sl_act/100.0)
             
             if l_arr[i] <= sl_p:
-                gross = pos_size * (1 - sl_act/100)
+                gross = pos_size * (1.0 - sl_act/100.0)
                 comm_out = gross * com_pct
                 total_comms += comm_out
                 net = gross - comm_out
@@ -342,7 +360,7 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
                 en_pos = False
                 
             elif h_arr[i] >= tp_p:
-                gross = pos_size * (1 + tp_act/100)
+                gross = pos_size * (1.0 + tp_act/100.0)
                 comm_out = gross * com_pct
                 total_comms += comm_out
                 net = gross - comm_out
@@ -359,7 +377,7 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
                 
             elif s_c[i]:
                 ret = (c_arr[i] - p_ent) / p_ent
-                gross = pos_size * (1 + ret)
+                gross = pos_size * (1.0 + ret)
                 comm_out = gross * com_pct
                 total_comms += comm_out
                 net = gross - comm_out
@@ -377,12 +395,12 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
             total_equity = cap_act + divs
             if total_equity > peak: peak = total_equity
             if peak > 0:
-                dd = (peak - total_equity) / peak * 100
+                dd = (peak - total_equity) / peak * 100.0
                 if dd > max_dd: max_dd = dd
             if cap_act <= 0: break
             
         if not en_pos and b_c[i] and i+1 < len(h_arr):
-            invest_amt = cap_act if reinvest_pct == 100 else cap_ini
+            invest_amt = cap_act if reinvest_pct == 100.0 else cap_ini
             if invest_amt > cap_act: invest_amt = cap_act 
             comm_in = invest_amt * com_pct
             total_comms += comm_in
@@ -501,27 +519,26 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
         h_a, l_a, c_a, o_a = df_precalc['High'].values, df_precalc['Low'].values, df_precalc['Close'].values, df_precalc['Open'].values
         
         if s_id == "TRINITY":
-            b_c, s_c = df_precalc['Trinity_Buy'], df_precalc['Trinity_Sell']
+            b_c, s_c = df_precalc['Trinity_Buy'].values, df_precalc['Trinity_Sell'].values
         elif s_id == "JUGGERNAUT":
-            b_c, s_c = df_precalc['Jugg_Buy'], df_precalc['Jugg_Sell']
+            b_c, s_c = df_precalc['Jugg_Buy'].values, df_precalc['Jugg_Sell'].values
         elif s_id == "DEFCON":
-            b_c, s_c = df_precalc['Defcon_Buy_Sig'], df_precalc['Defcon_Sell_Sig']
+            b_c, s_c = df_precalc['Defcon_Buy_Sig'].values, df_precalc['Defcon_Sell_Sig'].values
         elif s_id == "TARGET_LOCK":
-            b_c, s_c = df_precalc['Lock_Buy'], df_precalc['Lock_Sell']
+            b_c, s_c = df_precalc['Lock_Buy'].values, df_precalc['Lock_Sell'].values
         elif s_id == "THERMAL":
-            b_c, s_c = df_precalc['Thermal_Buy'], df_precalc['Thermal_Sell']
+            b_c, s_c = df_precalc['Thermal_Buy'].values, df_precalc['Thermal_Sell'].values
         elif s_id == "PINK_CLIMAX":
-            b_c, s_c = df_precalc['Climax_Buy'], df_precalc['Climax_Sell']
+            b_c, s_c = df_precalc['Climax_Buy'].values, df_precalc['Climax_Sell'].values
         elif s_id == "PING_PONG":
-            b_c, s_c = df_precalc['Ping_Buy'], df_precalc['Ping_Sell']
+            b_c, s_c = df_precalc['Ping_Buy'].values, df_precalc['Ping_Sell'].values
         elif s_id == "NEON_SQUEEZE":
-            b_c, s_c = df_precalc['Squeeze_Buy'], df_precalc['Squeeze_Sell']
+            b_c, s_c = df_precalc['Squeeze_Buy'].values, df_precalc['Squeeze_Sell'].values
         elif s_id == "NUEVA_ESTRATEGIA":
-            # Espacio reservado para inyectar su próxima lógica
             b_c, s_c = np.zeros(len(df_precalc), dtype=bool), np.zeros(len(df_precalc), dtype=bool) 
             
-        t_arr, sl_arr = np.full(len(df_precalc), rtp), np.full(len(df_precalc), rsl)
-        net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c.values, s_c.values, t_arr, sl_arr, cap_ini, com_pct, reinv_q)
+        t_arr, sl_arr = np.full(len(df_precalc), float(rtp)), np.full(len(df_precalc), float(rsl))
+        net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c, s_c, t_arr, sl_arr, float(cap_ini), float(com_pct), float(reinv_q))
         
         actual_ado = nt / dias_reales if dias_reales > 0 else 0
         ado_multiplier = 1.0
@@ -811,10 +828,10 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
             eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state.get('gen_reinv', 100.0), comision_pct)
 
-        # --- PESTAÑA PARA LA NUEVA ESTRATEGIA (En blanco) ---
+        # --- PESTAÑA PARA LA NUEVA ESTRATEGIA ---
         elif s_id == "NUEVA_ESTRATEGIA":
             st.markdown("### 🔥 SU NUEVO SOLDADO")
-            st.warning("Estoy esperando que me pase el código de su nueva estrategia para inyectarlo aquí. Por ahora, los gatillos están apagados, pero el motor está listo.")
+            st.warning("Estoy esperando que me pase el código de su nueva estrategia. En el siguiente mensaje envíemela y la programaré aquí al instante.")
             
         # --- BLOQUES ESTRATÉGICOS INDIVIDUALES ---
         else:
