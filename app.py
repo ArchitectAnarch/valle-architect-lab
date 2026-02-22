@@ -40,10 +40,10 @@ tab_id_map = {
     "🌌 GENESIS": "GENESIS", "👑 ROCKET": "ROCKET"
 }
 
-macro_opts = ["All-Weather", "Bull Only (Precio > EMA 200)", "Bear Only (Precio < EMA 200)"]
-vol_opts = ["All-Weather", "Trend (ADX > 25)", "Range (ADX < 25)"]
+macro_opts = ["All-Weather", "All-Weather", "All-Weather", "Bull Only (Precio > EMA 200)", "Bear Only (Precio < EMA 200)"]
+vol_opts = ["All-Weather", "All-Weather", "All-Weather", "Trend (ADX > 25)", "Range (ADX < 25)"]
 
-# --- SHADOW STATE (PREVIENE STREAMLIT API EXCEPTIONS) ---
+# --- SHADOW STATE ---
 if 'ui_allf_b_team' not in st.session_state: st.session_state['ui_allf_b_team'] = ['Commander_Buy', 'Squeeze_Buy', 'Ping_Buy']
 if 'ui_allf_s_team' not in st.session_state: st.session_state['ui_allf_s_team'] = ['Commander_Sell', 'Squeeze_Sell']
 if 'ui_allf_macro' not in st.session_state: st.session_state['ui_allf_macro'] = "All-Weather"
@@ -85,7 +85,7 @@ ph_holograma = st.empty()
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V88.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V89.0 (BERSERKER)</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     for s in estrategias: st.session_state[f'opt_status_{s}'] = False 
@@ -225,7 +225,7 @@ else:
     st.stop()
 
 # ==========================================
-# 🔥 IDENTIDADES Y LÓGICAS (PURAS V88.0) 🔥
+# 🔥 IDENTIDADES Y LÓGICAS ALGORÍTMICAS 🔥
 # ==========================================
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     df_sim['Ping_Buy'] = (df_sim['ADX'] < 25) & (df_sim['Close'] < df_sim['BBL']) & df_sim['Vela_Verde']
@@ -260,6 +260,7 @@ def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
 
     df_sim['Commander_Buy'] = df_sim['Climax_Buy'] | df_sim['Thermal_Buy'] | df_sim['Lock_Buy']
     df_sim['Commander_Sell'] = df_sim['Thermal_Sell'] | (df_sim['Close'] < df_sim['EMA_50'])
+    df_sim['Pink_Whale_Buy'] = df_sim['Climax_Buy']
 
     return df_sim
 
@@ -425,15 +426,15 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
             
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
+# 🧠 RUTINA DE OPTIMIZACIÓN (BERSERKER MODE) 🧠
 def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, is_meta=False):
     best_fit = -float('inf')
     bp = None
-    tp_min, tp_max = (10.0, 100.0) 
+    tp_min, tp_max = (10.0, 150.0) 
     
     iters = 3000 if s_id == "ALL_FORCES" else (1500 if is_meta else 2000)
     chunks = 10
     chunk_size = iters // chunks
-    
     start_time = time.time()
 
     for c in range(chunks):
@@ -450,13 +451,9 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
             o_a = np.asarray(df_precalc['Open'].values, dtype=np.float64)
             
             if s_id == "ALL_FORCES":
-                # 🔥 FORZAR SINERGIA PROFUNDA EN ALL_FORCES (3 a 7 compras, 2 a 5 ventas)
-                b_mat_opts, s_mat_opts = base_b, base_s
-                b_mat = {r: df_precalc[r].values for r in b_mat_opts}
-                s_mat = {r: df_precalc[r].values for r in s_mat_opts}
-                
-                dna_b_team = random.sample(b_mat_opts, random.randint(3, 7))
-                dna_s_team = random.sample(s_mat_opts, random.randint(2, 5))
+                # 🔥 BERSERKER OMNI-ENSEMBLE (Garantiza mínimo 3 compras y 2 cierres mezclados)
+                dna_b_team = random.sample(base_b, random.randint(3, len(base_b)))
+                dna_s_team = random.sample(base_s, random.randint(2, len(base_s)))
                 dna_macro = random.choice(macro_opts)
                 dna_vol = random.choice(vol_opts)
                 
@@ -471,11 +468,11 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
                 global_mask = macro_mask & vol_mask
                 
                 f_buy = np.zeros(len(df_precalc), dtype=bool)
-                for r in dna_b_team: f_buy |= b_mat[r]
+                for r in dna_b_team: f_buy |= df_precalc[r].values
                 f_buy &= global_mask
                 
                 f_sell = np.zeros(len(df_precalc), dtype=bool)
-                for r in dna_s_team: f_sell |= s_mat[r]
+                for r in dna_s_team: f_sell |= df_precalc[r].values
                 
                 b_c_arr = np.asarray(f_buy, dtype=bool)
                 s_c_arr = np.asarray(f_sell, dtype=bool)
@@ -483,10 +480,8 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
                 sl_arr = np.asarray(np.full(len(df_precalc), float(rsl)), dtype=np.float64)
                 
             elif is_meta:
-                if s_id == "GENESIS": b_mat_opts, s_mat_opts = base_b, base_s
-                elif s_id == "ROCKET": b_mat_opts, s_mat_opts = rocket_b, rocket_s
-                b_mat = {r: df_precalc[r].values for r in b_mat_opts}
-                s_mat = {r: df_precalc[r].values for r in s_mat_opts}
+                b_mat_opts = base_b if s_id == "GENESIS" else rocket_b
+                s_mat_opts = base_s if s_id == "GENESIS" else rocket_s
                 
                 dna_b = [random.sample(b_mat_opts, random.randint(1, 2)) for _ in range(4)]
                 dna_s = [random.sample(s_mat_opts, random.randint(1, 2)) for _ in range(4)]
@@ -499,10 +494,10 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
                 for idx in range(4):
                     mask = (regime_arr == (idx + 1))
                     r_b_cond = np.zeros(len(df_precalc), dtype=bool)
-                    for r in dna_b[idx]: r_b_cond |= b_mat[r]
+                    for r in dna_b[idx]: r_b_cond |= df_precalc[r].values
                     f_buy[mask] = r_b_cond[mask]
                     r_s_cond = np.zeros(len(df_precalc), dtype=bool)
-                    for r in dna_s[idx]: r_s_cond |= s_mat[r]
+                    for r in dna_s[idx]: r_s_cond |= df_precalc[r].values
                     f_sell[mask] = r_s_cond[mask]
                     f_tp[mask] = dna_tp[idx]
                     f_sl[mask] = dna_sl[idx]
@@ -528,17 +523,19 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
                 sl_arr = np.asarray(np.full(len(df_precalc), float(rsl)), dtype=np.float64)
 
             net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c_arr, s_c_arr, t_arr, sl_arr, float(cap_ini), float(com_pct), float(reinv_q))
-            
-            actual_ado = nt / dias_reales if dias_reales > 0 else 0
-            ado_multiplier = 1.0
-            if target_ado > 0 and actual_ado < target_ado: ado_multiplier = (actual_ado / target_ado) ** 2  
-
             alpha_money = net - buy_hold_money
             
+            # 🔥 V89.0 FITNESS BERSERKER (Prioridad a Dinero Neto y Obligación Estadística)
             if nt >= 1: 
-                if net > 0: fit = (net * (pf**2) * np.sqrt(nt)) / ((mdd ** 1.5) + 1.0) * ado_multiplier
-                else: fit = net * ((mdd ** 1.5) + 1.0) / (pf + 0.001)
-                if alpha_money > 0: fit *= 2.0 
+                if net > 0: 
+                    # Castigo a estrategias cobardes (< 12 operaciones)
+                    trade_penalty = np.sqrt(float(nt)) if nt >= 12 else (float(nt) / 12.0)
+                    # Nerf al PF, Buff al Net Profit Absoluto
+                    fit = net * (pf ** 0.5) * trade_penalty / ((mdd ** 0.5) + 1.0)
+                    if alpha_money > 0: fit *= 1.5 
+                else: 
+                    fit = net * ((mdd ** 0.5) + 1.0) / (pf + 0.001)
+                    if alpha_money > 0: fit /= 1.5 # Recompensa a las que perdieron menos que el Hold en caídas
                     
                 if fit > best_fit:
                     best_fit = fit
@@ -549,6 +546,7 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
                     else:
                         bp = {'tp': rtp, 'sl': rsl, 'wh': rwh, 'rd': rrd, 'reinv': reinv_q, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms}
         
+        # ACTULIZAR HOLOGRMA
         elapsed = time.time() - start_time
         pct_done = int(((c + 1) / chunks) * 100)
         combos = (c + 1) * chunk_size
@@ -602,7 +600,7 @@ def save_optimization_to_state(s_id, bp, is_meta):
 
 # 📋 REPORTE UNIVERSAL 📋
 def generar_reporte_universal(df_base, cap_ini, com_pct):
-    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V88.0)**\n\n"
+    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V89.0 - BERSERKER)**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_base)}\n\n"
     buy_hold_ret = ((df_base['Close'].iloc[-1] - df_base['Open'].iloc[0]) / df_base['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
@@ -749,13 +747,9 @@ if not df_global.empty:
             b_c_arr, s_c_arr = np.asarray(f_buy, dtype=bool), np.asarray(f_sell, dtype=bool)
         else:
             reinv_q = st.session_state.get(f'ui_reinv_{s_id}', 0.0)
-            tp_val = st.session_state.get(f'ui_tp_{s_id}', 50.0)
-            sl_val = st.session_state.get(f'ui_sl_{s_id}', 5.0)
-            wh_val = st.session_state.get(f'ui_wh_{s_id}', 2.5)
-            rd_val = st.session_state.get(f'ui_rd_{s_id}', 1.5)
+            tp_val, sl_val = st.session_state.get(f'ui_tp_{s_id}', 50.0), st.session_state.get(f'ui_sl_{s_id}', 5.0)
             df_strat = inyectar_adn(df_global.copy(), rd_val, wh_val)
-            b_c = np.zeros(len(df_strat), dtype=bool)
-            s_c = np.zeros(len(df_strat), dtype=bool)
+            b_c, s_c = np.zeros(len(df_strat), dtype=bool), np.zeros(len(df_strat), dtype=bool)
             if s_id == "TRINITY": b_c, s_c = df_strat['Trinity_Buy'], df_strat['Trinity_Sell']
             elif s_id == "JUGGERNAUT": b_c, s_c = df_strat['Jugg_Buy'], df_strat['Jugg_Sell']
             elif s_id == "DEFCON": b_c, s_c = df_strat['Defcon_Buy'], df_strat['Defcon_Sell']
@@ -765,8 +759,7 @@ if not df_global.empty:
             elif s_id == "PING_PONG": b_c, s_c = df_strat['Ping_Buy'], df_strat['Ping_Sell']
             elif s_id == "NEON_SQUEEZE": b_c, s_c = df_strat['Squeeze_Buy'], df_strat['Squeeze_Sell']
             elif s_id == "COMMANDER": b_c, s_c = df_strat['Commander_Buy'], df_strat['Commander_Sell']
-            b_c_arr = np.asarray(b_c.values, dtype=bool)
-            s_c_arr = np.asarray(s_c.values, dtype=bool)
+            b_c_arr, s_c_arr = np.asarray(b_c.values, dtype=bool), np.asarray(s_c.values, dtype=bool)
             t_arr = np.asarray(np.full(len(df_strat), float(tp_val)), dtype=np.float64)
             sl_arr = np.asarray(np.full(len(df_strat), float(sl_val)), dtype=np.float64)
 
@@ -777,12 +770,8 @@ if not df_global.empty:
         net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c_arr, s_c_arr, t_arr, sl_arr, float(capital_inicial), float(comision_pct), float(reinv_q))
         
         ret_pct = (net / capital_inicial) * 100
-        
-        if ret_pct > 0 and nt > 0:
-            score = ret_pct * (1 + np.log1p(nt))
-        else:
-            score = ret_pct 
-            
+        if ret_pct > 0 and nt > 0: score = ret_pct * (1 + np.log1p(nt))
+        else: score = ret_pct 
         leaderboard.append((s_id, ret_pct, nt, score))
         
     leaderboard.sort(key=lambda x: x[3], reverse=True)
@@ -832,7 +821,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
         if s_id == "ALL_FORCES":
             st.markdown(f"### 🌟 ALL FORCES ALGO (Omni-Ensemble) {opt_badge}", unsafe_allow_html=True)
-            st.info("El Director Supremo de Portafolio. Ensambla un Escuadrón de Élite híbrido y le aplica filtros de Clima Global.")
+            st.info("El Director Supremo de Portafolio. Obligado matemáticamente a diversificar el Strike Team (Mínimo 3 IAs de compra).")
             
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state['ui_allf_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get('ui_allf_ado', 100.0)), key="w_ado_allf", step=0.5)
@@ -852,7 +841,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             c1, c2 = st.columns(2)
             with c1:
                 st.session_state['ui_allf_b_team'] = st.multiselect("Fuerzas de Ataque (Compras)", base_b, default=[x for x in st.session_state.get('ui_allf_b_team', []) if x in base_b], key="w_bteam_allf")
-                st.session_state['ui_allf_tp'] = st.slider("TP del Escuadrón %", 0.5, 100.0, value=float(st.session_state.get('ui_allf_tp', 50.0)), key="w_tp_allf", step=0.5)
+                st.session_state['ui_allf_tp'] = st.slider("TP del Escuadrón %", 0.5, 150.0, value=float(st.session_state.get('ui_allf_tp', 50.0)), key="w_tp_allf", step=0.5)
             with c2:
                 st.session_state['ui_allf_s_team'] = st.multiselect("Fuerzas de Retirada (Ventas)", base_s, default=[x for x in st.session_state.get('ui_allf_s_team', []) if x in base_s], key="w_steam_allf")
                 st.session_state['ui_allf_sl'] = st.slider("SL del Escuadrón %", 0.5, 25.0, value=float(st.session_state.get('ui_allf_sl', 5.0)), key="w_sl_allf", step=0.5)
@@ -872,7 +861,6 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             m_mask = np.ones(len(df_strat), dtype=bool)
             if st.session_state['ui_allf_macro'] == "Bull Only (Precio > EMA 200)": m_mask = df_strat['Macro_Bull'].values
             elif st.session_state['ui_allf_macro'] == "Bear Only (Precio < EMA 200)": m_mask = ~df_strat['Macro_Bull'].values
-            
             v_mask = np.ones(len(df_strat), dtype=bool)
             if st.session_state['ui_allf_vol'] == "Trend (ADX > 25)": v_mask = df_strat['ADX'].values >= 25
             elif st.session_state['ui_allf_vol'] == "Range (ADX < 25)": v_mask = df_strat['ADX'].values < 25
@@ -880,7 +868,6 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             for r in st.session_state['ui_allf_b_team']: 
                 if r in df_strat.columns: f_buy |= df_strat[r].values
             f_buy &= (m_mask & v_mask)
-            
             for r in st.session_state['ui_allf_s_team']: 
                 if r in df_strat.columns: f_sell |= df_strat[r].values
                 
