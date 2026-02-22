@@ -35,19 +35,19 @@ estrategias = ["TRINITY", "JUGGERNAUT", "DEFCON", "TARGET_LOCK", "THERMAL", "PIN
 for r_idx in range(1, 5):
     if f'gen_r{r_idx}_b' not in st.session_state: st.session_state[f'gen_r{r_idx}_b'] = ['Neon_Up']
     if f'gen_r{r_idx}_s' not in st.session_state: st.session_state[f'gen_r{r_idx}_s'] = ['Neon_Dn']
-    if f'gen_r{r_idx}_tp' not in st.session_state: st.session_state[f'gen_r{r_idx}_tp'] = 5.0
-    if f'gen_r{r_idx}_sl' not in st.session_state: st.session_state[f'gen_r{r_idx}_sl'] = 2.0
+    if f'gen_r{r_idx}_tp' not in st.session_state: st.session_state[f'gen_r{r_idx}_tp'] = 15.0
+    if f'gen_r{r_idx}_sl' not in st.session_state: st.session_state[f'gen_r{r_idx}_sl'] = 3.0
     
     if f'roc_r{r_idx}_b' not in st.session_state: st.session_state[f'roc_r{r_idx}_b'] = ['Commander_Buy']
     if f'roc_r{r_idx}_s' not in st.session_state: st.session_state[f'roc_r{r_idx}_s'] = ['Commander_Sell']
-    if f'roc_r{r_idx}_tp' not in st.session_state: st.session_state[f'roc_r{r_idx}_tp'] = 5.0
-    if f'roc_r{r_idx}_sl' not in st.session_state: st.session_state[f'roc_r{r_idx}_sl'] = 2.0
+    if f'roc_r{r_idx}_tp' not in st.session_state: st.session_state[f'roc_r{r_idx}_tp'] = 15.0
+    if f'roc_r{r_idx}_sl' not in st.session_state: st.session_state[f'roc_r{r_idx}_sl'] = 3.0
 
 for s in estrategias:
     if f'dna_{s}' not in st.session_state: st.session_state[f'dna_{s}'] = ""
     if f'ado_{s}' not in st.session_state: st.session_state[f'ado_{s}'] = 5.0 
-    if f'sld_tp_{s}' not in st.session_state: st.session_state[f'sld_tp_{s}'] = 3.0
-    if f'sld_sl_{s}' not in st.session_state: st.session_state[f'sld_sl_{s}'] = 1.5
+    if f'sld_tp_{s}' not in st.session_state: st.session_state[f'sld_tp_{s}'] = 15.0
+    if f'sld_sl_{s}' not in st.session_state: st.session_state[f'sld_sl_{s}'] = 3.0
     if f'sld_wh_{s}' not in st.session_state: st.session_state[f'sld_wh_{s}'] = 2.5
     if f'sld_rd_{s}' not in st.session_state: st.session_state[f'sld_rd_{s}'] = 1.5
     if f'sld_reinv_{s}' not in st.session_state: st.session_state[f'sld_reinv_{s}'] = 100.0
@@ -62,7 +62,7 @@ css_spinner = """
 """
 ph_holograma = st.empty()
 
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL V66.1</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL V68.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     gc.collect()
@@ -88,7 +88,7 @@ start_date, end_date = st.sidebar.slider("📅 Scope Histórico", min_value=hoy 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
-@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Velas y Lógicas Avanzadas...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Velas y Lógicas Diamond Hands...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -154,7 +154,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['BBU'] = df['Basis'] + (2.0 * dev)
         df['BBL'] = df['Basis'] - (2.0 * dev)
         
-        # 🔥 FIX KEYERROR: BB_WIDTH AHORA SE CALCULA CORRECTAMENTE 🔥
         df['BB_Width'] = (df['BBU'] - df['BBL']) / df['Basis'].replace(0, 1)
         df['BB_Width_Avg'] = df['BB_Width'].rolling(20, min_periods=1).mean()
         
@@ -219,55 +218,58 @@ else:
     st.error(status_api)
     st.stop()
 
-# 🔥 LA CIRUGÍA ALGORÍTMICA PROFUNDA (V66.1) 🔥
+# 🔥 LA CIRUGÍA "DIAMOND HANDS" (V68.0) 🔥
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     
-    # 🏓 1. PING PONG (Libre de Radar, Momentum Rápido)
-    df_sim['Ping_Buy'] = (df_sim['Momentum'] > 0) & (df_sim['Momentum'].shift(1).fillna(0) <= 0) & (df_sim['RSI'] < 65) & df_sim['Vela_Verde']
-    df_sim['Ping_Sell'] = (df_sim['Momentum'] < 0) & (df_sim['Momentum'].shift(1).fillna(0) >= 0) & (df_sim['RSI'] > 45)
+    # 🏓 1. PING PONG (Trend-Aligned Reversion)
+    # Ya no opera en contra de tendencia. Exige estar sobre EMA 50 y que el RSI no esté alto.
+    df_sim['Ping_Buy'] = (df_sim['Momentum'] > 0) & (df_sim['Momentum'].shift(1).fillna(0) <= 0) & (df_sim['Close'] > df_sim['EMA_50']) & (df_sim['RSI'] < 60) & df_sim['Vela_Verde']
+    df_sim['Ping_Sell'] = (df_sim['RSI'] > 75) | (df_sim['Close'] < df_sim['EMA_50'])
 
-    # 🌸 2. PINK CLIMAX (Holgura Anti-Cuchillo: Mecha >= 80% y Confirmación Verde)
+    # 🌸 2. PINK CLIMAX (Hold the Line)
     df_sim['Climax_Buy'] = (df_sim['RVol'] > 1.2) & (df_sim['lower_wick'] >= (df_sim['body_size'] * 0.8)) & (df_sim['RSI'] < 50) & df_sim['Vela_Verde']
-    df_sim['Climax_Sell'] = (df_sim['RVol'] > 1.2) & (df_sim['upper_wick'] >= (df_sim['body_size'] * 0.8)) & (df_sim['RSI'] > 50) & df_sim['Vela_Roja']
+    df_sim['Climax_Sell'] = (df_sim['RSI'] > 75) | (df_sim['Close'] < df_sim['EMA_50'])
 
-    # 🌡️ 3. THERMAL (Radar Anti-Cimas y Cajas de Impacto extendidas)
-    df_sim['Therm_Bounce'] = (df_sim['floor_w'] >= 1) & (df_sim['RSI'] > df_sim['RSI'].shift(1)) & (df_sim['RSI'] < 60) & df_sim['Vela_Verde']
-    df_sim['Thermal_Sell'] = (df_sim['ceil_w'] >= 1) & (df_sim['RSI'] < df_sim['RSI'].shift(1)) & (df_sim['RSI'] > 50) & df_sim['Vela_Roja']
+    # 🌡️ 3. THERMAL (Ignora Techos de Papel)
+    df_sim['Therm_Bounce'] = (df_sim['floor_w'] >= 1) & df_sim['RSI_Cross_Up'] & (df_sim['RSI'] < 60)
     dist_next_res = (df_sim['Target_Lock_Res'] - df_sim['Close']) / df_sim['Close'] * 100
     df_sim['Therm_Vacuum'] = (df_sim['Close'] > df_sim['Target_Lock_Res']) & (dist_next_res > 2.0) & df_sim['Vela_Verde']
     df_sim['Thermal_Buy'] = df_sim['Therm_Bounce'] | df_sim['Therm_Vacuum']
+    # Solo vende si el techo es masivo (>=4) o se pierde el tren (EMA 50)
+    df_sim['Thermal_Sell'] = ((df_sim['ceil_w'] >= 4) & (df_sim['RSI'] > 65)) | (df_sim['Close'] < df_sim['EMA_50'])
 
-    # 🎯 4. TARGET LOCK (Mayor tolerancia al toque + Impulso RSI)
+    # 🎯 4. TARGET LOCK (Anti-Cúspides)
     df_sim['Lock_Bounce'] = (df_sim['Low'] <= (df_sim['Target_Lock_Sup'] + df_sim['ATR'])) & (df_sim['Close'] > df_sim['Target_Lock_Sup']) & df_sim['Vela_Verde']
-    df_sim['Lock_Buy'] = df_sim['Lock_Bounce'] & (df_sim['RSI'] > 40)
-    df_sim['Lock_Reject'] = (df_sim['High'] >= (df_sim['Target_Lock_Res'] - df_sim['ATR'])) & (df_sim['Close'] < df_sim['Target_Lock_Res']) & df_sim['Vela_Roja']
-    df_sim['Lock_Sell'] = df_sim['Lock_Reject']
+    # ¡CRÍTICO! No compra si el precio ya está pegado a la banda superior BBU o si RSI es alto
+    df_sim['Lock_Buy'] = df_sim['Lock_Bounce'] & (df_sim['RSI'] < 60) & (df_sim['Close'] < df_sim['BBU'])
+    df_sim['Lock_Sell'] = (df_sim['High'] >= df_sim['Target_Lock_Res']) & (df_sim['RSI'] > 70)
 
-    # 🐛 5. NEON SQUEEZE (Contracción Dinámica BBW + Filtro Volumen)
+    # 🐛 5. NEON SQUEEZE (Trend Follower Exponencial)
     df_sim['BB_Contraction'] = df_sim['BB_Width'] < df_sim['BB_Width_Avg']
-    df_sim['Neon_Up'] = df_sim['BB_Contraction'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Verde'] & (df_sim['ADX'] > 20)
+    df_sim['Neon_Up'] = df_sim['Squeeze_On'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Verde'] & (df_sim['RVol'] > 1.0) & (df_sim['RSI'] < 70)
     df_sim['Squeeze_Buy'] = df_sim['Neon_Up']
-    df_sim['Squeeze_Sell'] = df_sim['Close'] < df_sim['EMA_50'] # Salida inteligente macro
+    # Vende solo si se rompe la tendencia media
+    df_sim['Squeeze_Sell'] = df_sim['Close'] < df_sim['EMA_50'] 
 
-    # 🚀 6. DEFCON (Squeeze Agresivo + Salida Inteligente)
-    df_sim['Defcon_Buy_Sig'] = df_sim['Neon_Up'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['RVol'] > 1.1)
-    df_sim['Defcon_Sell_Sig'] = (df_sim['Close'] < df_sim['EMA_50']) | (df_sim['RSI'] > 75)
+    # 🚀 6. DEFCON (Captura Macro)
+    df_sim['Defcon_Buy_Sig'] = df_sim['Squeeze_On'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & (df_sim['BB_Delta'] > 0)
+    df_sim['Defcon_Sell_Sig'] = df_sim['Close'] < df_sim['EMA_50']
 
-    # ⚔️ 7. JUGGERNAUT (Desencadenado Macro, Protegido por Aegis)
+    # ⚔️ 7. JUGGERNAUT (Sin Pánico)
     df_sim['Pink_Whale_Buy'] = df_sim['Climax_Buy'] & (df_sim['RVol'] > (w_factor * 0.8))
     df_sim['aegis_safe'] = ~df_sim['is_falling_knife']
-    df_sim['Jugg_Buy'] = (df_sim['Defcon_Buy_Sig'] | df_sim['Pink_Whale_Buy'] | df_sim['Lock_Buy']) & df_sim['aegis_safe']
-    df_sim['Jugg_Sell'] = (df_sim['Close'] < df_sim['EMA_50']) | df_sim['Thermal_Sell']
+    df_sim['Jugg_Buy'] = (df_sim['Defcon_Buy_Sig'] | df_sim['Pink_Whale_Buy'] | df_sim['Lock_Buy']) & df_sim['Macro_Bull'] & df_sim['aegis_safe']
+    df_sim['Jugg_Sell'] = (df_sim['Close'] < df_sim['EMA_50']) | (df_sim['RSI'] > 80)
 
     # 👑 TRINITY Y COMMANDER
     df_sim['Trinity_Buy'] = df_sim['Pink_Whale_Buy'] | (df_sim['Lock_Buy'] & df_sim['aegis_safe']) | (df_sim['Defcon_Buy_Sig'] & df_sim['aegis_safe'])
-    df_sim['Trinity_Sell'] = df_sim['Defcon_Sell_Sig'] | df_sim['Thermal_Sell']
+    df_sim['Trinity_Sell'] = df_sim['Close'] < df_sim['EMA_50']
     df_sim['Lev_Buy'] = df_sim['Macro_Bull'] & df_sim['RSI_Cross_Up'] & (df_sim['RSI'].shift(1).fillna(50) < 50)
     df_sim['Lev_Sell'] = (df_sim['Close'] < df_sim['EMA_200'])
     
     df_sim['confirmacion_alcista'] = (df_sim['Close'] > df_sim['High'].shift(1)) & df_sim['Vela_Verde']
     df_sim['Commander_Buy'] = df_sim['Pink_Whale_Buy'] | ((df_sim['Lock_Buy'] | df_sim['Thermal_Buy']) & df_sim['aegis_safe']) | (df_sim['Climax_Buy'] & df_sim['confirmacion_alcista'])
-    df_sim['Commander_Sell'] = df_sim['Defcon_Sell_Sig'] | df_sim['Thermal_Sell'] | df_sim['Climax_Sell'] | df_sim['Ping_Sell']
+    df_sim['Commander_Sell'] = df_sim['Defcon_Sell_Sig'] | df_sim['Thermal_Sell'] | (df_sim['Close'] < df_sim['EMA_50'])
 
     return df_sim
 
@@ -446,13 +448,14 @@ tab_id_map = {
 def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money):
     best_fit = -float('inf')
     bp = None
-    tp_min, tp_max = (0.5, 15.0) if target_ado > 2 else (2.0, 30.0)
+    # 🔥 AUMENTAMOS EL RANGO DE BÚSQUEDA DE TAKE PROFIT (Permite ganar hasta +40%) 🔥
+    tp_min, tp_max = (5.0, 20.0) if target_ado > 2 else (10.0, 45.0)
     
     for _ in range(2000): 
         rtp = round(random.uniform(tp_min, tp_max), 1)
-        rsl = round(random.uniform(0.5, 10.0), 1)
-        rwh = round(random.uniform(1.5, 4.0), 1)
-        rrd = round(random.uniform(0.5, 3.0), 1)
+        rsl = round(random.uniform(1.0, 10.0), 1)
+        rwh = round(random.uniform(1.5, 3.5), 1)
+        rrd = round(random.uniform(0.5, 3.5), 1)
         
         df_precalc = inyectar_adn(df_base.copy(), r_sens=rrd, w_factor=rwh)
         h_a, l_a, c_a, o_a = df_precalc['High'].values, df_precalc['Low'].values, df_precalc['Close'].values, df_precalc['Open'].values
@@ -540,25 +543,25 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 st.markdown("<h5 style='color:lime;'>🟢 Bull Trend</h5>", unsafe_allow_html=True)
                 st.multiselect("Estrategia Compra", rocket_b, key="roc_r1_b")
                 st.multiselect("Estrategia Cierre", rocket_s, key="roc_r1_s")
-                st.slider("TP %", 0.5, 30.0, step=0.5, key="roc_r1_tp")
+                st.slider("TP %", 0.5, 40.0, step=0.5, key="roc_r1_tp")
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="roc_r1_sl")
             with c2:
                 st.markdown("<h5 style='color:yellow;'>🟡 Bull Chop</h5>", unsafe_allow_html=True)
                 st.multiselect("Estrategia Compra", rocket_b, key="roc_r2_b")
                 st.multiselect("Estrategia Cierre", rocket_s, key="roc_r2_s")
-                st.slider("TP %", 0.5, 30.0, step=0.5, key="roc_r2_tp")
+                st.slider("TP %", 0.5, 40.0, step=0.5, key="roc_r2_tp")
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="roc_r2_sl")
             with c3:
                 st.markdown("<h5 style='color:red;'>🔴 Bear Trend</h5>", unsafe_allow_html=True)
                 st.multiselect("Estrategia Compra", rocket_b, key="roc_r3_b")
                 st.multiselect("Estrategia Cierre", rocket_s, key="roc_r3_s")
-                st.slider("TP %", 0.5, 30.0, step=0.5, key="roc_r3_tp")
+                st.slider("TP %", 0.5, 40.0, step=0.5, key="roc_r3_tp")
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="roc_r3_sl")
             with c4:
                 st.markdown("<h5 style='color:orange;'>🟠 Bear Chop</h5>", unsafe_allow_html=True)
                 st.multiselect("Estrategia Compra", rocket_b, key="roc_r4_b")
                 st.multiselect("Estrategia Cierre", rocket_s, key="roc_r4_s")
-                st.slider("TP %", 0.5, 30.0, step=0.5, key="roc_r4_tp")
+                st.slider("TP %", 0.5, 40.0, step=0.5, key="roc_r4_tp")
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="roc_r4_sl")
 
             if c_ia3.button("🚀 INICIAR ENSAMBLAJE", type="primary", key="btn_roc"):
@@ -583,8 +586,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
                     dna_b = [random.sample(rocket_b, random.randint(1, 2)) for _ in range(4)]
                     dna_s = [random.sample(rocket_s, random.randint(1, 2)) for _ in range(4)]
-                    dna_tp = [random.uniform(0.5, 20.0) for _ in range(4)]
-                    dna_sl = [random.uniform(0.5, 8.0) for _ in range(4)]
+                    dna_tp = [random.uniform(5.0, 30.0) for _ in range(4)]
+                    dna_sl = [random.uniform(1.0, 10.0) for _ in range(4)]
                     f_buy, f_sell = np.zeros(len(df_p), dtype=bool), np.zeros(len(df_p), dtype=bool)
                     f_tp, f_sl = np.zeros(len(df_p)), np.zeros(len(df_p))
                     
@@ -639,8 +642,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 r_s_cond = np.zeros(len(df_strat), dtype=bool)
                 for r in st.session_state.get(f'roc_r{idx}_s', []): r_s_cond |= df_strat[r].values
                 f_sell[mask] = r_s_cond[mask]
-                f_tp[mask] = st.session_state.get(f'roc_r{idx}_tp', 5.0)
-                f_sl[mask] = st.session_state.get(f'roc_r{idx}_sl', 2.0)
+                f_tp[mask] = st.session_state.get(f'roc_r{idx}_tp', 15.0)
+                f_sl[mask] = st.session_state.get(f'roc_r{idx}_sl', 3.0)
                 
             df_strat['Signal_Buy'], df_strat['Signal_Sell'] = f_buy, f_sell
             df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
@@ -664,25 +667,25 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 st.markdown("<h5 style='color:lime;'>🟢 Bull Trend</h5>", unsafe_allow_html=True)
                 st.multiselect("Compras", buy_rules, key="gen_r1_b")
                 st.multiselect("Cierres", sell_rules, key="gen_r1_s")
-                st.slider("TP %", 0.5, 30.0, step=0.5, key="gen_r1_tp")
+                st.slider("TP %", 0.5, 40.0, step=0.5, key="gen_r1_tp")
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r1_sl")
             with c2:
                 st.markdown("<h5 style='color:yellow;'>🟡 Bull Chop</h5>", unsafe_allow_html=True)
                 st.multiselect("Compras", buy_rules, key="gen_r2_b")
                 st.multiselect("Cierres", sell_rules, key="gen_r2_s")
-                st.slider("TP %", 0.5, 30.0, step=0.5, key="gen_r2_tp")
+                st.slider("TP %", 0.5, 40.0, step=0.5, key="gen_r2_tp")
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r2_sl")
             with c3:
                 st.markdown("<h5 style='color:red;'>🔴 Bear Trend</h5>", unsafe_allow_html=True)
                 st.multiselect("Compras", buy_rules, key="gen_r3_b")
                 st.multiselect("Cierres", sell_rules, key="gen_r3_s")
-                st.slider("TP %", 0.5, 30.0, step=0.5, key="gen_r3_tp")
+                st.slider("TP %", 0.5, 40.0, step=0.5, key="gen_r3_tp")
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r3_sl")
             with c4:
                 st.markdown("<h5 style='color:orange;'>🟠 Bear Chop</h5>", unsafe_allow_html=True)
                 st.multiselect("Compras", buy_rules, key="gen_r4_b")
                 st.multiselect("Cierres", sell_rules, key="gen_r4_s")
-                st.slider("TP %", 0.5, 30.0, step=0.5, key="gen_r4_tp")
+                st.slider("TP %", 0.5, 40.0, step=0.5, key="gen_r4_tp")
                 st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r4_sl")
 
             if c_ia3.button("🚀 EXTRACCIÓN CUÁNTICA", type="primary", key="btn_gen"):
@@ -705,8 +708,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
                     dna_b = [random.sample(buy_rules, random.randint(1, 3)) for _ in range(4)]
                     dna_s = [random.sample(sell_rules, random.randint(1, 3)) for _ in range(4)]
-                    dna_tp = [random.uniform(0.5, 20.0) for _ in range(4)]
-                    dna_sl = [random.uniform(0.5, 8.0) for _ in range(4)]
+                    dna_tp = [random.uniform(5.0, 30.0) for _ in range(4)]
+                    dna_sl = [random.uniform(1.0, 10.0) for _ in range(4)]
                     f_buy, f_sell = np.zeros(len(df_p), dtype=bool), np.zeros(len(df_p), dtype=bool)
                     f_tp, f_sl = np.zeros(len(df_p)), np.zeros(len(df_p))
                     
@@ -761,8 +764,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 r_s_cond = np.zeros(len(df_strat), dtype=bool)
                 for r in st.session_state.get(f'gen_r{idx}_s', []): r_s_cond |= df_strat[r].values
                 f_sell[mask] = r_s_cond[mask]
-                f_tp[mask] = st.session_state.get(f'gen_r{idx}_tp', 5.0)
-                f_sl[mask] = st.session_state.get(f'gen_r{idx}_sl', 2.0)
+                f_tp[mask] = st.session_state.get(f'gen_r{idx}_tp', 15.0)
+                f_sl[mask] = st.session_state.get(f'gen_r{idx}_sl', 3.0)
                 
             df_strat['Signal_Buy'], df_strat['Signal_Sell'] = f_buy, f_sell
             df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
@@ -800,7 +803,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
             with st.expander("🛠️ Ajuste Manual de Parámetros"):
                 c1, c2, c3, c4 = st.columns(4)
-                st.session_state[f'sld_tp_{s_id}'] = c1.slider("🎯 TP Base (%)", 0.5, 50.0, value=float(st.session_state.get(f'sld_tp_{s_id}', 10.0)), step=0.1, key=f"man_tp_{s_id}")
+                st.session_state[f'sld_tp_{s_id}'] = c1.slider("🎯 TP Base (%)", 0.5, 50.0, value=float(st.session_state.get(f'sld_tp_{s_id}', 15.0)), step=0.1, key=f"man_tp_{s_id}")
                 st.session_state[f'sld_sl_{s_id}'] = c2.slider("🛑 SL (%)", 0.5, 20.0, value=float(st.session_state.get(f'sld_sl_{s_id}', 3.0)), step=0.1, key=f"man_sl_{s_id}")
                 st.session_state[f'sld_wh_{s_id}'] = c3.slider("🐋 Factor Ballena", 1.0, 5.0, value=float(st.session_state.get(f'sld_wh_{s_id}', 2.5)), step=0.1, key=f"man_wh_{s_id}")
                 st.session_state[f'sld_rd_{s_id}'] = c4.slider("📡 Radar Sens.", 0.5, 5.0, value=float(st.session_state.get(f'sld_rd_{s_id}', 1.5)), step=0.1, key=f"man_rd_{s_id}")
@@ -866,7 +869,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
             fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
             fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
-            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200', line=dict(color='orange', width=2)), row=1, col=1)
+            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='EMA 50 (Trend Line)', line=dict(color='yellow', width=2)), row=1, col=1)
+            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200 (Macro Line)', line=dict(color='orange', width=2)), row=1, col=1)
 
             if not dftr.empty:
                 ents = dftr[dftr['Tipo'] == 'ENTRY']
