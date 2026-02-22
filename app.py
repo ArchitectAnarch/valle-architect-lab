@@ -43,7 +43,7 @@ tab_id_map = {
 macro_opts = ["All-Weather", "Bull Only (Precio > EMA 200)", "Bear Only (Precio < EMA 200)"]
 vol_opts = ["All-Weather", "Trend (ADX > 25)", "Range (ADX < 25)"]
 
-# --- SHADOW STATE (PREVIENE STREAMLIT API EXCEPTIONS) ---
+# --- SHADOW STATE Y RETENCIÓN GENÉTICA ---
 if 'ui_allf_b_team' not in st.session_state: st.session_state['ui_allf_b_team'] = ['Commander_Buy', 'Squeeze_Buy', 'Ping_Buy']
 if 'ui_allf_s_team' not in st.session_state: st.session_state['ui_allf_s_team'] = ['Commander_Sell', 'Squeeze_Sell']
 if 'ui_allf_macro' not in st.session_state: st.session_state['ui_allf_macro'] = "All-Weather"
@@ -85,10 +85,13 @@ ph_holograma = st.empty()
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V90.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V91.0 (EVOLUTION)</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
-    for s in estrategias: st.session_state[f'opt_status_{s}'] = False 
+    for s in estrategias: 
+        st.session_state[f'opt_status_{s}'] = False 
+        if f'best_fit_{s}' in st.session_state:
+            del st.session_state[f'best_fit_{s}'] # Borra la memoria genética para empezar de 0 en la nueva temporalidad
     clear_widget_state()
     gc.collect()
 
@@ -425,7 +428,7 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
             
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
-# 🧠 RUTINA DE OPTIMIZACIÓN (THE GREED PROTOCOL V90.0) 🧠
+# 🧠 RUTINA DE OPTIMIZACIÓN (THE GREED PROTOCOL V91.0) 🧠
 def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, is_meta=False):
     best_fit = -float('inf')
     bp = None
@@ -450,11 +453,9 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
             o_a = np.asarray(df_precalc['Open'].values, dtype=np.float64)
             
             if s_id == "ALL_FORCES":
-                # 🔥 BERSERKER OMNI-ENSEMBLE (Mínimo 3 compras y 2 cierres)
                 dna_b_team = random.sample(base_b, random.randint(3, len(base_b)))
                 dna_s_team = random.sample(base_s, random.randint(2, len(base_s)))
                 
-                # Relajamos los filtros: 60% de chance de elegir All-Weather para no estancarse
                 dna_macro = "All-Weather" if random.random() < 0.6 else random.choice(["Bull Only (Precio > EMA 200)", "Bear Only (Precio < EMA 200)"])
                 dna_vol = "All-Weather" if random.random() < 0.6 else random.choice(["Trend (ADX > 25)", "Range (ADX < 25)"])
                 
@@ -526,33 +527,28 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
             net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c_arr, s_c_arr, t_arr, sl_arr, float(cap_ini), float(com_pct), float(reinv_q))
             alpha_money = net - buy_hold_money
             
-            # 🔥 V90.0 FITNESS: EL PROTOCOLO DE CODICIA (GREED PROTOCOL)
+            # 🔥 V90.0: EL PROTOCOLO DE CODICIA 🔥
             if nt >= 1: 
                 if net > 0: 
-                    # Castigo brutal a estrategias cobardes (< 15 operaciones)
                     trade_penalty = np.sqrt(float(nt)) if nt >= 15 else (float(nt) / 15.0)
-                    
-                    # REGLA DE ORO: Si gana menos de un 10% de la cuenta, lo consideramos basura y lo penalizamos
                     min_profit_threshold = cap_ini * 0.10
-                    if net < min_profit_threshold:
-                        net_score = net * 0.1 # Lo hundimos
-                    else:
-                        net_score = net ** 1.5 # Exponenciamos la codicia para que busque los números grandes
+                    if net < min_profit_threshold: net_score = net * 0.1 
+                    else: net_score = net ** 1.5 
                     
                     fit = net_score * (pf ** 0.5) * trade_penalty / ((mdd ** 0.5) + 1.0)
                     if alpha_money > 0: fit *= 1.5 
                 else: 
                     fit = net * ((mdd ** 0.5) + 1.0) / (pf + 0.001)
-                    if alpha_money > 0: fit /= 1.5 # Recompensa si perdió menos que el Hold en caídas
+                    if alpha_money > 0: fit /= 1.5 
                     
                 if fit > best_fit:
                     best_fit = fit
                     if s_id == "ALL_FORCES":
-                        bp = {'b_team': dna_b_team, 's_team': dna_s_team, 'macro': dna_macro, 'vol': dna_vol, 'tp': rtp, 'sl': rsl, 'wh': rwh, 'rd': rrd, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms}
+                        bp = {'b_team': dna_b_team, 's_team': dna_s_team, 'macro': dna_macro, 'vol': dna_vol, 'tp': rtp, 'sl': rsl, 'wh': rwh, 'rd': rrd, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms, 'fit': fit}
                     elif is_meta:
-                        bp = {'b1': dna_b[0], 's1': dna_s[0], 'tp1': dna_tp[0], 'sl1': dna_sl[0], 'b2': dna_b[1], 's2': dna_s[1], 'tp2': dna_tp[1], 'sl2': dna_sl[1], 'b3': dna_b[2], 's3': dna_s[2], 'tp3': dna_tp[2], 'sl3': dna_sl[2], 'b4': dna_b[3], 's4': dna_s[3], 'tp4': dna_tp[3], 'sl4': dna_sl[3], 'wh': rwh, 'rd': rrd, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms}
+                        bp = {'b1': dna_b[0], 's1': dna_s[0], 'tp1': dna_tp[0], 'sl1': dna_sl[0], 'b2': dna_b[1], 's2': dna_s[1], 'tp2': dna_tp[1], 'sl2': dna_sl[1], 'b3': dna_b[2], 's3': dna_s[2], 'tp3': dna_tp[2], 'sl3': dna_sl[2], 'b4': dna_b[3], 's4': dna_s[3], 'tp4': dna_tp[3], 'sl4': dna_sl[3], 'wh': rwh, 'rd': rrd, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms, 'fit': fit}
                     else:
-                        bp = {'tp': rtp, 'sl': rsl, 'wh': rwh, 'rd': rrd, 'reinv': reinv_q, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms}
+                        bp = {'tp': rtp, 'sl': rsl, 'wh': rwh, 'rd': rrd, 'reinv': reinv_q, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms, 'fit': fit}
         
         elapsed = time.time() - start_time
         pct_done = int(((c + 1) / chunks) * 100)
@@ -607,7 +603,7 @@ def save_optimization_to_state(s_id, bp, is_meta):
 
 # 📋 REPORTE UNIVERSAL 📋
 def generar_reporte_universal(df_base, cap_ini, com_pct):
-    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V90.0)**\n\n"
+    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V91.0 - EVOLUTION)**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_base)}\n\n"
     buy_hold_ret = ((df_base['Close'].iloc[-1] - df_base['Open'].iloc[0]) / df_base['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
@@ -754,10 +750,7 @@ if not df_global.empty:
             b_c_arr, s_c_arr = np.asarray(f_buy, dtype=bool), np.asarray(f_sell, dtype=bool)
         else:
             reinv_q = st.session_state.get(f'ui_reinv_{s_id}', 0.0)
-            tp_val = st.session_state.get(f'ui_tp_{s_id}', 50.0)
-            sl_val = st.session_state.get(f'ui_sl_{s_id}', 5.0)
-            wh_val = st.session_state.get(f'ui_wh_{s_id}', 2.5)
-            rd_val = st.session_state.get(f'ui_rd_{s_id}', 1.5)
+            tp_val, sl_val = st.session_state.get(f'ui_tp_{s_id}', 50.0), st.session_state.get(f'ui_sl_{s_id}', 5.0)
             df_strat = inyectar_adn(df_global.copy(), rd_val, wh_val)
             b_c = np.zeros(len(df_strat), dtype=bool)
             s_c = np.zeros(len(df_strat), dtype=bool)
@@ -782,7 +775,6 @@ if not df_global.empty:
         net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c_arr, s_c_arr, t_arr, sl_arr, float(capital_inicial), float(comision_pct), float(reinv_q))
         
         ret_pct = (net / capital_inicial) * 100
-        
         if ret_pct > 0 and nt > 0: score = ret_pct * (1 + np.log1p(nt))
         else: score = ret_pct 
         leaderboard.append((s_id, ret_pct, nt, score))
@@ -804,33 +796,21 @@ if st.sidebar.button("🧠 OPT. GLOBAL (12 SQUADS)", type="primary", use_contain
     total_strats = len(estrategias)
     
     for i, s_id in enumerate(estrategias):
-        pct_done = int((i / total_strats) * 100)
-        dyn_spinner = f"""
-        <style>
-        .loader-container {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; pointer-events: none; background: transparent; text-align: center; }}
-        .rocket {{ font-size: 10rem; animation: spin 1.5s ease-in-out infinite; filter: drop-shadow(0 0 40px rgba(0, 255, 255, 1)); }}
-        @keyframes spin {{ 0% {{ transform: scale(1) rotate(0deg); }} 50% {{ transform: scale(1.3) rotate(180deg); }} 100% {{ transform: scale(1) rotate(360deg); }} }}
-        .prog-text {{ color: cyan; font-size: 2rem; font-weight: bold; margin-top: 15px; text-shadow: 0 0 10px cyan; }}
-        </style>
-        <div class="loader-container">
-            <div class="rocket">🚀</div>
-            <div class="prog-text">FORJANDO IA: {pct_done}%</div>
-            <div style='color: white; font-size: 1rem;'>Entrenando: {s_id}</div>
-        </div>
-        """
-        ph_holograma.markdown(dyn_spinner, unsafe_allow_html=True)
-        
         is_meta = s_id in ["GENESIS", "ROCKET", "ALL_FORCES"]
         prefix = "gen" if s_id == "GENESIS" else "roc" if s_id == "ROCKET" else "allf" if s_id == "ALL_FORCES" else ""
         reinv_q = st.session_state.get(f'ui_{prefix}_reinv' if is_meta else f'ui_reinv_{s_id}', 0.0)
         t_ado = st.session_state.get(f'ui_{prefix}_ado' if is_meta else f'ui_ado_{s_id}', 100.0)
         
         bp = optimizar_ia_tracker(s_id, df_global, capital_inicial, comision_pct, reinv_q, t_ado, dias_reales, buy_hold_money, is_meta=is_meta)
-        if bp: save_optimization_to_state(s_id, bp, is_meta)
+        if bp:
+            current_fit = st.session_state.get(f'best_fit_{s_id}', -float('inf'))
+            if bp['fit'] > current_fit:
+                save_optimization_to_state(s_id, bp, is_meta)
+                st.session_state[f'best_fit_{s_id}'] = bp['fit']
             
     clear_widget_state()
     ph_holograma.empty()
-    st.sidebar.success("✅ ¡Forja Global Completada!")
+    st.sidebar.success("✅ ¡Forja Evolutiva Global Completada!")
     time.sleep(1)
     st.rerun()
 
@@ -851,7 +831,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
         if s_id == "ALL_FORCES":
             st.markdown(f"### 🌟 ALL FORCES ALGO (Omni-Ensemble) {opt_badge}", unsafe_allow_html=True)
-            st.info("El Director Supremo de Portafolio. Obligado matemáticamente a priorizar el DINERO NETO sobre la especulación.")
+            st.info("El Director Supremo. Equipado con el **Seguro Evolutivo V91**: si le da Optimizar varias veces, solo retendrá el cálculo si es mejor que el anterior.")
             
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state['ui_allf_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get('ui_allf_ado', 100.0)), key="w_ado_allf", step=0.5)
@@ -880,9 +860,18 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
                 bp = optimizar_ia_tracker(s_id, df_global, capital_inicial, comision_pct, st.session_state['ui_allf_reinv'], st.session_state['ui_allf_ado'], dias_reales, buy_hold_money, is_meta=True)
-                if bp: save_optimization_to_state(s_id, bp, True)
-                clear_widget_state()
+                
+                if bp: 
+                    current_fit = st.session_state.get(f'best_fit_{s_id}', -float('inf'))
+                    if bp['fit'] > current_fit:
+                        save_optimization_to_state(s_id, bp, True)
+                        st.session_state[f'best_fit_{s_id}'] = bp['fit']
+                        st.success("👑 ¡Evolución Exitosa! La IA encontró una combinación más letal.")
+                    else:
+                        st.warning("🛡️ Se evaluaron 3,000 cruces, pero la genética actual sigue siendo insuperable. Se retuvo la configuración.")
+                    time.sleep(2)
                 ph_holograma.empty()
+                clear_widget_state()
                 st.rerun() 
 
             df_strat = inyectar_adn(df_global.copy(), st.session_state['ui_allf_rd'], st.session_state['ui_allf_wh'])
@@ -952,9 +941,18 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
                 bp = optimizar_ia_tracker(s_id, df_global, capital_inicial, comision_pct, st.session_state[f'ui_{prefix}_reinv'], st.session_state[f'ui_{prefix}_ado'], dias_reales, buy_hold_money, is_meta=True)
-                if bp: save_optimization_to_state(s_id, bp, True)
-                clear_widget_state()
+                
+                if bp: 
+                    current_fit = st.session_state.get(f'best_fit_{s_id}', -float('inf'))
+                    if bp['fit'] > current_fit:
+                        save_optimization_to_state(s_id, bp, True)
+                        st.session_state[f'best_fit_{s_id}'] = bp['fit']
+                        st.success("👑 ¡Evolución Exitosa! La IA encontró una combinación más letal.")
+                    else:
+                        st.warning("🛡️ Se evaluaron miles de cruces, pero la genética actual sigue siendo superior. Se retuvo la configuración.")
+                    time.sleep(2)
                 ph_holograma.empty()
+                clear_widget_state()
                 st.rerun() 
 
             df_strat = inyectar_adn(df_global.copy(), st.session_state[f'ui_{prefix}_rd'], st.session_state[f'ui_{prefix}_wh'])
@@ -985,9 +983,18 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
                 bp = optimizar_ia_tracker(s_id, df_global, capital_inicial, comision_pct, st.session_state[f'ui_reinv_{s_id}'], st.session_state[f'ui_ado_{s_id}'], dias_reales, buy_hold_money)
-                if bp: save_optimization_to_state(s_id, bp, False)
-                clear_widget_state()
+                
+                if bp:
+                    current_fit = st.session_state.get(f'best_fit_{s_id}', -float('inf'))
+                    if bp['fit'] > current_fit:
+                        save_optimization_to_state(s_id, bp, False)
+                        st.session_state[f'best_fit_{s_id}'] = bp['fit']
+                        st.success("👑 ¡Evolución Exitosa! Nuevo récord encontrado.")
+                    else:
+                        st.warning("🛡️ Ningún escenario superó la genética actual. Se mantuvo la corona.")
+                    time.sleep(2)
                 ph_holograma.empty()
+                clear_widget_state()
                 st.rerun()
 
             with st.expander("🛠️ Ajuste Manual de Parámetros"):
