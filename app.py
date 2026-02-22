@@ -22,7 +22,7 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Alpha Quant", layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
-# 🧠 MEMORIA GLOBAL BLINDADA
+# 🧠 MEMORIA GLOBAL BLINDADA (PREVIENE NAME_ERRORS)
 # ==========================================
 buy_rules = ['Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Pink_Whale_Buy', 'Jugg_Buy', 'Trinity_Buy', 'Commander_Buy', 'Lev_Buy']
 sell_rules = ['Ping_Sell', 'Climax_Sell', 'Thermal_Sell', 'Lock_Sell', 'Squeeze_Sell', 'Defcon_Sell', 'Jugg_Sell', 'Trinity_Sell', 'Commander_Sell', 'Lev_Sell']
@@ -39,16 +39,16 @@ tab_id_map = {
     "🌌 GENESIS": "GENESIS", "👑 ROCKET": "ROCKET"
 }
 
-# --- INICIALIZACIÓN DE ESTADOS E INSIGNIAS ---
+# --- INICIALIZACIÓN DE ESTADOS (UI = IA) Y MARCADORES ---
 for r_idx in range(1, 5):
     if f'ui_gen_r{r_idx}_b' not in st.session_state: st.session_state[f'ui_gen_r{r_idx}_b'] = ['Squeeze_Buy']
     if f'ui_gen_r{r_idx}_s' not in st.session_state: st.session_state[f'ui_gen_r{r_idx}_s'] = ['Squeeze_Sell']
-    if f'ui_gen_r{r_idx}_tp' not in st.session_state: st.session_state[f'ui_gen_r{r_idx}_tp'] = 50.0
+    if f'ui_gen_r{r_idx}_tp' not in st.session_state: st.session_state[f'ui_gen_r{r_idx}_tp'] = 25.0
     if f'ui_gen_r{r_idx}_sl' not in st.session_state: st.session_state[f'ui_gen_r{r_idx}_sl'] = 5.0
     
     if f'ui_roc_r{r_idx}_b' not in st.session_state: st.session_state[f'ui_roc_r{r_idx}_b'] = ['Jugg_Buy']
     if f'ui_roc_r{r_idx}_s' not in st.session_state: st.session_state[f'ui_roc_r{r_idx}_s'] = ['Jugg_Sell']
-    if f'ui_roc_r{r_idx}_tp' not in st.session_state: st.session_state[f'ui_roc_r{r_idx}_tp'] = 50.0
+    if f'ui_roc_r{r_idx}_tp' not in st.session_state: st.session_state[f'ui_roc_r{r_idx}_tp'] = 25.0
     if f'ui_roc_r{r_idx}_sl' not in st.session_state: st.session_state[f'ui_roc_r{r_idx}_sl'] = 5.0
 
 for s in estrategias:
@@ -56,7 +56,7 @@ for s in estrategias:
     if f'ui_reinv_{s}' not in st.session_state: st.session_state[f'ui_reinv_{s}'] = 0.0
     if f'opt_status_{s}' not in st.session_state: st.session_state[f'opt_status_{s}'] = False
     if s not in ["GENESIS", "ROCKET"]:
-        if f'ui_tp_{s}' not in st.session_state: st.session_state[f'ui_tp_{s}'] = 50.0
+        if f'ui_tp_{s}' not in st.session_state: st.session_state[f'ui_tp_{s}'] = 25.0
         if f'ui_sl_{s}' not in st.session_state: st.session_state[f'ui_sl_{s}'] = 5.0
         if f'ui_wh_{s}' not in st.session_state: st.session_state[f'ui_wh_{s}'] = 2.5
         if f'ui_rd_{s}' not in st.session_state: st.session_state[f'ui_rd_{s}'] = 1.5
@@ -432,7 +432,6 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
 def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, is_meta=False):
     best_fit = -float('inf')
     bp = None
-    # 🔥 TPs EXPANDIDOS HASTA 100% PARA RALLIES MASIVOS 🔥
     tp_min, tp_max = (5.0, 40.0) if target_ado > 2 else (20.0, 100.0) 
     iters = 300 if is_meta else 2000 
     
@@ -519,7 +518,6 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
                     bp = {'b1': dna_b[0], 's1': dna_s[0], 'tp1': dna_tp[0], 'sl1': dna_sl[0], 'b2': dna_b[1], 's2': dna_s[1], 'tp2': dna_tp[1], 'sl2': dna_sl[1], 'b3': dna_b[2], 's3': dna_s[2], 'tp3': dna_tp[2], 'sl3': dna_sl[2], 'b4': dna_b[3], 's4': dna_s[3], 'tp4': dna_tp[3], 'sl4': dna_sl[3], 'wh': rwh, 'rd': rrd, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms}
     return bp
 
-# 📋 REPORTE UNIVERSAL 📋
 def generar_reporte_universal(df_base, cap_ini, com_pct):
     res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V81.0)**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_base)}\n\n"
@@ -552,7 +550,7 @@ def generar_reporte_universal(df_base, cap_ini, com_pct):
                 for rule in st.session_state.get(f'ui_{prefix}_r{r_idx}_s', []):
                     if rule in df_strat.columns: s_cond |= df_strat[rule].values
                 f_sell[mask] = s_cond[mask]
-                t_arr[mask] = st.session_state.get(f'ui_{prefix}_r{r_idx}_tp', 50.0)
+                t_arr[mask] = st.session_state.get(f'ui_{prefix}_r{r_idx}_tp', 25.0)
                 sl_arr[mask] = st.session_state.get(f'ui_{prefix}_r{r_idx}_sl', 5.0)
                 
             b_c_arr = np.asarray(f_buy, dtype=bool)
@@ -562,7 +560,7 @@ def generar_reporte_universal(df_base, cap_ini, com_pct):
             tp_val, sl_val = "Dyn", "Dyn"
         else:
             reinv_q = st.session_state.get(f'ui_reinv_{s_id}', 0.0)
-            tp_val = st.session_state.get(f'ui_tp_{s_id}', 50.0)
+            tp_val = st.session_state.get(f'ui_tp_{s_id}', 25.0)
             sl_val = st.session_state.get(f'ui_sl_{s_id}', 5.0)
             wh_val = st.session_state.get(f'ui_wh_{s_id}', 2.5)
             rd_val = st.session_state.get(f'ui_rd_{s_id}', 1.5)
@@ -604,6 +602,92 @@ def generar_reporte_universal(df_base, cap_ini, com_pct):
         res_str += f"⚙️ TP: {tp_val}% | SL: {sl_val}% | R: {rd_val} | W: {wh_val}\n---\n"
         
     return res_str
+
+# ==========================================
+# 🏆 SCORECARD OVERALL (TRANSVERSAL) 🏆
+# ==========================================
+st.sidebar.markdown("---")
+st.sidebar.markdown("<h3 style='text-align: center; color: gold;'>🏆 SCORECARD OVERALL</h3>", unsafe_allow_html=True)
+
+if not df_global.empty:
+    buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
+    leaderboard = []
+    
+    for s_id in estrategias:
+        if s_id in ["GENESIS", "ROCKET"]:
+            prefix = "gen" if s_id == "GENESIS" else "roc"
+            reinv_q = st.session_state.get(f'ui_{prefix}_reinv', 0.0)
+            wh_val = st.session_state.get(f'ui_{prefix}_wh', 2.5)
+            rd_val = st.session_state.get(f'ui_{prefix}_rd', 1.5)
+            df_strat = inyectar_adn(df_global.copy(), rd_val, wh_val)
+            
+            f_buy = np.zeros(len(df_strat), dtype=bool)
+            f_sell = np.zeros(len(df_strat), dtype=bool)
+            t_arr = np.zeros(len(df_strat), dtype=np.float64)
+            sl_arr = np.zeros(len(df_strat), dtype=np.float64)
+            regimes = df_strat['Regime'].values
+            for r_idx in range(1, 5):
+                mask = (regimes == r_idx)
+                b_cond = np.zeros(len(df_strat), dtype=bool)
+                for rule in st.session_state.get(f'ui_{prefix}_r{r_idx}_b', []):
+                    if rule in df_strat.columns: b_cond |= df_strat[rule].values
+                f_buy[mask] = b_cond[mask]
+                s_cond = np.zeros(len(df_strat), dtype=bool)
+                for rule in st.session_state.get(f'ui_{prefix}_r{r_idx}_s', []):
+                    if rule in df_strat.columns: s_cond |= df_strat[rule].values
+                f_sell[mask] = s_cond[mask]
+                t_arr[mask] = st.session_state.get(f'ui_{prefix}_r{r_idx}_tp', 25.0)
+                sl_arr[mask] = st.session_state.get(f'ui_{prefix}_r{r_idx}_sl', 5.0)
+            b_c_arr = np.asarray(f_buy, dtype=bool)
+            s_c_arr = np.asarray(f_sell, dtype=bool)
+            t_arr = np.asarray(t_arr, dtype=np.float64)
+            sl_arr = np.asarray(sl_arr, dtype=np.float64)
+        else:
+            reinv_q = st.session_state.get(f'ui_reinv_{s_id}', 0.0)
+            tp_val = st.session_state.get(f'ui_tp_{s_id}', 25.0)
+            sl_val = st.session_state.get(f'ui_sl_{s_id}', 5.0)
+            wh_val = st.session_state.get(f'ui_wh_{s_id}', 2.5)
+            rd_val = st.session_state.get(f'ui_rd_{s_id}', 1.5)
+            df_strat = inyectar_adn(df_global.copy(), rd_val, wh_val)
+            b_c = np.zeros(len(df_strat), dtype=bool)
+            s_c = np.zeros(len(df_strat), dtype=bool)
+            if s_id == "TRINITY": b_c, s_c = df_strat['Trinity_Buy'], df_strat['Trinity_Sell']
+            elif s_id == "JUGGERNAUT": b_c, s_c = df_strat['Jugg_Buy'], df_strat['Jugg_Sell']
+            elif s_id == "DEFCON": b_c, s_c = df_strat['Defcon_Buy'], df_strat['Defcon_Sell']
+            elif s_id == "TARGET_LOCK": b_c, s_c = df_strat['Lock_Buy'], df_strat['Lock_Sell']
+            elif s_id == "THERMAL": b_c, s_c = df_strat['Thermal_Buy'], df_strat['Thermal_Sell']
+            elif s_id == "PINK_CLIMAX": b_c, s_c = df_strat['Climax_Buy'], df_strat['Climax_Sell']
+            elif s_id == "PING_PONG": b_c, s_c = df_strat['Ping_Buy'], df_strat['Ping_Sell']
+            elif s_id == "NEON_SQUEEZE": b_c, s_c = df_strat['Squeeze_Buy'], df_strat['Squeeze_Sell']
+            elif s_id == "COMMANDER": b_c, s_c = df_strat['Commander_Buy'], df_strat['Commander_Sell']
+            b_c_arr = np.asarray(b_c.values, dtype=bool)
+            s_c_arr = np.asarray(s_c.values, dtype=bool)
+            t_arr = np.asarray(np.full(len(df_strat), float(tp_val)), dtype=np.float64)
+            sl_arr = np.asarray(np.full(len(df_strat), float(sl_val)), dtype=np.float64)
+
+        h_a = np.asarray(df_strat['High'].values, dtype=np.float64)
+        l_a = np.asarray(df_strat['Low'].values, dtype=np.float64)
+        c_a = np.asarray(df_strat['Close'].values, dtype=np.float64)
+        o_a = np.asarray(df_strat['Open'].values, dtype=np.float64)
+        net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c_arr, s_c_arr, t_arr, sl_arr, float(capital_inicial), float(comision_pct), float(reinv_q))
+        
+        ret_pct = (net / capital_inicial) * 100
+        
+        # Puntuación Matemática (Premia rentabilidad y premia actividad de forma logarítmica)
+        if ret_pct > 0:
+            score = ret_pct * (1 + np.log1p(nt))
+        else:
+            score = ret_pct 
+            
+        leaderboard.append((s_id, ret_pct, nt, score))
+        
+    leaderboard.sort(key=lambda x: x[3], reverse=True)
+    
+    st.sidebar.markdown(f"**📈 HOLD MKT:** `{buy_hold_ret:.2f}%`")
+    for rank, (s_id, ret_pct, nt, score) in enumerate(leaderboard):
+        medal = "🏆" if rank == 0 else "🥈" if rank == 1 else "🥉" if rank == 2 else "🔹"
+        color = "lime" if ret_pct > buy_hold_ret else ("#00FF00" if ret_pct > 0 else "red")
+        st.sidebar.markdown(f"{medal} **{s_id}** <br> <span style='color:{color}; font-size:0.9rem;'>Neto: {ret_pct:.1f}% | Trades: {nt} | Pts: {score:.0f}</span>", unsafe_allow_html=True)
 
 # ==========================================
 # 🧠 BOTONES MAESTROS SIDEBAR
