@@ -63,7 +63,7 @@ css_spinner = """
 ph_holograma = st.empty()
 
 # --- SIDEBAR E INFRAESTRUCTURA ---
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V76.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V76.1</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     gc.collect()
@@ -234,7 +234,6 @@ def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     df_sim['Commander_Buy'] = df_sim['Climax_Buy'] | df_sim['Thermal_Buy'] | df_sim['Lock_Buy']
     df_sim['Commander_Sell'] = df_sim['Thermal_Sell'] | (df_sim['Close'] < df_sim['EMA_50'])
     
-    # ROCKET/GENESIS ALIAS (Para evitar KeyErrors en el reporte global)
     df_sim['Pink_Whale_Buy'] = df_sim['Climax_Buy']
 
     return df_sim
@@ -404,7 +403,7 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
 def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, is_meta=False):
     best_fit = -float('inf')
     bp = None
-    tp_min, tp_max = (5.0, 30.0) if target_ado > 2 else (10.0, 80.0) # Expanded Range
+    tp_min, tp_max = (5.0, 40.0) if target_ado > 2 else (10.0, 100.0) 
     iters = 300 if is_meta else 2000 
     
     for _ in range(iters): 
@@ -487,9 +486,9 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
                     bp = {'b1': dna_b[0], 's1': dna_s[0], 'tp1': dna_tp[0], 'sl1': dna_sl[0], 'b2': dna_b[1], 's2': dna_s[1], 'tp2': dna_tp[1], 'sl2': dna_sl[1], 'b3': dna_b[2], 's3': dna_s[2], 'tp3': dna_tp[2], 'sl3': dna_sl[2], 'b4': dna_b[3], 's4': dna_s[3], 'tp4': dna_tp[3], 'sl4': dna_sl[3], 'wh': rwh, 'rd': rrd, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms}
     return bp
 
-# 📋 REPORTE UNIVERSAL (CERO ERRORES, 11 SQUADS) 📋
+# 📋 EL OJO QUE TODO LO VE: REPORTE UNIVERSAL 📋
 def generar_reporte_universal(df_base, cap_ini, com_pct):
-    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V76)**\n\n"
+    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V76.1)**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_base)}\n\n"
     buy_hold_ret = ((df_base['Close'].iloc[-1] - df_base['Open'].iloc[0]) / df_base['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
@@ -573,6 +572,7 @@ def generar_reporte_universal(df_base, cap_ini, com_pct):
     return res_str
 
 # --- BOTONES MAESTROS SIDEBAR ---
+st.sidebar.markdown("---")
 if st.sidebar.button("🧠 OPTIMIZACIÓN GLOBAL (11 SQUADS)", type="primary", use_container_width=True):
     ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
     with st.spinner("Desatando a la IA... Optimizando y Ajustando Controles de las 11 inteligencias. Esto tomará unos segundos..."):
@@ -630,13 +630,13 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             prefix = "gen" if s_id == "GENESIS" else "roc"
             st.markdown(f"### {'🌌 GÉNESIS (Omni-Brain)' if s_id == 'GENESIS' else '👑 ROCKET PROTOCOL (El Comandante Supremo)'}")
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
-            st.session_state[f'ui_{prefix}_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, key=f"ui_{prefix}_ado", step=0.5)
-            st.session_state[f'ui_{prefix}_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, key=f"ui_{prefix}_reinv", step=5.0)
+            c_ia1.slider("🎯 Target ADO", 0.0, 100.0, key=f"ui_{prefix}_ado", step=0.5)
+            c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, key=f"ui_{prefix}_reinv", step=5.0)
 
             with st.expander("⚙️ Calibración Global"):
                 c_adv1, c_adv2 = st.columns(2)
-                st.session_state[f'ui_{prefix}_wh'] = c_adv1.slider("🐋 Factor Ballena", 1.0, 5.0, key=f"ui_{prefix}_wh", step=0.1)
-                st.session_state[f'ui_{prefix}_rd'] = c_adv2.slider("📡 Radar Sens.", 0.5, 5.0, key=f"ui_{prefix}_rd", step=0.1)
+                c_adv1.slider("🐋 Factor Ballena", 1.0, 5.0, key=f"ui_{prefix}_wh", step=0.1)
+                c_adv2.slider("📡 Radar Sens.", 0.5, 5.0, key=f"ui_{prefix}_rd", step=0.1)
 
             st.markdown("---")
             c1, c2, c3, c4 = st.columns(4)
@@ -708,8 +708,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
         else:
             st.markdown(f"### ⚙️ {s_id} (Truth Engine)")
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
-            st.session_state[f'ui_ado_{s_id}'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, key=f"ui_ado_{s_id}", step=0.5)
-            st.session_state[f'ui_reinv_{s_id}'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, key=f"ui_reinv_{s_id}", step=5.0)
+            c_ia1.slider("🎯 Target ADO", 0.0, 100.0, key=f"ui_ado_{s_id}", step=0.5)
+            c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, key=f"ui_reinv_{s_id}", step=5.0)
 
             if c_ia3.button(f"🚀 OPTIMIZACIÓN INDIVIDUAL ({s_id})", type="primary", key=f"btn_opt_{s_id}"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
@@ -729,10 +729,10 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
             with st.expander("🛠️ Ajuste Manual de Parámetros"):
                 c1, c2, c3, c4 = st.columns(4)
-                st.session_state[f'ui_tp_{s_id}'] = c1.slider("🎯 TP Base (%)", 0.5, 100.0, key=f"ui_tp_{s_id}", step=0.1)
-                st.session_state[f'ui_sl_{s_id}'] = c2.slider("🛑 SL (%)", 0.5, 25.0, key=f"ui_sl_{s_id}", step=0.1)
-                st.session_state[f'ui_wh_{s_id}'] = c3.slider("🐋 Factor Ballena", 1.0, 5.0, key=f"ui_wh_{s_id}", step=0.1)
-                st.session_state[f'ui_rd_{s_id}'] = c4.slider("📡 Radar Sens.", 0.5, 5.0, key=f"ui_rd_{s_id}", step=0.1)
+                c1.slider("🎯 TP Base (%)", 0.5, 100.0, key=f"ui_tp_{s_id}", step=0.1)
+                c2.slider("🛑 SL (%)", 0.5, 25.0, key=f"ui_sl_{s_id}", step=0.1)
+                c3.slider("🐋 Factor Ballena", 1.0, 5.0, key=f"ui_wh_{s_id}", step=0.1)
+                c4.slider("📡 Radar Sens.", 0.5, 5.0, key=f"ui_rd_{s_id}", step=0.1)
 
             df_strat = inyectar_adn(df_global.copy(), st.session_state[f'ui_rd_{s_id}'], st.session_state[f'ui_wh_{s_id}'])
             b_c, s_c = np.zeros(len(df_strat), dtype=bool), np.zeros(len(df_strat), dtype=bool)
