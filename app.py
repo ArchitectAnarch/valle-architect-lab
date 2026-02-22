@@ -78,7 +78,7 @@ ph_holograma = st.empty()
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V84.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V84.1</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     for s in estrategias: st.session_state[f'opt_status_{s}'] = False 
@@ -174,12 +174,14 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
         df['is_falling_knife'] = (df['Open'].shift(1) - df['Close'].shift(1)) > (df['ATR'].shift(1) * 1.5)
         
+        # FIX: Se calculan explícitamente y se verifican las ventanas largas
         df['PL30'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
         df['PH30'] = df['High'].shift(1).rolling(30, min_periods=1).max()
         df['PL100'] = df['Low'].shift(1).rolling(100, min_periods=1).min()
         df['PH100'] = df['High'].shift(1).rolling(100, min_periods=1).max()
         df['PL300'] = df['Low'].shift(1).rolling(300, min_periods=1).min()
-        df['PL300'] = df['High'].shift(1).rolling(300, min_periods=1).max()
+        df['PH300'] = df['High'].shift(1).rolling(300, min_periods=1).max()
+        
         df['Target_Lock_Sup'] = df[['PL30', 'PL100', 'PL300']].max(axis=1)
         df['Target_Lock_Res'] = df[['PH30', 'PH100', 'PH300']].min(axis=1)
         
@@ -422,7 +424,7 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
 def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, is_meta=False):
     best_fit = -float('inf')
     bp = None
-    tp_min, tp_max = (10.0, 40.0) if target_ado > 2 else (20.0, 100.0) 
+    tp_min, tp_max = (5.0, 40.0) if target_ado > 2 else (20.0, 100.0) 
     
     # 🔥 DESBLOQUEO COMPUTACIONAL (Deep Blue Search)
     if s_id == "ALL_FORCES": iters = 3000
@@ -466,7 +468,6 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
             b_mat = {r: df_precalc[r].values for r in b_mat_opts}
             s_mat = {r: df_precalc[r].values for r in s_mat_opts}
             
-            # 🔥 MUTACIÓN FORZADA (El All Forces debe elegir entre 2 y 4 algoritmos cruzados)
             min_mut = 2 if s_id == "ALL_FORCES" else 1
             max_mut = 4 if s_id == "ALL_FORCES" else 2
             
@@ -518,9 +519,9 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
                     bp = {'b1': dna_b[0], 's1': dna_s[0], 'tp1': dna_tp[0], 'sl1': dna_sl[0], 'b2': dna_b[1], 's2': dna_s[1], 'tp2': dna_tp[1], 'sl2': dna_sl[1], 'b3': dna_b[2], 's3': dna_s[2], 'tp3': dna_tp[2], 'sl3': dna_sl[2], 'b4': dna_b[3], 's4': dna_s[3], 'tp4': dna_tp[3], 'sl4': dna_sl[3], 'wh': rwh, 'rd': rrd, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms}
     return bp
 
-# 📋 REPORTE UNIVERSAL 📋
+# 📋 EL OJO QUE TODO LO VE: REPORTE UNIVERSAL 📋
 def generar_reporte_universal(df_base, cap_ini, com_pct):
-    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V84.0)**\n\n"
+    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V84.1)**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_base)}\n\n"
     buy_hold_ret = ((df_base['Close'].iloc[-1] - df_base['Open'].iloc[0]) / df_base['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
@@ -763,7 +764,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             st.markdown(f"### {title_text} {opt_badge}", unsafe_allow_html=True)
             
             if s_id == "ALL_FORCES":
-                st.info("El Director de Portafolio. Asigna Escuadrones Completos (Ej. Defcon, Ping Pong) en lugar de indicadores sueltos dependiendo del clima del mercado.")
+                st.info("El Director de Portafolio. Asigna Escuadrones Híbridos (Ej. Defcon + Squeeze) en lugar de indicadores sueltos, forzando la diversificación por clima.")
             
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state[f'ui_{prefix}_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get(f'ui_{prefix}_ado', 100.0)), key=f"sl_ado_{prefix}", step=0.5)
@@ -923,7 +924,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
         c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
 
         # 📝 BLOCK NOTE INDIVIDUAL
-        with st.expander("📝 BLOCK NOTE INDIVIDUAL", expanded=True):
+        with st.expander("📝 BLOCK NOTE INDIVIDUAL", expanded=False):
             b_note = f"⚔️ **{s_id}** {'[✅ Optimizada]' if is_opt else '[➖ No Optimizada]'}\n"
             b_note += f"Net Profit: ${eq_curve[-1]-capital_inicial:,.2f} ({ret_pct:.2f}%)\n"
             b_note += f"ALPHA vs Hold: {alpha_pct:.2f}%\n"
