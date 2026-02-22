@@ -39,7 +39,7 @@ tab_id_map = {
     "🌌 GENESIS": "GENESIS", "👑 ROCKET": "ROCKET"
 }
 
-# --- INICIALIZACIÓN DE ESTADOS (UI = IA) ---
+# --- INICIALIZACIÓN DE ESTADOS (UI = IA) Y MARCADORES ---
 for r_idx in range(1, 5):
     if f'ui_gen_r{r_idx}_b' not in st.session_state: st.session_state[f'ui_gen_r{r_idx}_b'] = ['Squeeze_Buy']
     if f'ui_gen_r{r_idx}_s' not in st.session_state: st.session_state[f'ui_gen_r{r_idx}_s'] = ['Squeeze_Sell']
@@ -54,6 +54,7 @@ for r_idx in range(1, 5):
 for s in estrategias:
     if f'ui_ado_{s}' not in st.session_state: st.session_state[f'ui_ado_{s}'] = 100.0 
     if f'ui_reinv_{s}' not in st.session_state: st.session_state[f'ui_reinv_{s}'] = 0.0
+    if f'opt_status_{s}' not in st.session_state: st.session_state[f'opt_status_{s}'] = False # MARCADOR NUEVO
     if s not in ["GENESIS", "ROCKET"]:
         if f'ui_tp_{s}' not in st.session_state: st.session_state[f'ui_tp_{s}'] = 25.0
         if f'ui_sl_{s}' not in st.session_state: st.session_state[f'ui_sl_{s}'] = 5.0
@@ -66,20 +67,21 @@ for s in estrategias:
 
 css_spinner = """
 <style>
-.loader-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; pointer-events: none; background: transparent; }
+.loader-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; pointer-events: none; background: transparent; text-align: center; }
 .rocket { font-size: 10rem; animation: spin 1.5s ease-in-out infinite; filter: drop-shadow(0 0 40px rgba(0, 255, 255, 1)); }
 @keyframes spin { 0% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.3) rotate(180deg); } 100% { transform: scale(1) rotate(360deg); } }
+.prog-text { color: cyan; font-size: 2rem; font-weight: bold; margin-top: 15px; text-shadow: 0 0 10px cyan; }
 </style>
-<div class="loader-container"><div class="rocket">🚀</div></div>
 """
 ph_holograma = st.empty()
 
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V79.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V80.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
+    for s in estrategias: st.session_state[f'opt_status_{s}'] = False # Purga marcadores
     gc.collect()
 
 st.sidebar.markdown("---")
@@ -99,7 +101,7 @@ start_date, end_date = st.sidebar.slider("📅 Scope Histórico", min_value=hoy 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
-@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Velas...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Topología Fractal...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -168,6 +170,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['Vela_Verde'] = df['Close'] > df['Open']
         df['Vela_Roja'] = df['Close'] < df['Open']
         df['body_size'] = abs(df['Close'] - df['Open']).replace(0, 0.0001)
+        df['upper_wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
         df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
         df['is_falling_knife'] = (df['Open'].shift(1) - df['Close'].shift(1)) > (df['ATR'].shift(1) * 1.5)
         
@@ -214,40 +217,53 @@ else:
     st.stop()
 
 # ==========================================
-# 🔥 IDENTIDADES Y LÓGICAS ALGORÍTMICAS 🔥
+# 🔥 IDENTIDADES Y LÓGICAS (FRACTAL ADAPTIVE) 🔥
 # ==========================================
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
-    df_sim['Ping_Buy'] = (df_sim['Momentum'] > 0) & (df_sim['Momentum'].shift(1).fillna(0) <= 0) & (df_sim['Close'] < df_sim['VWAP']) & (df_sim['Close'] > df_sim['EMA_200'])
-    df_sim['Ping_Sell'] = (df_sim['Close'] < df_sim['EMA_50'])
+    # 🏓 PING PONG (Rey de la Lateralidad y Rebotes Macro)
+    df_sim['Ping_Buy'] = (df_sim['ADX'] < 25) & (df_sim['Low'] <= df_sim['BBL']) & df_sim['Vela_Verde'] & (df_sim['RSI'] < 55) & df_sim['Macro_Bull']
+    df_sim['Ping_Sell'] = (df_sim['High'] >= df_sim['BBU']) | (df_sim['Close'] < df_sim['VWAP'])
 
-    df_sim['Climax_Buy'] = (df_sim['RVol'] > 1.0) & (df_sim['lower_wick'] >= (df_sim['body_size'] * 0.5)) & df_sim['Vela_Verde']
-    df_sim['Climax_Sell'] = (df_sim['Close'] < df_sim['EMA_100'])
-
-    df_sim['Thermal_Buy'] = ((df_sim['floor_w'] >= 1) & df_sim['RSI_Cross_Up'] & (df_sim['Close'] > df_sim['EMA_200'])) | ((df_sim['Close'] > df_sim['Target_Lock_Res']) & df_sim['Vela_Verde'])
-    df_sim['Thermal_Sell'] = (df_sim['ceil_w'] >= 4) & (df_sim['RSI'] > 75)
-
-    df_sim['Lock_Buy'] = (df_sim['Low'] <= (df_sim['Target_Lock_Sup'] + df_sim['ATR'])) & (df_sim['Close'] > df_sim['Target_Lock_Sup']) & df_sim['Vela_Verde'] & (df_sim['RSI'] < 60)
-    df_sim['Lock_Sell'] = (df_sim['High'] >= df_sim['Target_Lock_Res']) & (df_sim['RSI'] > 70)
-
-    df_sim['Squeeze_Buy'] = df_sim['Squeeze_On'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Verde']
+    # 🐛 NEON SQUEEZE (Anti-Cúspide Absoluto)
+    df_sim['BB_Contraction'] = df_sim['BB_Width'] < df_sim['BB_Width_Avg']
+    df_sim['Neon_Up'] = df_sim['BB_Contraction'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Verde'] & (df_sim['RSI'] < 65)
+    df_sim['Squeeze_Buy'] = df_sim['Neon_Up']
     df_sim['Squeeze_Sell'] = (df_sim['Close'] < df_sim['EMA_50'])
 
-    df_sim['Defcon_Buy'] = df_sim['Squeeze_Buy'] & (df_sim['BB_Delta'] > 0) & (df_sim['ADX'] > 20)
+    # 🌡️ THERMAL (Termómetro de Muros Pesados)
+    df_sim['Thermal_Buy'] = (df_sim['floor_w'] >= 3) & df_sim['RSI_Cross_Up'] & (df_sim['RSI'] < 55)
+    df_sim['Thermal_Sell'] = (df_sim['ceil_w'] >= 3) & df_sim['RSI_Cross_Dn']
+
+    # 🌸 PINK CLIMAX (El Paramedico - Pánico Real)
+    df_sim['Climax_Buy'] = (df_sim['RVol'] > 1.5) & (df_sim['lower_wick'] >= df_sim['body_size']) & (df_sim['RSI'] < 35) & df_sim['Vela_Verde']
+    df_sim['Climax_Sell'] = (df_sim['RSI'] > 75) | (df_sim['Close'] < df_sim['VWAP'])
+
+    # 🎯 TARGET LOCK (Hitbox Expandida)
+    dist_sup = (df_sim['Close'] - df_sim['Target_Lock_Sup']) / df_sim['Close'] * 100
+    df_sim['Lock_Buy'] = (dist_sup < 1.5) & df_sim['Vela_Verde'] & df_sim['RSI_Cross_Up'] & (df_sim['RSI'] < 60)
+    df_sim['Lock_Sell'] = (df_sim['High'] >= df_sim['Target_Lock_Res']) & (df_sim['RSI'] > 65)
+
+    # 🚀 DEFCON (Gatillo Sensible Temprano)
+    df_sim['Defcon_Buy'] = df_sim['Squeeze_Buy'] & (df_sim['ADX'] > 15) & (df_sim['RVol'] > 1.0)
     df_sim['Defcon_Sell'] = (df_sim['Close'] < df_sim['EMA_50'])
 
-    df_sim['Pink_Whale_Buy'] = df_sim['Climax_Buy'] & (df_sim['RVol'] > w_factor)
-
-    df_sim['Jugg_Buy'] = (df_sim['Defcon_Buy'] | df_sim['Pink_Whale_Buy'] | df_sim['Lock_Buy'])
+    # ⚔️ JUGGERNAUT (Tanque Imparable Macro)
+    df_sim['Jugg_Buy'] = (df_sim['EMA_50'] > df_sim['EMA_200']) & df_sim['Squeeze_Buy'] & (df_sim['ADX'] > 25)
     df_sim['Jugg_Sell'] = (df_sim['Close'] < df_sim['EMA_50'])
 
-    df_sim['Trinity_Buy'] = df_sim['Pink_Whale_Buy'] | df_sim['Lock_Buy'] | df_sim['Defcon_Buy']
-    df_sim['Trinity_Sell'] = (df_sim['Close'] < df_sim['EMA_50'])
+    # 👑 TRINITY (Comprador de Caídas - Trend Pullbacks)
+    df_sim['Trinity_Buy'] = df_sim['Macro_Bull'] & (df_sim['Close'] < df_sim['EMA_50']) & df_sim['Vela_Verde'] & df_sim['RSI_Cross_Up']
+    df_sim['Trinity_Sell'] = (df_sim['Close'] > df_sim['BBU']) | (df_sim['RSI'] > 75)
     
-    df_sim['Lev_Buy'] = df_sim['Macro_Bull'] & df_sim['RSI_Cross_Up'] & (df_sim['RSI'].shift(1).fillna(50) < 50)
+    # 🐉 LEVIATHAN
+    df_sim['Lev_Buy'] = df_sim['Macro_Bull'] & df_sim['RSI_Cross_Up'] & (df_sim['RSI'] < 45)
     df_sim['Lev_Sell'] = (df_sim['Close'] < df_sim['EMA_200'])
 
-    df_sim['Commander_Buy'] = df_sim['Pink_Whale_Buy'] | df_sim['Thermal_Buy'] | df_sim['Climax_Buy']
-    df_sim['Commander_Sell'] = (df_sim['Close'] < df_sim['EMA_50'])
+    # 🎖️ COMMANDER
+    df_sim['Commander_Buy'] = df_sim['Climax_Buy'] | df_sim['Thermal_Buy'] | df_sim['Lock_Buy']
+    df_sim['Commander_Sell'] = df_sim['Thermal_Sell'] | (df_sim['Close'] < df_sim['EMA_50'])
+    
+    df_sim['Pink_Whale_Buy'] = df_sim['Climax_Buy']
 
     return df_sim
 
@@ -416,9 +432,13 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
 def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, is_meta=False):
     best_fit = -float('inf')
     bp = None
+    # 🔥 TPs HASTA EL 100% PARA BURBUJAS 🔥
     tp_min, tp_max = (10.0, 40.0) if target_ado > 2 else (20.0, 100.0) 
     iters = 300 if is_meta else 2000 
     
+    loc_buy_rules = ['Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Jugg_Buy', 'Trinity_Buy', 'Commander_Buy', 'Lev_Buy']
+    loc_sell_rules = ['Ping_Sell', 'Climax_Sell', 'Thermal_Sell', 'Lock_Sell', 'Squeeze_Sell', 'Defcon_Sell', 'Jugg_Sell', 'Trinity_Sell', 'Commander_Sell', 'Lev_Sell']
+
     for _ in range(iters): 
         rtp = round(random.uniform(tp_min, tp_max), 1)
         rsl = round(random.uniform(1.0, 15.0), 1)
@@ -432,7 +452,8 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
         o_a = np.asarray(df_precalc['Open'].values, dtype=np.float64)
         
         if not is_meta:
-            b_c, s_c = np.zeros(len(df_precalc), dtype=bool), np.zeros(len(df_precalc), dtype=bool)
+            b_c = np.zeros(len(df_precalc), dtype=bool)
+            s_c = np.zeros(len(df_precalc), dtype=bool)
             if s_id == "TRINITY": b_c, s_c = df_precalc['Trinity_Buy'].values, df_precalc['Trinity_Sell'].values
             elif s_id == "JUGGERNAUT": b_c, s_c = df_precalc['Jugg_Buy'].values, df_precalc['Jugg_Sell'].values
             elif s_id == "DEFCON": b_c, s_c = df_precalc['Defcon_Buy'].values, df_precalc['Defcon_Sell'].values
@@ -448,15 +469,17 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
             t_arr = np.asarray(np.full(len(df_precalc), float(rtp)), dtype=np.float64)
             sl_arr = np.asarray(np.full(len(df_precalc), float(rsl)), dtype=np.float64)
         else:
-            b_mat = {r: df_precalc[r].values for r in (buy_rules if s_id == "GENESIS" else rocket_b)}
-            s_mat = {r: df_precalc[r].values for r in (sell_rules if s_id == "GENESIS" else rocket_s)}
+            b_mat = {r: df_precalc[r].values for r in (loc_buy_rules if s_id == "GENESIS" else rocket_b)}
+            s_mat = {r: df_precalc[r].values for r in (loc_sell_rules if s_id == "GENESIS" else rocket_s)}
             dna_b = [random.sample(list(b_mat.keys()), random.randint(1, 2)) for _ in range(4)]
             dna_s = [random.sample(list(s_mat.keys()), random.randint(1, 2)) for _ in range(4)]
             dna_tp = [random.uniform(tp_min, tp_max) for _ in range(4)]
             dna_sl = [random.uniform(2.0, 15.0) for _ in range(4)]
             
-            f_buy, f_sell = np.zeros(len(df_precalc), dtype=bool), np.zeros(len(df_precalc), dtype=bool)
-            f_tp, f_sl = np.zeros(len(df_precalc)), np.zeros(len(df_precalc))
+            f_buy = np.zeros(len(df_precalc), dtype=bool)
+            f_sell = np.zeros(len(df_precalc), dtype=bool)
+            f_tp = np.zeros(len(df_precalc), dtype=np.float64)
+            f_sl = np.zeros(len(df_precalc), dtype=np.float64)
             regime_arr = df_precalc['Regime'].values
             
             for idx in range(4):
@@ -496,9 +519,8 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
                     bp = {'b1': dna_b[0], 's1': dna_s[0], 'tp1': dna_tp[0], 'sl1': dna_sl[0], 'b2': dna_b[1], 's2': dna_s[1], 'tp2': dna_tp[1], 'sl2': dna_sl[1], 'b3': dna_b[2], 's3': dna_s[2], 'tp3': dna_tp[2], 'sl3': dna_sl[2], 'b4': dna_b[3], 's4': dna_s[3], 'tp4': dna_tp[3], 'sl4': dna_sl[3], 'wh': rwh, 'rd': rrd, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms}
     return bp
 
-# 📋 EL OJO QUE TODO LO VE: REPORTE UNIVERSAL 📋
 def generar_reporte_universal(df_base, cap_ini, com_pct):
-    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V79.0)**\n\n"
+    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V80.0)**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_base)}\n\n"
     buy_hold_ret = ((df_base['Close'].iloc[-1] - df_base['Open'].iloc[0]) / df_base['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
@@ -573,7 +595,8 @@ def generar_reporte_universal(df_base, cap_ini, com_pct):
         ret_pct = (net / cap_ini) * 100
         alpha = ret_pct - buy_hold_ret
         
-        res_str += f"⚔️ **{s_id}**\n"
+        opt_icon = "✅" if st.session_state.get(f'opt_status_{s_id}', False) else "➖"
+        res_str += f"⚔️ **{s_id}** [{opt_icon} Optimizada]\n"
         res_str += f"Net Profit: ${net:,.2f} ({ret_pct:.2f}%)\n"
         res_str += f"ALPHA vs Hold: {alpha:.2f}%\n"
         res_str += f"Trades: {nt} | PF: {pf:.2f}x | MDD: {mdd:.2f}%\n"
@@ -587,34 +610,53 @@ def generar_reporte_universal(df_base, cap_ini, com_pct):
 st.sidebar.markdown("---")
 if st.sidebar.button("🧠 OPT. GLOBAL (11 SQUADS)", type="primary", use_container_width=True):
     ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
-    with st.spinner("Desatando a la IA... Optimizando y Ajustando Controles de las 11 inteligencias. Esto tomará unos segundos..."):
-        buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
-        buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
+    buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
+    buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
+    
+    total_strats = len(estrategias)
+    
+    for i, s_id in enumerate(estrategias):
+        pct_done = int((i / total_strats) * 100)
+        # ACUALIZAR HOLOGRMA CON PORCENTAJE
+        dyn_spinner = f"""
+        <style>
+        .loader-container {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; pointer-events: none; background: transparent; text-align: center; }}
+        .rocket {{ font-size: 10rem; animation: spin 1.5s ease-in-out infinite; filter: drop-shadow(0 0 40px rgba(0, 255, 255, 1)); }}
+        @keyframes spin {{ 0% {{ transform: scale(1) rotate(0deg); }} 50% {{ transform: scale(1.3) rotate(180deg); }} 100% {{ transform: scale(1) rotate(360deg); }} }}
+        .prog-text {{ color: cyan; font-size: 2rem; font-weight: bold; margin-top: 15px; text-shadow: 0 0 10px cyan; }}
+        </style>
+        <div class="loader-container">
+            <div class="rocket">🚀</div>
+            <div class="prog-text">FORJANDO IA: {pct_done}%</div>
+            <div style='color: white; font-size: 1rem;'>Entrenando: {s_id}</div>
+        </div>
+        """
+        ph_holograma.markdown(dyn_spinner, unsafe_allow_html=True)
         
-        for s_id in estrategias:
-            is_meta = s_id in ["GENESIS", "ROCKET"]
-            prefix = "gen" if s_id == "GENESIS" else "roc" if s_id == "ROCKET" else ""
-            reinv_q = st.session_state.get(f'ui_{prefix}_reinv' if is_meta else f'ui_reinv_{s_id}', 0.0)
-            t_ado = st.session_state.get(f'ui_{prefix}_ado' if is_meta else f'ui_ado_{s_id}', 100.0)
+        is_meta = s_id in ["GENESIS", "ROCKET"]
+        prefix = "gen" if s_id == "GENESIS" else "roc" if s_id == "ROCKET" else ""
+        reinv_q = st.session_state.get(f'ui_{prefix}_reinv' if is_meta else f'ui_reinv_{s_id}', 0.0)
+        t_ado = st.session_state.get(f'ui_{prefix}_ado' if is_meta else f'ui_ado_{s_id}', 100.0)
+        
+        bp = optimizar_ia(s_id, df_global, capital_inicial, comision_pct, reinv_q, t_ado, dias_reales, buy_hold_money, is_meta=is_meta)
+        if bp:
+            st.session_state[f'opt_status_{s_id}'] = True
+            if is_meta:
+                for r_idx in range(1, 5):
+                    st.session_state[f'ui_{prefix}_r{r_idx}_b'] = bp[f'b{r_idx}']
+                    st.session_state[f'ui_{prefix}_r{r_idx}_s'] = bp[f's{r_idx}']
+                    st.session_state[f'ui_{prefix}_r{r_idx}_tp'] = float(round(bp[f'tp{r_idx}'], 1))
+                    st.session_state[f'ui_{prefix}_r{r_idx}_sl'] = float(round(bp[f'sl{r_idx}'], 1))
+                st.session_state[f'ui_{prefix}_wh'] = float(round(bp['wh'], 1))
+                st.session_state[f'ui_{prefix}_rd'] = float(round(bp['rd'], 1))
+            else:
+                st.session_state[f'ui_tp_{s_id}'] = float(round(bp['tp'], 1))
+                st.session_state[f'ui_sl_{s_id}'] = float(round(bp['sl'], 1))
+                st.session_state[f'ui_wh_{s_id}'] = float(round(bp['wh'], 1))
+                st.session_state[f'ui_rd_{s_id}'] = float(round(bp['rd'], 1))
             
-            bp = optimizar_ia(s_id, df_global, capital_inicial, comision_pct, reinv_q, t_ado, dias_reales, buy_hold_money, is_meta=is_meta)
-            if bp:
-                if is_meta:
-                    for r_idx in range(1, 5):
-                        st.session_state[f'ui_{prefix}_r{r_idx}_b'] = bp[f'b{r_idx}']
-                        st.session_state[f'ui_{prefix}_r{r_idx}_s'] = bp[f's{r_idx}']
-                        st.session_state[f'ui_{prefix}_r{r_idx}_tp'] = float(round(bp[f'tp{r_idx}'], 1))
-                        st.session_state[f'ui_{prefix}_r{r_idx}_sl'] = float(round(bp[f'sl{r_idx}'], 1))
-                    st.session_state[f'ui_{prefix}_wh'] = float(round(bp['wh'], 1))
-                    st.session_state[f'ui_{prefix}_rd'] = float(round(bp['rd'], 1))
-                else:
-                    st.session_state[f'ui_tp_{s_id}'] = float(round(bp['tp'], 1))
-                    st.session_state[f'ui_sl_{s_id}'] = float(round(bp['sl'], 1))
-                    st.session_state[f'ui_wh_{s_id}'] = float(round(bp['wh'], 1))
-                    st.session_state[f'ui_rd_{s_id}'] = float(round(bp['rd'], 1))
-                
     ph_holograma.empty()
-    st.sidebar.success("✅ Sincronización Exitosa. Los gráficos y controles han sido actualizados.")
+    st.sidebar.success("✅ ¡Forja Completada! (100%)")
     time.sleep(1)
     st.rerun()
 
@@ -630,10 +672,14 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
     with tabs[idx]:
         if df_global.empty: continue
         s_id = tab_id_map[tab_name]
+        
+        is_opt = st.session_state.get(f'opt_status_{s_id}', False)
+        opt_badge = "<span style='color: lime; border: 1px solid lime; padding: 2px 6px; border-radius: 4px; font-size: 0.8rem;'>✅ IA OPTIMIZADA</span>" if is_opt else ""
 
         if s_id in ["GENESIS", "ROCKET"]:
             prefix = "gen" if s_id == "GENESIS" else "roc"
-            st.markdown(f"### {'🌌 GÉNESIS (Omni-Brain)' if s_id == 'GENESIS' else '👑 ROCKET PROTOCOL (El Comandante Supremo)'}")
+            st.markdown(f"### {'🌌 GÉNESIS (Omni-Brain)' if s_id == 'GENESIS' else '👑 ROCKET PROTOCOL (El Comandante Supremo)'} {opt_badge}", unsafe_allow_html=True)
+            
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state[f'ui_{prefix}_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get(f'ui_{prefix}_ado', 100.0)), key=f"sl_ado_{prefix}", step=0.5)
             st.session_state[f'ui_{prefix}_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'ui_{prefix}_reinv', 0.0)), key=f"sl_reinv_{prefix}", step=5.0)
@@ -674,15 +720,14 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 st.session_state[f'ui_{prefix}_r4_sl'] = st.slider("SL %", 0.5, 25.0, value=float(st.session_state.get(f'ui_{prefix}_r4_sl', 5.0)), key=f"sl_{prefix}_r4_sl", step=0.5)
 
             if c_ia3.button("🚀 OPTIMIZACIÓN INDIVIDUAL", type="primary", key=f"btn_opt_{prefix}"):
-                ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
                 buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
-                reinv_q = st.session_state[f'ui_{prefix}_reinv']
-                t_ado = st.session_state[f'ui_{prefix}_ado']
+                dyn_spinner = f"""<style>.loader-container {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; background: transparent; text-align: center; }} .rocket {{ font-size: 10rem; animation: spin 1.5s ease-in-out infinite; filter: drop-shadow(0 0 40px rgba(0, 255, 255, 1)); }} @keyframes spin {{ 0% {{ transform: scale(1) rotate(0deg); }} 50% {{ transform: scale(1.3) rotate(180deg); }} 100% {{ transform: scale(1) rotate(360deg); }} }} .prog-text {{ color: cyan; font-size: 2rem; font-weight: bold; margin-top: 15px; }}</style><div class="loader-container"><div class="rocket">🚀</div><div class="prog-text">FORJANDO {s_id}...</div></div>"""
+                ph_holograma.markdown(dyn_spinner, unsafe_allow_html=True)
                 
-                bp = optimizar_ia(s_id, df_global, capital_inicial, comision_pct, reinv_q, t_ado, dias_reales, buy_hold_money, is_meta=True)
-                ph_holograma.empty()
+                bp = optimizar_ia(s_id, df_global, capital_inicial, comision_pct, st.session_state[f'ui_{prefix}_reinv'], st.session_state[f'ui_{prefix}_ado'], dias_reales, buy_hold_money, is_meta=True)
                 if bp: 
+                    st.session_state[f'opt_status_{s_id}'] = True
                     for r_idx in range(1, 5):
                         st.session_state[f'ui_{prefix}_r{r_idx}_b'] = bp[f'b{r_idx}']
                         st.session_state[f'ui_{prefix}_r{r_idx}_s'] = bp[f's{r_idx}']
@@ -690,7 +735,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                         st.session_state[f'ui_{prefix}_r{r_idx}_sl'] = float(round(bp[f'sl{r_idx}'], 1))
                     st.session_state[f'ui_{prefix}_wh'] = float(round(bp['wh'], 1))
                     st.session_state[f'ui_{prefix}_rd'] = float(round(bp['rd'], 1))
-                    st.rerun() 
+                ph_holograma.empty()
+                st.rerun() 
 
             df_strat = inyectar_adn(df_global.copy(), st.session_state[f'ui_{prefix}_rd'], st.session_state[f'ui_{prefix}_wh'])
             f_buy, f_sell = np.zeros(len(df_strat), dtype=bool), np.zeros(len(df_strat), dtype=bool)
@@ -711,26 +757,26 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state[f'ui_{prefix}_reinv'], comision_pct)
 
         else:
-            st.markdown(f"### ⚙️ {s_id} (Truth Engine)")
+            st.markdown(f"### ⚙️ {s_id} (Truth Engine) {opt_badge}", unsafe_allow_html=True)
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.session_state[f'ui_ado_{s_id}'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get(f'ui_ado_{s_id}', 100.0)), key=f"sl_ado_{s_id}", step=0.5)
             st.session_state[f'ui_reinv_{s_id}'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'ui_reinv_{s_id}', 0.0)), key=f"sl_reinv_{s_id}", step=5.0)
 
             if c_ia3.button(f"🚀 OPTIMIZACIÓN INDIVIDUAL ({s_id})", type="primary", key=f"btn_opt_{s_id}"):
-                ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
                 buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
-                reinv_q = st.session_state[f'ui_reinv_{s_id}']
-                t_ado = st.session_state[f'ui_ado_{s_id}']
+                dyn_spinner = f"""<style>.loader-container {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; background: transparent; text-align: center; }} .rocket {{ font-size: 10rem; animation: spin 1.5s ease-in-out infinite; filter: drop-shadow(0 0 40px rgba(0, 255, 255, 1)); }} @keyframes spin {{ 0% {{ transform: scale(1) rotate(0deg); }} 50% {{ transform: scale(1.3) rotate(180deg); }} 100% {{ transform: scale(1) rotate(360deg); }} }} .prog-text {{ color: cyan; font-size: 2rem; font-weight: bold; margin-top: 15px; }}</style><div class="loader-container"><div class="rocket">🚀</div><div class="prog-text">FORJANDO {s_id}...</div></div>"""
+                ph_holograma.markdown(dyn_spinner, unsafe_allow_html=True)
                 
-                bp = optimizar_ia(s_id, df_global, capital_inicial, comision_pct, reinv_q, t_ado, dias_reales, buy_hold_money)
-                ph_holograma.empty()
+                bp = optimizar_ia(s_id, df_global, capital_inicial, comision_pct, st.session_state[f'ui_reinv_{s_id}'], st.session_state[f'ui_ado_{s_id}'], dias_reales, buy_hold_money)
                 if bp:
+                    st.session_state[f'opt_status_{s_id}'] = True
                     st.session_state[f'ui_tp_{s_id}'] = float(round(bp['tp'], 1))
                     st.session_state[f'ui_sl_{s_id}'] = float(round(bp['sl'], 1))
                     st.session_state[f'ui_wh_{s_id}'] = float(round(bp['wh'], 1))
                     st.session_state[f'ui_rd_{s_id}'] = float(round(bp['rd'], 1))
-                    st.rerun()
+                ph_holograma.empty()
+                st.rerun()
 
             with st.expander("🛠️ Ajuste Manual de Parámetros"):
                 c1, c2, c3, c4 = st.columns(4)
