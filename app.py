@@ -109,7 +109,7 @@ def wipe_widget_cache():
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V94.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V94.1</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     for s in estrategias: 
@@ -225,7 +225,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         is_trend = df['ADX'] >= 25
         df['Regime'] = np.where(df['Macro_Bull'] & is_trend, 1, np.where(df['Macro_Bull'] & ~is_trend, 2, np.where(~df['Macro_Bull'] & is_trend, 3, 4)))
         
-        # PIVOT DISTANCES FOR FAST VECTOR COMPUTATION (V94.0)
+        # PIVOT DISTANCES FOR FAST VECTOR COMPUTATION
         c_val = df['Close'].values
         df['dist_sup'] = (c_val - df['Target_Lock_Sup'].values) / c_val * 100
         df['dist_res'] = (df['Target_Lock_Res'].values - c_val) / c_val * 100
@@ -245,7 +245,7 @@ else:
     st.stop()
 
 # ==========================================
-# 🔥 IDENTIDADES Y LÓGICAS (IDENTIDADES PURAS V94.0) 🔥
+# 🔥 IDENTIDADES Y LÓGICAS (IDENTIDADES PURAS V94.1) 🔥
 # ==========================================
 def inyectar_adn(df_sim, hitbox, therm_w, adx_th, whale_f):
     # Vectorized Thermal Weights
@@ -264,8 +264,9 @@ def inyectar_adn(df_sim, hitbox, therm_w, adx_th, whale_f):
     df_sim['Ping_Buy'] = (df_sim['ADX'] < adx_th) & (df_sim['Close'] < df_sim['BBL']) & df_sim['Vela_Verde']
     df_sim['Ping_Sell'] = (df_sim['Close'] > df_sim['BBU']) | (df_sim['RSI'] > 70)
 
-    # 🐛 NEON SQUEEZE (Anti-Cúspides)
-    df_sim['Neon_Up'] = df_sim['BB_Width'] < df_sim['BB_Width_Avg'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Verde'] & (df_sim['RSI'] < 60)
+    # 🐛 NEON SQUEEZE (Anti-Cúspides - CORRECCIÓN DE PRECEDENCIA)
+    df_sim['BB_Contraction'] = df_sim['BB_Width'] < df_sim['BB_Width_Avg']
+    df_sim['Neon_Up'] = df_sim['BB_Contraction'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Verde'] & (df_sim['RSI'] < 60)
     df_sim['Squeeze_Buy'] = df_sim['Neon_Up']
     df_sim['Squeeze_Sell'] = (df_sim['Close'] < df_sim['EMA_50'])
 
@@ -465,7 +466,7 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
             
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
-# 🧠 RUTINA DE OPTIMIZACIÓN (RELAJACIÓN Y TRUE IDENTITIES V94.0) 🧠
+# 🧠 RUTINA DE OPTIMIZACIÓN (RELAJACIÓN Y TRUE IDENTITIES V94.1) 🧠
 def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, is_meta=False):
     best_fit = -float('inf')
     bp = None
@@ -571,8 +572,6 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
             # 🔥 V94.0 RELAXED FITNESS: Evolución Libre 🔥
             if nt >= 1: 
                 if net > 0: 
-                    # El castigo por operar poco se elimina. En su lugar, se usa el logaritmo para PREMIAR suavemente
-                    # a quienes ganan lo mismo pero operando más (demuestran más consistencia).
                     fit = net * (pf ** 0.5) * np.log1p(nt) / ((mdd ** 0.5) + 1.0)
                     if alpha_money > 0: fit *= 1.2 
                 else: 
@@ -614,7 +613,7 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
 
 # 📋 REPORTE UNIVERSAL 📋
 def generar_reporte_universal(df_base, cap_ini, com_pct):
-    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V94.0)**\n\n"
+    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V94.1)**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_base)}\n\n"
     buy_hold_ret = ((df_base['Close'].iloc[-1] - df_base['Open'].iloc[0]) / df_base['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
@@ -802,7 +801,8 @@ if not df_global.empty:
             elif s_id == "PING_PONG": b_c, s_c = df_strat['Ping_Buy'], df_strat['Ping_Sell']
             elif s_id == "NEON_SQUEEZE": b_c, s_c = df_strat['Squeeze_Buy'], df_strat['Squeeze_Sell']
             elif s_id == "COMMANDER": b_c, s_c = df_strat['Commander_Buy'], df_strat['Commander_Sell']
-            b_c_arr, s_c_arr = np.asarray(b_c.values, dtype=bool), np.asarray(s_c.values, dtype=bool)
+            b_c_arr = np.asarray(b_c.values, dtype=bool)
+            s_c_arr = np.asarray(s_c.values, dtype=bool)
             t_arr = np.asarray(np.full(len(df_strat), float(tp_val)), dtype=np.float64)
             sl_arr = np.asarray(np.full(len(df_strat), float(sl_val)), dtype=np.float64)
 
@@ -869,7 +869,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
         if s_id == "ALL_FORCES":
             st.markdown(f"### 🌟 ALL FORCES ALGO (Omni-Ensemble) {opt_badge}", unsafe_allow_html=True)
-            st.info("El Director Supremo. Ahora optimiza automáticamente Target Lock, Thermal, Defcon y Climax mientras ensambla al equipo ganador.")
+            st.info("El Director Supremo. Ahora optimiza automáticamente Target Lock, Thermal, Defcon y Climax mientras ensambla al equipo ganador sin estancarse.")
             
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             st.slider("🎯 Target ADO", 0.0, 100.0, key="w_ado_ALL_FORCES", step=0.5)
@@ -941,15 +941,15 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             st.markdown(f"### {'🌌 GÉNESIS (Omni-Brain)' if s_id == 'GENESIS' else '👑 ROCKET PROTOCOL (El Comandante Supremo)'} {opt_badge}", unsafe_allow_html=True)
             
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
-            st.slider("🎯 Target ADO", 0.0, 100.0, key=f"w_ado_{s_id}", step=0.5)
-            st.slider("💵 Reinversión (%)", 0.0, 100.0, key=f"w_reinv_{s_id}", step=5.0)
+            st.slider("🎯 Target ADO", 0.0, 100.0, key=f"w_ado_{prefix}", step=0.5)
+            st.slider("💵 Reinversión (%)", 0.0, 100.0, key=f"w_reinv_{prefix}", step=5.0)
 
             with st.expander("⚙️ Calibración del ADN Base"):
                 c_adv1, c_adv2 = st.columns(2)
-                st.slider("🎯 Target Lock Hitbox (%)", 0.5, 3.0, key=f"w_hitbox_{s_id}", step=0.1)
-                st.slider("🌡️ Thermal Wall Weight", 3.0, 8.0, key=f"w_therm_w_{s_id}", step=1.0)
-                st.slider("🚀 Defcon/Ping ADX Threshold", 15.0, 35.0, key=f"w_adx_th_{s_id}", step=1.0)
-                st.slider("🐋 Climax Whale Factor", 1.5, 4.0, key=f"w_whale_f_{s_id}", step=0.1)
+                st.slider("🎯 Target Lock Hitbox (%)", 0.5, 3.0, key=f"w_hitbox_{prefix}", step=0.1)
+                st.slider("🌡️ Thermal Wall Weight", 3.0, 8.0, key=f"w_therm_w_{prefix}", step=1.0)
+                st.slider("🚀 Defcon/Ping ADX Threshold", 15.0, 35.0, key=f"w_adx_th_{prefix}", step=1.0)
+                st.slider("🐋 Climax Whale Factor", 1.5, 4.0, key=f"w_whale_f_{prefix}", step=0.1)
 
             st.markdown("---")
             c1, c2, c3, c4 = st.columns(4)
@@ -958,34 +958,34 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             
             with c1:
                 st.markdown("<h5 style='color:lime;'>🟢 Bull Trend</h5>", unsafe_allow_html=True)
-                st.multiselect("Asignar Compra", opts_b, key=f"w_r1_b_{s_id}")
-                st.multiselect("Asignar Cierre", opts_s, key=f"w_r1_s_{s_id}")
-                st.slider("TP %", 0.5, 100.0, key=f"w_r1_tp_{s_id}", step=0.5)
-                st.slider("SL %", 0.5, 25.0, key=f"w_r1_sl_{s_id}", step=0.5)
+                st.multiselect("Asignar Compra", opts_b, key=f"w_r1_b_{prefix}")
+                st.multiselect("Asignar Cierre", opts_s, key=f"w_r1_s_{prefix}")
+                st.slider("TP %", 0.5, 100.0, key=f"w_r1_tp_{prefix}", step=0.5)
+                st.slider("SL %", 0.5, 25.0, key=f"w_r1_sl_{prefix}", step=0.5)
             with c2:
                 st.markdown("<h5 style='color:yellow;'>🟡 Bull Chop</h5>", unsafe_allow_html=True)
-                st.multiselect("Asignar Compra", opts_b, key=f"w_r2_b_{s_id}")
-                st.multiselect("Asignar Cierre", opts_s, key=f"w_r2_s_{s_id}")
-                st.slider("TP %", 0.5, 100.0, key=f"w_r2_tp_{s_id}", step=0.5)
-                st.slider("SL %", 0.5, 25.0, key=f"w_r2_sl_{s_id}", step=0.5)
+                st.multiselect("Asignar Compra", opts_b, key=f"w_r2_b_{prefix}")
+                st.multiselect("Asignar Cierre", opts_s, key=f"w_r2_s_{prefix}")
+                st.slider("TP %", 0.5, 100.0, key=f"w_r2_tp_{prefix}", step=0.5)
+                st.slider("SL %", 0.5, 25.0, key=f"w_r2_sl_{prefix}", step=0.5)
             with c3:
                 st.markdown("<h5 style='color:red;'>🔴 Bear Trend</h5>", unsafe_allow_html=True)
-                st.multiselect("Asignar Compra", opts_b, key=f"w_r3_b_{s_id}")
-                st.multiselect("Asignar Cierre", opts_s, key=f"w_r3_s_{s_id}")
-                st.slider("TP %", 0.5, 100.0, key=f"w_r3_tp_{s_id}", step=0.5)
-                st.slider("SL %", 0.5, 25.0, key=f"w_r3_sl_{s_id}", step=0.5)
+                st.multiselect("Asignar Compra", opts_b, key=f"w_r3_b_{prefix}")
+                st.multiselect("Asignar Cierre", opts_s, key=f"w_r3_s_{prefix}")
+                st.slider("TP %", 0.5, 100.0, key=f"w_r3_tp_{prefix}", step=0.5)
+                st.slider("SL %", 0.5, 25.0, key=f"w_r3_sl_{prefix}", step=0.5)
             with c4:
                 st.markdown("<h5 style='color:orange;'>🟠 Bear Chop</h5>", unsafe_allow_html=True)
-                st.multiselect("Asignar Compra", opts_b, key=f"w_r4_b_{s_id}")
-                st.multiselect("Asignar Cierre", opts_s, key=f"w_r4_s_{s_id}")
-                st.slider("TP %", 0.5, 100.0, key=f"w_r4_tp_{s_id}", step=0.5)
-                st.slider("SL %", 0.5, 25.0, key=f"w_r4_sl_{s_id}", step=0.5)
+                st.multiselect("Asignar Compra", opts_b, key=f"w_r4_b_{prefix}")
+                st.multiselect("Asignar Cierre", opts_s, key=f"w_r4_s_{prefix}")
+                st.slider("TP %", 0.5, 100.0, key=f"w_r4_tp_{prefix}", step=0.5)
+                st.slider("SL %", 0.5, 25.0, key=f"w_r4_sl_{prefix}", step=0.5)
 
             if c_ia3.button("🚀 EVOLUCIÓN INDIVIDUAL", type="primary", key=f"btn_opt_{prefix}"):
                 buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
                 
-                bp = optimizar_ia_tracker(s_id, df_global, capital_inicial, comision_pct, st.session_state[f'w_reinv_{s_id}'], st.session_state[f'w_ado_{s_id}'], dias_reales, buy_hold_money, is_meta=True)
+                bp = optimizar_ia_tracker(s_id, df_global, capital_inicial, comision_pct, st.session_state[f'w_reinv_{prefix}'], st.session_state[f'w_ado_{prefix}'], dias_reales, buy_hold_money, is_meta=True)
                 
                 if bp: 
                     current_fit = st.session_state.get(f'champion_{s_id}', {}).get('fit', -float('inf'))
@@ -1001,23 +1001,23 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 wipe_widget_cache()
                 st.rerun() 
 
-            df_strat = inyectar_adn(df_global.copy(), st.session_state[f'w_hitbox_{s_id}'], st.session_state[f'w_therm_w_{s_id}'], st.session_state[f'w_adx_th_{s_id}'], st.session_state[f'w_whale_f_{s_id}'])
+            df_strat = inyectar_adn(df_global.copy(), st.session_state[f'w_hitbox_{prefix}'], st.session_state[f'w_therm_w_{prefix}'], st.session_state[f'w_adx_th_{prefix}'], st.session_state[f'w_whale_f_{prefix}'])
             f_buy, f_sell = np.zeros(len(df_strat), dtype=bool), np.zeros(len(df_strat), dtype=bool)
             f_tp, f_sl = np.zeros(len(df_strat)), np.zeros(len(df_strat))
             for idx_q in range(1, 5):
                 mask = (df_strat['Regime'].values == idx_q)
                 r_b_cond = np.zeros(len(df_strat), dtype=bool)
-                for r in st.session_state[f'w_r{idx_q}_b_{s_id}']: r_b_cond |= df_strat[r].values
+                for r in st.session_state[f'w_r{idx_q}_b_{prefix}']: r_b_cond |= df_strat[r].values
                 f_buy[mask] = r_b_cond[mask]
                 r_s_cond = np.zeros(len(df_strat), dtype=bool)
-                for r in st.session_state[f'w_r{idx_q}_s_{s_id}']: r_s_cond |= df_strat[r].values
+                for r in st.session_state[f'w_r{idx_q}_s_{prefix}']: r_s_cond |= df_strat[r].values
                 f_sell[mask] = r_s_cond[mask]
-                f_tp[mask] = st.session_state[f'w_r{idx_q}_tp_{s_id}']
-                f_sl[mask] = st.session_state[f'w_r{idx_q}_sl_{s_id}']
+                f_tp[mask] = st.session_state[f'w_r{idx_q}_tp_{prefix}']
+                f_sl[mask] = st.session_state[f'w_r{idx_q}_sl_{prefix}']
                 
             df_strat['Signal_Buy'], df_strat['Signal_Sell'] = f_buy, f_sell
             df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
-            eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state[f'w_reinv_{s_id}'], comision_pct)
+            eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state[f'w_reinv_{prefix}'], comision_pct)
 
         else:
             st.markdown(f"### ⚙️ {s_id} (Truth Engine) {opt_badge}", unsafe_allow_html=True)
@@ -1115,11 +1115,12 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 b_note += f"🔫 Strike Team: {st.session_state['w_b_team_ALL_FORCES']}\n"
                 b_note += f"🛡️ Exit Team: {st.session_state['w_s_team_ALL_FORCES']}\n"
             elif s_id in ["GENESIS", "ROCKET"]:
-                b_note += f"⚙️ ADN: Hitbox: {st.session_state[f'w_hitbox_{s_id}']}% | Muro Térmico: {st.session_state[f'w_therm_w_{s_id}']} | ADX Trend: {st.session_state[f'w_adx_th_{s_id}']} | Vol Ballena: {st.session_state[f'w_whale_f_{s_id}']}x\n"
-                b_note += f"// 🟢 QUAD 1: BULL TREND\nCompras = {st.session_state[f'w_r1_b_{s_id}']}\nCierres = {st.session_state[f'w_r1_s_{s_id}']}\nTP = {st.session_state[f'w_r1_tp_{s_id}']:.1f}% | SL = {st.session_state[f'w_r1_sl_{s_id}']:.1f}%\n"
-                b_note += f"// 🟡 QUAD 2: BULL CHOP\nCompras = {st.session_state[f'w_r2_b_{s_id}']}\nCierres = {st.session_state[f'w_r2_s_{s_id}']}\nTP = {st.session_state[f'w_r2_tp_{s_id}']:.1f}% | SL = {st.session_state[f'w_r2_sl_{s_id}']:.1f}%\n"
-                b_note += f"// 🔴 QUAD 3: BEAR TREND\nCompras = {st.session_state[f'w_r3_b_{s_id}']}\nCierres = {st.session_state[f'w_r3_s_{s_id}']}\nTP = {st.session_state[f'w_r3_tp_{s_id}']:.1f}% | SL = {st.session_state[f'w_r3_sl_{s_id}']:.1f}%\n"
-                b_note += f"// 🟠 QUAD 4: BEAR CHOP\nCompras = {st.session_state[f'w_r4_b_{s_id}']}\nCierres = {st.session_state[f'w_r4_s_{s_id}']}\nTP = {st.session_state[f'w_r4_tp_{s_id}']:.1f}% | SL = {st.session_state[f'w_r4_sl_{s_id}']:.1f}%\n"
+                prefix = "gen" if s_id == "GENESIS" else "roc"
+                b_note += f"⚙️ ADN: Hitbox: {st.session_state[f'w_hitbox_{prefix}']}% | Muro Térmico: {st.session_state[f'w_therm_w_{prefix}']} | ADX Trend: {st.session_state[f'w_adx_th_{prefix}']} | Vol Ballena: {st.session_state[f'w_whale_f_{prefix}']}x\n"
+                b_note += f"// 🟢 QUAD 1: BULL TREND\nCompras = {st.session_state[f'w_r1_b_{prefix}']}\nCierres = {st.session_state[f'w_r1_s_{prefix}']}\nTP = {st.session_state[f'w_r1_tp_{prefix}']:.1f}% | SL = {st.session_state[f'w_r1_sl_{prefix}']:.1f}%\n"
+                b_note += f"// 🟡 QUAD 2: BULL CHOP\nCompras = {st.session_state[f'w_r2_b_{prefix}']}\nCierres = {st.session_state[f'w_r2_s_{prefix}']}\nTP = {st.session_state[f'w_r2_tp_{prefix}']:.1f}% | SL = {st.session_state[f'w_r2_sl_{prefix}']:.1f}%\n"
+                b_note += f"// 🔴 QUAD 3: BEAR TREND\nCompras = {st.session_state[f'w_r3_b_{prefix}']}\nCierres = {st.session_state[f'w_r3_s_{prefix}']}\nTP = {st.session_state[f'w_r3_tp_{prefix}']:.1f}% | SL = {st.session_state[f'w_r3_sl_{prefix}']:.1f}%\n"
+                b_note += f"// 🟠 QUAD 4: BEAR CHOP\nCompras = {st.session_state[f'w_r4_b_{prefix}']}\nCierres = {st.session_state[f'w_r4_s_{prefix}']}\nTP = {st.session_state[f'w_r4_tp_{prefix}']:.1f}% | SL = {st.session_state[f'w_r4_sl_{prefix}']:.1f}%\n"
             else:
                 b_note += f"⚙️ TP: {st.session_state[f'w_tp_{s_id}']}% | SL: {st.session_state[f'w_sl_{s_id}']}%\n"
                 b_note += f"⚙️ ADN: Hitbox: {st.session_state[f'w_hitbox_{s_id}']}% | Muro Térmico: {st.session_state[f'w_therm_w_{s_id}']} | ADX Trend: {st.session_state[f'w_adx_th_{s_id}']} | Vol Ballena: {st.session_state[f'w_whale_f_{s_id}']}x\n"
