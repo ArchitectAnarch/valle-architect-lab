@@ -62,7 +62,7 @@ css_spinner = """
 """
 ph_holograma = st.empty()
 
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL V68.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL V69.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     gc.collect()
@@ -218,48 +218,49 @@ else:
     st.error(status_api)
     st.stop()
 
-# 🔥 LA CIRUGÍA "DIAMOND HANDS" (V68.0) 🔥
+# 🔥 LA CIRUGÍA "ALPHA HUNTER" (V69.0) 🔥
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     
-    # 🏓 1. PING PONG (Trend-Aligned Reversion)
-    # Ya no opera en contra de tendencia. Exige estar sobre EMA 50 y que el RSI no esté alto.
-    df_sim['Ping_Buy'] = (df_sim['Momentum'] > 0) & (df_sim['Momentum'].shift(1).fillna(0) <= 0) & (df_sim['Close'] > df_sim['EMA_50']) & (df_sim['RSI'] < 60) & df_sim['Vela_Verde']
+    # 🏓 1. PING PONG (Bottom Fisher)
+    # Ya no opera en contra. Compra suelos locales (debajo del VWAP) cuando el momentum gira positivo.
+    df_sim['Ping_Buy'] = (df_sim['Momentum'] > 0) & (df_sim['Momentum'].shift(1).fillna(0) <= 0) & (df_sim['Close'] < df_sim['VWAP']) & (df_sim['RSI'] < 50) & df_sim['Vela_Verde']
     df_sim['Ping_Sell'] = (df_sim['RSI'] > 75) | (df_sim['Close'] < df_sim['EMA_50'])
 
-    # 🌸 2. PINK CLIMAX (Hold the Line)
-    df_sim['Climax_Buy'] = (df_sim['RVol'] > 1.2) & (df_sim['lower_wick'] >= (df_sim['body_size'] * 0.8)) & (df_sim['RSI'] < 50) & df_sim['Vela_Verde']
-    df_sim['Climax_Sell'] = (df_sim['RSI'] > 75) | (df_sim['Close'] < df_sim['EMA_50'])
+    # 🌸 2. PINK CLIMAX (Diamond Hands)
+    df_sim['Climax_Buy'] = (df_sim['RVol'] > 1.2) & (df_sim['lower_wick'] >= (df_sim['body_size'] * 0.8)) & (df_sim['RSI'] < 45) & df_sim['Vela_Verde']
+    # Se niega a vender hasta la euforia extrema
+    df_sim['Climax_Sell'] = (df_sim['RSI'] > 80)
 
-    # 🌡️ 3. THERMAL (Ignora Techos de Papel)
-    df_sim['Therm_Bounce'] = (df_sim['floor_w'] >= 1) & df_sim['RSI_Cross_Up'] & (df_sim['RSI'] < 60)
+    # 🌡️ 3. THERMAL (Ignora Techos Débiles)
+    df_sim['Therm_Bounce'] = (df_sim['floor_w'] >= 1) & df_sim['RSI_Cross_Up'] & (df_sim['RSI'] < 55) & df_sim['Vela_Verde']
     dist_next_res = (df_sim['Target_Lock_Res'] - df_sim['Close']) / df_sim['Close'] * 100
     df_sim['Therm_Vacuum'] = (df_sim['Close'] > df_sim['Target_Lock_Res']) & (dist_next_res > 2.0) & df_sim['Vela_Verde']
     df_sim['Thermal_Buy'] = df_sim['Therm_Bounce'] | df_sim['Therm_Vacuum']
-    # Solo vende si el techo es masivo (>=4) o se pierde el tren (EMA 50)
-    df_sim['Thermal_Sell'] = ((df_sim['ceil_w'] >= 4) & (df_sim['RSI'] > 65)) | (df_sim['Close'] < df_sim['EMA_50'])
+    # Solo vende si el techo es masivo (Nivel 5) o RSI Extremo
+    df_sim['Thermal_Sell'] = ((df_sim['ceil_w'] >= 5) & (df_sim['RSI'] > 70)) | (df_sim['RSI'] > 80)
 
-    # 🎯 4. TARGET LOCK (Anti-Cúspides)
+    # 🎯 4. TARGET LOCK (Anti-Cúspides y Falsa Euforia)
     df_sim['Lock_Bounce'] = (df_sim['Low'] <= (df_sim['Target_Lock_Sup'] + df_sim['ATR'])) & (df_sim['Close'] > df_sim['Target_Lock_Sup']) & df_sim['Vela_Verde']
-    # ¡CRÍTICO! No compra si el precio ya está pegado a la banda superior BBU o si RSI es alto
+    # No compra si está tocando la banda superior o si RSI > 60
     df_sim['Lock_Buy'] = df_sim['Lock_Bounce'] & (df_sim['RSI'] < 60) & (df_sim['Close'] < df_sim['BBU'])
-    df_sim['Lock_Sell'] = (df_sim['High'] >= df_sim['Target_Lock_Res']) & (df_sim['RSI'] > 70)
+    df_sim['Lock_Sell'] = (df_sim['High'] >= df_sim['Target_Lock_Res']) & (df_sim['RSI'] > 75)
 
-    # 🐛 5. NEON SQUEEZE (Trend Follower Exponencial)
+    # 🐛 5. NEON SQUEEZE (Trend Follower Expansivo)
     df_sim['BB_Contraction'] = df_sim['BB_Width'] < df_sim['BB_Width_Avg']
-    df_sim['Neon_Up'] = df_sim['Squeeze_On'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Verde'] & (df_sim['RVol'] > 1.0) & (df_sim['RSI'] < 70)
+    df_sim['Neon_Up'] = df_sim['BB_Contraction'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Verde'] & (df_sim['RVol'] > 1.0) & (df_sim['ADX'] > 15)
     df_sim['Squeeze_Buy'] = df_sim['Neon_Up']
-    # Vende solo si se rompe la tendencia media
-    df_sim['Squeeze_Sell'] = df_sim['Close'] < df_sim['EMA_50'] 
+    # Vende solo si pierde la EMA 50 Y ADEMÁS pierde impulso (RSI < 50)
+    df_sim['Squeeze_Sell'] = ((df_sim['Close'] < df_sim['EMA_50']) & (df_sim['RSI'] < 50)) | (df_sim['RSI'] > 80)
 
-    # 🚀 6. DEFCON (Captura Macro)
+    # 🚀 6. DEFCON (Captura Macro y Hold the Line)
     df_sim['Defcon_Buy_Sig'] = df_sim['Squeeze_On'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & (df_sim['BB_Delta'] > 0)
-    df_sim['Defcon_Sell_Sig'] = df_sim['Close'] < df_sim['EMA_50']
+    df_sim['Defcon_Sell_Sig'] = ((df_sim['Close'] < df_sim['EMA_50']) & (df_sim['RSI'] < 50)) | (df_sim['RSI'] > 80)
 
-    # ⚔️ 7. JUGGERNAUT (Sin Pánico)
+    # ⚔️ 7. JUGGERNAUT (Sin Pánico, Dejar Correr)
     df_sim['Pink_Whale_Buy'] = df_sim['Climax_Buy'] & (df_sim['RVol'] > (w_factor * 0.8))
     df_sim['aegis_safe'] = ~df_sim['is_falling_knife']
     df_sim['Jugg_Buy'] = (df_sim['Defcon_Buy_Sig'] | df_sim['Pink_Whale_Buy'] | df_sim['Lock_Buy']) & df_sim['Macro_Bull'] & df_sim['aegis_safe']
-    df_sim['Jugg_Sell'] = (df_sim['Close'] < df_sim['EMA_50']) | (df_sim['RSI'] > 80)
+    df_sim['Jugg_Sell'] = ((df_sim['Close'] < df_sim['EMA_50']) & (df_sim['RSI'] < 45)) | (df_sim['RSI'] > 85)
 
     # 👑 TRINITY Y COMMANDER
     df_sim['Trinity_Buy'] = df_sim['Pink_Whale_Buy'] | (df_sim['Lock_Buy'] & df_sim['aegis_safe']) | (df_sim['Defcon_Buy_Sig'] & df_sim['aegis_safe'])
@@ -448,8 +449,8 @@ tab_id_map = {
 def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money):
     best_fit = -float('inf')
     bp = None
-    # 🔥 AUMENTAMOS EL RANGO DE BÚSQUEDA DE TAKE PROFIT (Permite ganar hasta +40%) 🔥
-    tp_min, tp_max = (5.0, 20.0) if target_ado > 2 else (10.0, 45.0)
+    # 🔥 AUMENTAMOS EL RANGO DE BÚSQUEDA DE TAKE PROFIT HASTA EL 60% PARA VENCER AL HOLD 🔥
+    tp_min, tp_max = (5.0, 30.0) if target_ado > 2 else (10.0, 60.0)
     
     for _ in range(2000): 
         rtp = round(random.uniform(tp_min, tp_max), 1)
@@ -543,26 +544,26 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 st.markdown("<h5 style='color:lime;'>🟢 Bull Trend</h5>", unsafe_allow_html=True)
                 st.multiselect("Estrategia Compra", rocket_b, key="roc_r1_b")
                 st.multiselect("Estrategia Cierre", rocket_s, key="roc_r1_s")
-                st.slider("TP %", 0.5, 40.0, step=0.5, key="roc_r1_tp")
-                st.slider("SL %", 0.5, 15.0, step=0.5, key="roc_r1_sl")
+                st.slider("TP %", 0.5, 60.0, step=0.5, key="roc_r1_tp")
+                st.slider("SL %", 0.5, 20.0, step=0.5, key="roc_r1_sl")
             with c2:
                 st.markdown("<h5 style='color:yellow;'>🟡 Bull Chop</h5>", unsafe_allow_html=True)
                 st.multiselect("Estrategia Compra", rocket_b, key="roc_r2_b")
                 st.multiselect("Estrategia Cierre", rocket_s, key="roc_r2_s")
-                st.slider("TP %", 0.5, 40.0, step=0.5, key="roc_r2_tp")
-                st.slider("SL %", 0.5, 15.0, step=0.5, key="roc_r2_sl")
+                st.slider("TP %", 0.5, 60.0, step=0.5, key="roc_r2_tp")
+                st.slider("SL %", 0.5, 20.0, step=0.5, key="roc_r2_sl")
             with c3:
                 st.markdown("<h5 style='color:red;'>🔴 Bear Trend</h5>", unsafe_allow_html=True)
                 st.multiselect("Estrategia Compra", rocket_b, key="roc_r3_b")
                 st.multiselect("Estrategia Cierre", rocket_s, key="roc_r3_s")
-                st.slider("TP %", 0.5, 40.0, step=0.5, key="roc_r3_tp")
-                st.slider("SL %", 0.5, 15.0, step=0.5, key="roc_r3_sl")
+                st.slider("TP %", 0.5, 60.0, step=0.5, key="roc_r3_tp")
+                st.slider("SL %", 0.5, 20.0, step=0.5, key="roc_r3_sl")
             with c4:
                 st.markdown("<h5 style='color:orange;'>🟠 Bear Chop</h5>", unsafe_allow_html=True)
                 st.multiselect("Estrategia Compra", rocket_b, key="roc_r4_b")
                 st.multiselect("Estrategia Cierre", rocket_s, key="roc_r4_s")
-                st.slider("TP %", 0.5, 40.0, step=0.5, key="roc_r4_tp")
-                st.slider("SL %", 0.5, 15.0, step=0.5, key="roc_r4_sl")
+                st.slider("TP %", 0.5, 60.0, step=0.5, key="roc_r4_tp")
+                st.slider("SL %", 0.5, 20.0, step=0.5, key="roc_r4_sl")
 
             if c_ia3.button("🚀 INICIAR ENSAMBLAJE", type="primary", key="btn_roc"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
@@ -586,8 +587,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
                     dna_b = [random.sample(rocket_b, random.randint(1, 2)) for _ in range(4)]
                     dna_s = [random.sample(rocket_s, random.randint(1, 2)) for _ in range(4)]
-                    dna_tp = [random.uniform(5.0, 30.0) for _ in range(4)]
-                    dna_sl = [random.uniform(1.0, 10.0) for _ in range(4)]
+                    dna_tp = [random.uniform(10.0, 50.0) for _ in range(4)]
+                    dna_sl = [random.uniform(2.0, 15.0) for _ in range(4)]
                     f_buy, f_sell = np.zeros(len(df_p), dtype=bool), np.zeros(len(df_p), dtype=bool)
                     f_tp, f_sl = np.zeros(len(df_p)), np.zeros(len(df_p))
                     
@@ -623,7 +624,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 if bp: 
                     st.session_state[f'update_pending_{s_id}'] = True
                     st.session_state[f'pending_bp_{s_id}'] = bp
-                    status_msg = f"🏆 ALPHA CREADO: +${bp['alpha']:,.2f}" if bp['alpha'] > 0 else f"🛡️ RIESGO CONTROLADO. Hold: +${buy_hold_money:,.2f}" if bp['net'] > 0 else f"❌ PÉRDIDA."
+                    status_msg = f"🏆 ALPHA CREADO: +${bp['alpha']:,.2f}" if bp['alpha'] > 0 else f"🛡️ RIESGO CONTROLADO. Hold: +${buy_hold_money:,.2f}" if bp['net'] > 0 else f"❌ PÉRDIDA. Aún la mejor pierde (Hold = +${buy_hold_money:,.2f})"
                     dna_str = f"👑 ROCKET PROTOCOL (META-ALGORITMO)\nNet Profit: ${bp['net']:,.2f} | PF: {bp['pf']:.2f}x | Trades: {bp['nt']} | Comisiones: ${bp['comms']:,.2f}\n{status_msg}\n\n⚙️ Factor Ballena: {bp['wh']}x | Radar: {bp['rd']}%\n\n// 🟢 QUAD 1: BULL TREND\nAsignado a: {bp['b1']} & {bp['s1']}\nTP = {bp['tp1']:.1f}% | SL = {bp['sl1']:.1f}%\n// 🟡 QUAD 2: BULL CHOP\nAsignado a: {bp['b2']} & {bp['s2']}\nTP = {bp['tp2']:.1f}% | SL = {bp['sl2']:.1f}%\n// 🔴 QUAD 3: BEAR TREND\nAsignado a: {bp['b3']} & {bp['s3']}\nTP = {bp['tp3']:.1f}% | SL = {bp['sl3']:.1f}%\n// 🟠 QUAD 4: BEAR CHOP\nAsignado a: {bp['b4']} & {bp['s4']}\nTP = {bp['tp4']:.1f}% | SL = {bp['sl4']:.1f}%"
                     st.session_state[f'dna_{s_id}'] = dna_str
                     st.rerun() 
@@ -642,8 +643,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 r_s_cond = np.zeros(len(df_strat), dtype=bool)
                 for r in st.session_state.get(f'roc_r{idx}_s', []): r_s_cond |= df_strat[r].values
                 f_sell[mask] = r_s_cond[mask]
-                f_tp[mask] = st.session_state.get(f'roc_r{idx}_tp', 15.0)
-                f_sl[mask] = st.session_state.get(f'roc_r{idx}_sl', 3.0)
+                f_tp[mask] = st.session_state.get(f'roc_r{idx}_tp', 5.0)
+                f_sl[mask] = st.session_state.get(f'roc_r{idx}_sl', 2.0)
                 
             df_strat['Signal_Buy'], df_strat['Signal_Sell'] = f_buy, f_sell
             df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
@@ -667,26 +668,26 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 st.markdown("<h5 style='color:lime;'>🟢 Bull Trend</h5>", unsafe_allow_html=True)
                 st.multiselect("Compras", buy_rules, key="gen_r1_b")
                 st.multiselect("Cierres", sell_rules, key="gen_r1_s")
-                st.slider("TP %", 0.5, 40.0, step=0.5, key="gen_r1_tp")
-                st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r1_sl")
+                st.slider("TP %", 0.5, 60.0, step=0.5, key="gen_r1_tp")
+                st.slider("SL %", 0.5, 20.0, step=0.5, key="gen_r1_sl")
             with c2:
                 st.markdown("<h5 style='color:yellow;'>🟡 Bull Chop</h5>", unsafe_allow_html=True)
                 st.multiselect("Compras", buy_rules, key="gen_r2_b")
                 st.multiselect("Cierres", sell_rules, key="gen_r2_s")
-                st.slider("TP %", 0.5, 40.0, step=0.5, key="gen_r2_tp")
-                st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r2_sl")
+                st.slider("TP %", 0.5, 60.0, step=0.5, key="gen_r2_tp")
+                st.slider("SL %", 0.5, 20.0, step=0.5, key="gen_r2_sl")
             with c3:
                 st.markdown("<h5 style='color:red;'>🔴 Bear Trend</h5>", unsafe_allow_html=True)
                 st.multiselect("Compras", buy_rules, key="gen_r3_b")
                 st.multiselect("Cierres", sell_rules, key="gen_r3_s")
-                st.slider("TP %", 0.5, 40.0, step=0.5, key="gen_r3_tp")
-                st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r3_sl")
+                st.slider("TP %", 0.5, 60.0, step=0.5, key="gen_r3_tp")
+                st.slider("SL %", 0.5, 20.0, step=0.5, key="gen_r3_sl")
             with c4:
                 st.markdown("<h5 style='color:orange;'>🟠 Bear Chop</h5>", unsafe_allow_html=True)
                 st.multiselect("Compras", buy_rules, key="gen_r4_b")
                 st.multiselect("Cierres", sell_rules, key="gen_r4_s")
-                st.slider("TP %", 0.5, 40.0, step=0.5, key="gen_r4_tp")
-                st.slider("SL %", 0.5, 15.0, step=0.5, key="gen_r4_sl")
+                st.slider("TP %", 0.5, 60.0, step=0.5, key="gen_r4_tp")
+                st.slider("SL %", 0.5, 20.0, step=0.5, key="gen_r4_sl")
 
             if c_ia3.button("🚀 EXTRACCIÓN CUÁNTICA", type="primary", key="btn_gen"):
                 ph_holograma.markdown(css_spinner, unsafe_allow_html=True)
@@ -708,8 +709,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
                     dna_b = [random.sample(buy_rules, random.randint(1, 3)) for _ in range(4)]
                     dna_s = [random.sample(sell_rules, random.randint(1, 3)) for _ in range(4)]
-                    dna_tp = [random.uniform(5.0, 30.0) for _ in range(4)]
-                    dna_sl = [random.uniform(1.0, 10.0) for _ in range(4)]
+                    dna_tp = [random.uniform(5.0, 50.0) for _ in range(4)]
+                    dna_sl = [random.uniform(2.0, 15.0) for _ in range(4)]
                     f_buy, f_sell = np.zeros(len(df_p), dtype=bool), np.zeros(len(df_p), dtype=bool)
                     f_tp, f_sl = np.zeros(len(df_p)), np.zeros(len(df_p))
                     
@@ -764,8 +765,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 r_s_cond = np.zeros(len(df_strat), dtype=bool)
                 for r in st.session_state.get(f'gen_r{idx}_s', []): r_s_cond |= df_strat[r].values
                 f_sell[mask] = r_s_cond[mask]
-                f_tp[mask] = st.session_state.get(f'gen_r{idx}_tp', 15.0)
-                f_sl[mask] = st.session_state.get(f'gen_r{idx}_sl', 3.0)
+                f_tp[mask] = st.session_state.get(f'gen_r{idx}_tp', 5.0)
+                f_sl[mask] = st.session_state.get(f'gen_r{idx}_sl', 2.0)
                 
             df_strat['Signal_Buy'], df_strat['Signal_Sell'] = f_buy, f_sell
             df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
@@ -803,7 +804,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
             with st.expander("🛠️ Ajuste Manual de Parámetros"):
                 c1, c2, c3, c4 = st.columns(4)
-                st.session_state[f'sld_tp_{s_id}'] = c1.slider("🎯 TP Base (%)", 0.5, 50.0, value=float(st.session_state.get(f'sld_tp_{s_id}', 15.0)), step=0.1, key=f"man_tp_{s_id}")
+                st.session_state[f'sld_tp_{s_id}'] = c1.slider("🎯 TP Base (%)", 0.5, 60.0, value=float(st.session_state.get(f'sld_tp_{s_id}', 15.0)), step=0.1, key=f"man_tp_{s_id}")
                 st.session_state[f'sld_sl_{s_id}'] = c2.slider("🛑 SL (%)", 0.5, 20.0, value=float(st.session_state.get(f'sld_sl_{s_id}', 3.0)), step=0.1, key=f"man_sl_{s_id}")
                 st.session_state[f'sld_wh_{s_id}'] = c3.slider("🐋 Factor Ballena", 1.0, 5.0, value=float(st.session_state.get(f'sld_wh_{s_id}', 2.5)), step=0.1, key=f"man_wh_{s_id}")
                 st.session_state[f'sld_rd_{s_id}'] = c4.slider("📡 Radar Sens.", 0.5, 5.0, value=float(st.session_state.get(f'sld_rd_{s_id}', 1.5)), step=0.1, key=f"man_rd_{s_id}")
@@ -836,51 +837,50 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state.get(f'sld_reinv_{s_id}', 100.0), comision_pct)
 
         # --- SECCIÓN COMÚN (MÉTRICAS) ---
-        if s_id != "NUEVA_ESTRATEGIA":
-            df_strat['Total_Portfolio'] = eq_curve
-            ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
-            buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
-            alpha_pct = ret_pct - buy_hold_ret
+        df_strat['Total_Portfolio'] = eq_curve
+        ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
+        buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
+        alpha_pct = ret_pct - buy_hold_ret
 
-            dftr = pd.DataFrame(t_log)
-            tt, wr, pf_val, ado_act = 0, 0.0, 0.0, 0.0
-            if not dftr.empty:
-                exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
-                tt = len(exs)
-                ado_act = tt / dias_reales if dias_reales > 0 else 0
-                if tt > 0:
-                    ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
-                    wr = (ws / tt) * 100
-                    gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum()
-                    gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
-                    pf_val = gpp / gll if gll > 0 else float('inf')
-            
-            mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
+        dftr = pd.DataFrame(t_log)
+        tt, wr, pf_val, ado_act = 0, 0.0, 0.0, 0.0
+        if not dftr.empty:
+            exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
+            tt = len(exs)
+            ado_act = tt / dias_reales if dias_reales > 0 else 0
+            if tt > 0:
+                ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
+                wr = (ws / tt) * 100
+                gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum()
+                gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
+                pf_val = gpp / gll if gll > 0 else float('inf')
+        
+        mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
 
-            st.markdown(f"### 📊 Auditoría: {s_id}")
-            c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-            c1.metric("Portafolio Neto", f"${eq_curve[-1]:,.2f}", f"{ret_pct:.2f}%")
-            c2.metric("ALPHA (vs Hold)", f"{alpha_pct:.2f}%", f"Hold: {buy_hold_ret:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
-            c3.metric("Trades Totales", f"{tt}")
-            c4.metric("Win Rate", f"{wr:.1f}%")
-            c5.metric("Profit Factor", f"{pf_val:.2f}x")
-            c6.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
-            c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
+        st.markdown(f"### 📊 Auditoría: {s_id}")
+        c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+        c1.metric("Portafolio Neto", f"${eq_curve[-1]:,.2f}", f"{ret_pct:.2f}%")
+        c2.metric("ALPHA (vs Hold)", f"{alpha_pct:.2f}%", f"Hold: {buy_hold_ret:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
+        c3.metric("Trades Totales", f"{tt}")
+        c4.metric("Win Rate", f"{wr:.1f}%")
+        c5.metric("Profit Factor", f"{pf_val:.2f}x")
+        c6.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
+        c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
 
-            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
-            fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
-            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='EMA 50 (Trend Line)', line=dict(color='yellow', width=2)), row=1, col=1)
-            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200 (Macro Line)', line=dict(color='orange', width=2)), row=1, col=1)
+        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+        fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='EMA 50 (Trend Line)', line=dict(color='yellow', width=2)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='EMA 200 (Macro Line)', line=dict(color='orange', width=2)), row=1, col=1)
 
-            if not dftr.empty:
-                ents = dftr[dftr['Tipo'] == 'ENTRY']
-                fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white')), hovertemplate="COMPRA<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
-                wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
-                fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white')), text=wins['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
-                loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
-                fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white')), text=loss['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
+        if not dftr.empty:
+            ents = dftr[dftr['Tipo'] == 'ENTRY']
+            fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white')), hovertemplate="COMPRA<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
+            wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
+            fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white')), text=wins['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
+            loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
+            fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white')), text=loss['Tipo'], hovertemplate="%{text}<br>Precio: $%{y:,.4f}<extra></extra>"), row=1, col=1)
 
-            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
-            fig.update_yaxes(side="right")
-            fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan")
-            st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True}, key=f"chart_{s_id}")
+        fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
+        fig.update_yaxes(side="right")
+        fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False, margin=dict(l=20, r=20, t=30, b=20), hovermode="closest", dragmode="pan")
+        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': True}, key=f"chart_{s_id}")
