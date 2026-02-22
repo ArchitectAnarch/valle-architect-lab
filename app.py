@@ -33,8 +33,8 @@ rocket_s = ['Trinity_Sell', 'Jugg_Sell', 'Defcon_Sell_Sig', 'Lock_Sell', 'Therma
 estrategias = ["TRINITY", "JUGGERNAUT", "DEFCON", "TARGET_LOCK", "THERMAL", "PINK_CLIMAX", "PING_PONG", "NEON_SQUEEZE", "COMMANDER", "GENESIS", "ROCKET"]
 
 for r_idx in range(1, 5):
-    if f'gen_r{r_idx}_b' not in st.session_state: st.session_state[f'gen_r{r_idx}_b'] = ['Squeeze_Buy']
-    if f'gen_r{r_idx}_s' not in st.session_state: st.session_state[f'gen_r{r_idx}_s'] = ['Squeeze_Sell']
+    if f'gen_r{r_idx}_b' not in st.session_state: st.session_state[f'gen_r{r_idx}_b'] = ['Neon_Up']
+    if f'gen_r{r_idx}_s' not in st.session_state: st.session_state[f'gen_r{r_idx}_s'] = ['Neon_Dn']
     if f'gen_r{r_idx}_tp' not in st.session_state: st.session_state[f'gen_r{r_idx}_tp'] = 5.0
     if f'gen_r{r_idx}_sl' not in st.session_state: st.session_state[f'gen_r{r_idx}_sl'] = 2.0
     
@@ -62,7 +62,7 @@ css_spinner = """
 """
 ph_holograma = st.empty()
 
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL V65.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 ROCKET PROTOCOL V66.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     gc.collect()
@@ -135,7 +135,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         if len(df) < 50:
             return pd.DataFrame(), f"❌ Se sintetizaron solo {len(df)} velas de {iv_down}. La IA requiere mínimo 50. Amplíe los días."
             
-        # 🔥 CÁLCULOS MATEMÁTICOS BASE 🔥
         df['EMA_200'] = df['Close'].ewm(span=200, min_periods=1, adjust=False).mean()
         df['EMA_50'] = df['Close'].ewm(span=50, min_periods=1, adjust=False).mean()
         df['VWAP'] = (df['Close'] * df['Volume']).rolling(50).sum() / df['Volume'].rolling(50).sum().replace(0, 1) 
@@ -154,9 +153,12 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['BBU'] = df['Basis'] + (2.0 * dev)
         df['BBL'] = df['Basis'] - (2.0 * dev)
         
-        # Squeeze Dinámico
-        df['BB_Width'] = (df['BBU'] - df['BBL']) / df['Basis']
-        df['BB_Width_Avg'] = df['BB_Width'].rolling(20, min_periods=1).mean()
+        kc_basis = df['Close'].rolling(20, min_periods=1).mean()
+        df['KC_Upper'] = kc_basis + (df['ATR'] * 1.5)
+        df['KC_Lower'] = kc_basis - (df['ATR'] * 1.5)
+        df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
+        df['BB_Delta'] = (df['BBU'] - df['BBL']).diff().fillna(0)
+        df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10, min_periods=1).mean().fillna(0)
         
         df['Vela_Verde'] = df['Close'] > df['Open']
         df['Vela_Roja'] = df['Close'] < df['Open']
@@ -165,7 +167,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
         df['is_falling_knife'] = (df['Open'].shift(1) - df['Close'].shift(1)) > (df['ATR'].shift(1) * 1.5)
         
-        # 🔥 RED DE RADARES 360° 🔥
         df['PL30'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
         df['PH30'] = df['High'].shift(1).rolling(30, min_periods=1).max()
         df['PL100'] = df['Low'].shift(1).rolling(100, min_periods=1).min()
@@ -176,7 +177,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['Target_Lock_Sup'] = df[['PL30', 'PL100', 'PL300']].max(axis=1)
         df['Target_Lock_Res'] = df[['PH30', 'PH100', 'PH300']].min(axis=1)
         
-        # Termómetro Dinámico
         scan_range = df['ATR'] * 2.0
         c_val = df['Close'].values
         sr_val = scan_range.values
@@ -192,7 +192,9 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['RSI_Cross_Up'] = (df['RSI'] > df['RSI_MA']) & (df['RSI'].shift(1).fillna(50) <= df['RSI_MA'].shift(1).fillna(50))
         df['RSI_Cross_Dn'] = (df['RSI'] < df['RSI_MA']) & (df['RSI'].shift(1).fillna(50) >= df['RSI_MA'].shift(1).fillna(50))
         
-        df['PP_Slope'] = ta.linreg(df['Close'], 5, 0) - ta.linreg(df['Close'], 5, 1)
+        # Momentum Dinámico (En vez de Regresión Lenta)
+        df['Momentum'] = df['Close'] - df['Close'].shift(2).fillna(df['Close'])
+        
         df['Macro_Bull'] = df['Close'] >= df['EMA_200']
         is_trend = df['ADX'] >= 25
         df['Regime'] = np.where(df['Macro_Bull'] & is_trend, 1, np.where(df['Macro_Bull'] & ~is_trend, 2, np.where(~df['Macro_Bull'] & is_trend, 3, 4)))
@@ -211,44 +213,44 @@ else:
     st.error(status_api)
     st.stop()
 
-# 🔥 LA CIRUGÍA ALGORÍTMICA PROFUNDA (V65.0) 🔥
+# 🔥 LA CIRUGÍA ALGORÍTMICA PROFUNDA (V66.0) 🔥
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     
-    # 🏓 1. PING PONG (Libre de Radar, Momentum Puro)
-    df_sim['Ping_Buy'] = (df_sim['PP_Slope'] > 0) & (df_sim['PP_Slope'].shift(1).fillna(0) <= 0) & (df_sim['RSI'] < 60) & df_sim['Vela_Verde']
-    df_sim['Ping_Sell'] = (df_sim['PP_Slope'] < 0) & (df_sim['PP_Slope'].shift(1).fillna(0) >= 0) & (df_sim['RSI'] > 40) & df_sim['Vela_Roja']
+    # 🏓 1. PING PONG (Libre de Radar, Momentum Rápido)
+    df_sim['Ping_Buy'] = (df_sim['Momentum'] > 0) & (df_sim['Momentum'].shift(1).fillna(0) <= 0) & (df_sim['RSI'] < 65) & df_sim['Vela_Verde']
+    df_sim['Ping_Sell'] = (df_sim['Momentum'] < 0) & (df_sim['Momentum'].shift(1).fillna(0) >= 0) & (df_sim['RSI'] > 45)
 
-    # 🌸 2. PINK CLIMAX (Anti-Cuchillo: Solo entra si es verde)
-    df_sim['Climax_Buy'] = (df_sim['RVol'] > 1.5) & (df_sim['lower_wick'] > (df_sim['body_size'] * 1.5)) & (df_sim['RSI'] < 45) & df_sim['Vela_Verde']
-    df_sim['Climax_Sell'] = (df_sim['RVol'] > 1.5) & (df_sim['upper_wick'] > (df_sim['body_size'] * 1.5)) & (df_sim['RSI'] > 55) & df_sim['Vela_Roja']
+    # 🌸 2. PINK CLIMAX (Holgura Anti-Cuchillo: Mecha >= 80% y Confirmación Verde)
+    df_sim['Climax_Buy'] = (df_sim['RVol'] > 1.2) & (df_sim['lower_wick'] >= (df_sim['body_size'] * 0.8)) & (df_sim['RSI'] < 50) & df_sim['Vela_Verde']
+    df_sim['Climax_Sell'] = (df_sim['RVol'] > 1.2) & (df_sim['upper_wick'] >= (df_sim['body_size'] * 0.8)) & (df_sim['RSI'] > 50) & df_sim['Vela_Roja']
 
-    # 🌡️ 3. THERMAL (Radar Anti-Cimas)
-    df_sim['Therm_Bounce'] = (df_sim['floor_w'] >= 3) & df_sim['RSI_Cross_Up'] & (df_sim['RSI'] < 55) & df_sim['Vela_Verde']
-    df_sim['Thermal_Sell'] = (df_sim['ceil_w'] >= 3) & df_sim['RSI_Cross_Dn'] & (df_sim['RSI'] > 45) & df_sim['Vela_Roja']
-    df_sim['Thermal_Buy'] = df_sim['Therm_Bounce']
+    # 🌡️ 3. THERMAL (Radar Anti-Cimas y Cajas de Impacto extendidas)
+    df_sim['Therm_Bounce'] = (df_sim['floor_w'] >= 1) & (df_sim['RSI'] > df_sim['RSI'].shift(1)) & (df_sim['RSI'] < 60) & df_sim['Vela_Verde']
+    df_sim['Thermal_Sell'] = (df_sim['ceil_w'] >= 1) & (df_sim['RSI'] < df_sim['RSI'].shift(1)) & (df_sim['RSI'] > 50) & df_sim['Vela_Roja']
+    dist_next_res = (df_sim['Target_Lock_Res'] - df_sim['Close']) / df_sim['Close'] * 100
+    df_sim['Therm_Vacuum'] = (df_sim['Close'] > df_sim['Target_Lock_Res']) & (dist_next_res > 2.0) & df_sim['Vela_Verde']
+    df_sim['Thermal_Buy'] = df_sim['Therm_Bounce'] | df_sim['Therm_Vacuum']
 
-    # 🎯 4. TARGET LOCK (Alineación con el RSI MA para confirmar Momentum)
-    df_sim['Lock_Bounce'] = (df_sim['Low'] <= (df_sim['Target_Lock_Sup'] + (df_sim['ATR']*0.5))) & (df_sim['Close'] > df_sim['Target_Lock_Sup']) & df_sim['Vela_Verde']
-    df_sim['Lock_Buy'] = df_sim['Lock_Bounce'] & (df_sim['RSI'] > df_sim['RSI_MA'])
-    df_sim['Lock_Reject'] = (df_sim['High'] >= (df_sim['Target_Lock_Res'] - (df_sim['ATR']*0.5))) & (df_sim['Close'] < df_sim['Target_Lock_Res']) & df_sim['Vela_Roja']
-    df_sim['Lock_Sell'] = df_sim['Lock_Reject'] & (df_sim['RSI'] < df_sim['RSI_MA'])
+    # 🎯 4. TARGET LOCK (Mayor tolerancia al toque + Impulso RSI)
+    df_sim['Lock_Bounce'] = (df_sim['Low'] <= (df_sim['Target_Lock_Sup'] + df_sim['ATR'])) & (df_sim['Close'] > df_sim['Target_Lock_Sup']) & df_sim['Vela_Verde']
+    df_sim['Lock_Buy'] = df_sim['Lock_Bounce'] & (df_sim['RSI'] > 40)
+    df_sim['Lock_Reject'] = (df_sim['High'] >= (df_sim['Target_Lock_Res'] - df_sim['ATR'])) & (df_sim['Close'] < df_sim['Target_Lock_Res']) & df_sim['Vela_Roja']
+    df_sim['Lock_Sell'] = df_sim['Lock_Reject']
 
-    # 🐛 5. NEON SQUEEZE (Contracción Dinámica BBW + Filtro Volumen)
-    df_sim['BB_Contraction'] = df_sim['BB_Width'] < df_sim['BB_Width_Avg']
-    df_sim['Neon_Up'] = df_sim['BB_Contraction'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Verde'] & (df_sim['RVol'] > 1.2) & (df_sim['RSI'] < 75)
-    df_sim['Neon_Dn'] = df_sim['BB_Contraction'].shift(1).fillna(False) & (df_sim['Close'] < df_sim['BBL']) & df_sim['Vela_Roja'] & (df_sim['RVol'] > 1.2) & (df_sim['RSI'] > 25)
+    # 🐛 5. NEON SQUEEZE (Filtro ADX para Tendencia Real, Salida Holgada)
+    df_sim['Neon_Up'] = df_sim['Squeeze_On'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Verde'] & (df_sim['ADX'] > 20)
     df_sim['Squeeze_Buy'] = df_sim['Neon_Up']
-    df_sim['Squeeze_Sell'] = df_sim['Neon_Dn']
+    df_sim['Squeeze_Sell'] = df_sim['Close'] < df_sim['EMA_50'] # Salida inteligente macro
 
-    # 🚀 6. DEFCON (Squeeze + ADX + Cierre por Media de Bollinger)
-    df_sim['Defcon_Buy_Sig'] = df_sim['Neon_Up'] & (df_sim['ADX'] > 20)
-    df_sim['Defcon_Sell_Sig'] = (df_sim['Close'] < df_sim['Basis']) | df_sim['Neon_Dn'] # Salida inteligente
+    # 🚀 6. DEFCON (Squeeze Agresivo + Salida Inteligente)
+    df_sim['Defcon_Buy_Sig'] = df_sim['Neon_Up'] & (df_sim['BB_Delta'] > df_sim['BB_Delta_Avg']) & (df_sim['RVol'] > 1.1)
+    df_sim['Defcon_Sell_Sig'] = (df_sim['Close'] < df_sim['EMA_50']) | (df_sim['RSI'] > 75)
 
-    # ⚔️ 7. JUGGERNAUT (Desencadenado de la EMA 200, usa solo Aegis)
-    df_sim['aegis_safe'] = ~df_sim['is_falling_knife']
+    # ⚔️ 7. JUGGERNAUT (Desencadenado Macro, Protegido por Aegis)
     df_sim['Pink_Whale_Buy'] = df_sim['Climax_Buy'] & (df_sim['RVol'] > (w_factor * 0.8))
+    df_sim['aegis_safe'] = ~df_sim['is_falling_knife']
     df_sim['Jugg_Buy'] = (df_sim['Defcon_Buy_Sig'] | df_sim['Pink_Whale_Buy'] | df_sim['Lock_Buy']) & df_sim['aegis_safe']
-    df_sim['Jugg_Sell'] = df_sim['Defcon_Sell_Sig'] | df_sim['Thermal_Sell'] | df_sim['Lock_Sell']
+    df_sim['Jugg_Sell'] = (df_sim['Close'] < df_sim['EMA_50']) | df_sim['Thermal_Sell']
 
     # 👑 TRINITY, LEVIATHAN Y COMMANDER
     df_sim['Trinity_Buy'] = df_sim['Pink_Whale_Buy'] | (df_sim['Lock_Buy'] & df_sim['aegis_safe']) | (df_sim['Defcon_Buy_Sig'] & df_sim['aegis_safe'])
