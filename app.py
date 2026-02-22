@@ -27,6 +27,9 @@ st.set_page_config(page_title="ROCKET PROTOCOL | Alpha Quant", layout="wide", in
 base_b = ['Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Jugg_Buy', 'Trinity_Buy', 'Commander_Buy', 'Lev_Buy']
 base_s = ['Ping_Sell', 'Climax_Sell', 'Thermal_Sell', 'Lock_Sell', 'Squeeze_Sell', 'Defcon_Sell', 'Jugg_Sell', 'Trinity_Sell', 'Commander_Sell', 'Lev_Sell']
 
+rocket_b = ['Trinity_Buy', 'Jugg_Buy', 'Defcon_Buy', 'Lock_Buy', 'Thermal_Buy', 'Climax_Buy', 'Ping_Buy', 'Squeeze_Buy', 'Lev_Buy', 'Commander_Buy']
+rocket_s = ['Trinity_Sell', 'Jugg_Sell', 'Defcon_Sell', 'Lock_Sell', 'Thermal_Sell', 'Climax_Sell', 'Ping_Sell', 'Squeeze_Sell', 'Lev_Sell', 'Commander_Sell']
+
 estrategias = ["ALL_FORCES", "TRINITY", "JUGGERNAUT", "DEFCON", "TARGET_LOCK", "THERMAL", "PINK_CLIMAX", "PING_PONG", "NEON_SQUEEZE", "COMMANDER", "GENESIS", "ROCKET"]
 
 tab_id_map = {
@@ -41,8 +44,8 @@ macro_opts = ["All-Weather", "Bull Only (Precio > EMA 200)", "Bear Only (Precio 
 vol_opts = ["All-Weather", "Trend (ADX > 25)", "Range (ADX < 25)"]
 
 # --- SHADOW STATE (PREVIENE STREAMLIT API EXCEPTIONS) ---
-if 'ui_allf_b_team' not in st.session_state: st.session_state['ui_allf_b_team'] = ['Commander_Buy', 'Squeeze_Buy']
-if 'ui_allf_s_team' not in st.session_state: st.session_state['ui_allf_s_team'] = ['Commander_Sell']
+if 'ui_allf_b_team' not in st.session_state: st.session_state['ui_allf_b_team'] = ['Commander_Buy', 'Squeeze_Buy', 'Ping_Buy']
+if 'ui_allf_s_team' not in st.session_state: st.session_state['ui_allf_s_team'] = ['Commander_Sell', 'Squeeze_Sell']
 if 'ui_allf_macro' not in st.session_state: st.session_state['ui_allf_macro'] = "All-Weather"
 if 'ui_allf_vol' not in st.session_state: st.session_state['ui_allf_vol'] = "All-Weather"
 if 'ui_allf_tp' not in st.session_state: st.session_state['ui_allf_tp'] = 50.0
@@ -73,7 +76,6 @@ for s in estrategias:
         if f'ui_{prefix}_rd' not in st.session_state: st.session_state[f'ui_{prefix}_rd'] = 1.5
 
 def clear_widget_state():
-    """Destruye la memoria del widget físico para forzar la recarga del estado sombra"""
     for key in list(st.session_state.keys()):
         if key.startswith("w_"):
             del st.session_state[key]
@@ -83,7 +85,7 @@ ph_holograma = st.empty()
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V87.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V88.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     for s in estrategias: st.session_state[f'opt_status_{s}'] = False 
@@ -223,7 +225,7 @@ else:
     st.stop()
 
 # ==========================================
-# 🔥 IDENTIDADES Y LÓGICAS (PURAS V87.0) 🔥
+# 🔥 IDENTIDADES Y LÓGICAS (PURAS V88.0) 🔥
 # ==========================================
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
     df_sim['Ping_Buy'] = (df_sim['ADX'] < 25) & (df_sim['Close'] < df_sim['BBL']) & df_sim['Vela_Verde']
@@ -423,7 +425,6 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
             
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
-# 🧠 RUTINA DE OPTIMIZACIÓN CON TRACKER CUÁNTICO 🧠
 def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, is_meta=False):
     best_fit = -float('inf')
     bp = None
@@ -449,14 +450,13 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
             o_a = np.asarray(df_precalc['Open'].values, dtype=np.float64)
             
             if s_id == "ALL_FORCES":
-                # 🔥 ALL FORCES OMNI-ENSEMBLE
+                # 🔥 FORZAR SINERGIA PROFUNDA EN ALL_FORCES (3 a 7 compras, 2 a 5 ventas)
                 b_mat_opts, s_mat_opts = base_b, base_s
                 b_mat = {r: df_precalc[r].values for r in b_mat_opts}
                 s_mat = {r: df_precalc[r].values for r in s_mat_opts}
                 
-                # Frecuencia de selección ilimitada (1 a 10 algoritmos a la vez)
-                dna_b_team = random.sample(b_mat_opts, random.randint(2, len(b_mat_opts)))
-                dna_s_team = random.sample(s_mat_opts, random.randint(1, len(s_mat_opts)))
+                dna_b_team = random.sample(b_mat_opts, random.randint(3, 7))
+                dna_s_team = random.sample(s_mat_opts, random.randint(2, 5))
                 dna_macro = random.choice(macro_opts)
                 dna_vol = random.choice(vol_opts)
                 
@@ -549,7 +549,6 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
                     else:
                         bp = {'tp': rtp, 'sl': rsl, 'wh': rwh, 'rd': rrd, 'reinv': reinv_q, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms}
         
-        # ACTULIZAR HOLOGRMA (TRACKER EN VIVO)
         elapsed = time.time() - start_time
         pct_done = int(((c + 1) / chunks) * 100)
         combos = (c + 1) * chunk_size
@@ -557,15 +556,15 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
         
         dyn_spinner = f"""
         <style>
-        .loader-container {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; text-align: center; }}
-        .rocket {{ font-size: 8rem; animation: spin 1s linear infinite; filter: drop-shadow(0 0 25px cyan); }}
+        .loader-container {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; text-align: center; background: rgba(0,0,0,0.7); padding: 30px; border-radius: 20px; border: 1px solid cyan; }}
+        .rocket {{ font-size: 6rem; animation: spin 1s linear infinite; filter: drop-shadow(0 0 15px cyan); }}
         @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
-        .prog-text {{ color: cyan; font-size: 1.8rem; font-weight: bold; margin-top: 10px; }}
+        .prog-text {{ color: cyan; font-size: 1.5rem; font-weight: bold; margin-top: 10px; }}
         .hud-text {{ color: #00FF00; font-size: 1.1rem; margin-top: 5px; font-family: monospace; }}
         </style>
         <div class="loader-container">
             <div class="rocket">🚀</div>
-            <div class="prog-text">FORJANDO: {s_id}</div>
+            <div class="prog-text">FORJANDO IA: {s_id}</div>
             <div class="hud-text">Progreso: {pct_done}%</div>
             <div class="hud-text">Combos Evaluados: {combos:,}</div>
             <div class="hud-text" style="color: yellow;">ETA: {eta:.1f} segs</div>
@@ -603,7 +602,7 @@ def save_optimization_to_state(s_id, bp, is_meta):
 
 # 📋 REPORTE UNIVERSAL 📋
 def generar_reporte_universal(df_base, cap_ini, com_pct):
-    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V87.0)**\n\n"
+    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V88.0)**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_base)}\n\n"
     buy_hold_ret = ((df_base['Close'].iloc[-1] - df_base['Open'].iloc[0]) / df_base['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
@@ -750,8 +749,13 @@ if not df_global.empty:
             b_c_arr, s_c_arr = np.asarray(f_buy, dtype=bool), np.asarray(f_sell, dtype=bool)
         else:
             reinv_q = st.session_state.get(f'ui_reinv_{s_id}', 0.0)
-            tp_val, sl_val = st.session_state.get(f'ui_tp_{s_id}', 50.0), st.session_state.get(f'ui_sl_{s_id}', 5.0)
-            b_c, s_c = np.zeros(len(df_strat), dtype=bool), np.zeros(len(df_strat), dtype=bool)
+            tp_val = st.session_state.get(f'ui_tp_{s_id}', 50.0)
+            sl_val = st.session_state.get(f'ui_sl_{s_id}', 5.0)
+            wh_val = st.session_state.get(f'ui_wh_{s_id}', 2.5)
+            rd_val = st.session_state.get(f'ui_rd_{s_id}', 1.5)
+            df_strat = inyectar_adn(df_global.copy(), rd_val, wh_val)
+            b_c = np.zeros(len(df_strat), dtype=bool)
+            s_c = np.zeros(len(df_strat), dtype=bool)
             if s_id == "TRINITY": b_c, s_c = df_strat['Trinity_Buy'], df_strat['Trinity_Sell']
             elif s_id == "JUGGERNAUT": b_c, s_c = df_strat['Jugg_Buy'], df_strat['Jugg_Sell']
             elif s_id == "DEFCON": b_c, s_c = df_strat['Defcon_Buy'], df_strat['Defcon_Sell']
@@ -761,16 +765,24 @@ if not df_global.empty:
             elif s_id == "PING_PONG": b_c, s_c = df_strat['Ping_Buy'], df_strat['Ping_Sell']
             elif s_id == "NEON_SQUEEZE": b_c, s_c = df_strat['Squeeze_Buy'], df_strat['Squeeze_Sell']
             elif s_id == "COMMANDER": b_c, s_c = df_strat['Commander_Buy'], df_strat['Commander_Sell']
-            b_c_arr, s_c_arr = np.asarray(b_c.values, dtype=bool), np.asarray(s_c.values, dtype=bool)
+            b_c_arr = np.asarray(b_c.values, dtype=bool)
+            s_c_arr = np.asarray(s_c.values, dtype=bool)
             t_arr = np.asarray(np.full(len(df_strat), float(tp_val)), dtype=np.float64)
             sl_arr = np.asarray(np.full(len(df_strat), float(sl_val)), dtype=np.float64)
 
-        h_a, l_a = np.asarray(df_strat['High'].values, dtype=np.float64), np.asarray(df_strat['Low'].values, dtype=np.float64)
-        c_a, o_a = np.asarray(df_strat['Close'].values, dtype=np.float64), np.asarray(df_strat['Open'].values, dtype=np.float64)
+        h_a = np.asarray(df_strat['High'].values, dtype=np.float64)
+        l_a = np.asarray(df_strat['Low'].values, dtype=np.float64)
+        c_a = np.asarray(df_strat['Close'].values, dtype=np.float64)
+        o_a = np.asarray(df_strat['Open'].values, dtype=np.float64)
         net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c_arr, s_c_arr, t_arr, sl_arr, float(capital_inicial), float(comision_pct), float(reinv_q))
         
         ret_pct = (net / capital_inicial) * 100
-        score = (ret_pct * (1 + np.log1p(nt))) if ret_pct > 0 and nt > 0 else ret_pct 
+        
+        if ret_pct > 0 and nt > 0:
+            score = ret_pct * (1 + np.log1p(nt))
+        else:
+            score = ret_pct 
+            
         leaderboard.append((s_id, ret_pct, nt, score))
         
     leaderboard.sort(key=lambda x: x[3], reverse=True)
@@ -891,8 +903,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
             st.markdown("---")
             c1, c2, c3, c4 = st.columns(4)
-            opts_b = buy_rules if s_id == "GENESIS" else rocket_b 
-            opts_s = sell_rules if s_id == "GENESIS" else rocket_s
+            opts_b = base_b if s_id == "GENESIS" else rocket_b 
+            opts_s = base_s if s_id == "GENESIS" else rocket_s
             
             with c1:
                 st.markdown("<h5 style='color:lime;'>🟢 Bull Trend</h5>", unsafe_allow_html=True)
