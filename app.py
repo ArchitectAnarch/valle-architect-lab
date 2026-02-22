@@ -30,7 +30,7 @@ sell_rules = ['Ping_Sell', 'Climax_Sell', 'Thermal_Sell', 'Lock_Sell', 'Squeeze_
 rocket_b = ['Trinity_Buy', 'Jugg_Buy', 'Defcon_Buy', 'Lock_Buy', 'Thermal_Buy', 'Climax_Buy', 'Ping_Buy', 'Squeeze_Buy', 'Lev_Buy', 'Commander_Buy']
 rocket_s = ['Trinity_Sell', 'Jugg_Sell', 'Defcon_Sell', 'Lock_Sell', 'Thermal_Sell', 'Climax_Sell', 'Ping_Sell', 'Squeeze_Sell', 'Lev_Sell', 'Commander_Sell']
 
-# 🔥 LAS 9 FUERZAS PURAS PARA EL "ALL FORCES ALGO" 🔥
+# 🔥 LAS 9 FUERZAS PURAS PARA EL "ALL FORCES ALGO" (Excluye Meta-Algos) 🔥
 all_forces_b = ['Trinity_Buy', 'Jugg_Buy', 'Defcon_Buy', 'Lock_Buy', 'Thermal_Buy', 'Climax_Buy', 'Ping_Buy', 'Squeeze_Buy', 'Commander_Buy']
 all_forces_s = ['Trinity_Sell', 'Jugg_Sell', 'Defcon_Sell', 'Lock_Sell', 'Thermal_Sell', 'Climax_Sell', 'Ping_Sell', 'Squeeze_Sell', 'Commander_Sell']
 
@@ -88,7 +88,7 @@ ph_holograma = st.empty()
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V82.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V83.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     for s in estrategias: st.session_state[f'opt_status_{s}'] = False 
@@ -230,7 +230,7 @@ else:
 # 🔥 IDENTIDADES Y LÓGICAS (ULTRA DIAMOND) 🔥
 # ==========================================
 def inyectar_adn(df_sim, r_sens=1.5, w_factor=2.5):
-    df_sim['Ping_Buy'] = (df_sim['ADX'] < 25) & (df_sim['Low'] <= df_sim['BBL']) & df_sim['Vela_Verde'] & (df_sim['RSI'] < 55)
+    df_sim['Ping_Buy'] = (df_sim['ADX'] < 25) & (df_sim['Low'] <= df_sim['BBL']) & df_sim['Vela_Verde'] & (df_sim['RSI'] < 55) & df_sim['Macro_Bull']
     df_sim['Ping_Sell'] = (df_sim['High'] >= df_sim['BBU']) | (df_sim['Close'] < df_sim['VWAP'])
 
     df_sim['BB_Contraction'] = df_sim['BB_Width'] < df_sim['BB_Width_Avg']
@@ -433,7 +433,7 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
     best_fit = -float('inf')
     bp = None
     tp_min, tp_max = (5.0, 40.0) if target_ado > 2 else (20.0, 100.0) 
-    iters = 1000 if is_meta else 2000 
+    iters = 300 if is_meta else 2000 
     
     loc_buy_rules = ['Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Jugg_Buy', 'Trinity_Buy', 'Commander_Buy', 'Lev_Buy']
     loc_sell_rules = ['Ping_Sell', 'Climax_Sell', 'Thermal_Sell', 'Lock_Sell', 'Squeeze_Sell', 'Defcon_Sell', 'Jugg_Sell', 'Trinity_Sell', 'Commander_Sell', 'Lev_Sell']
@@ -470,13 +470,14 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
         else:
             if s_id == "GENESIS": b_mat_opts, s_mat_opts = loc_buy_rules, loc_sell_rules
             elif s_id == "ROCKET": b_mat_opts, s_mat_opts = rocket_b, rocket_s
-            else: b_mat_opts, s_mat_opts = all_forces_b, all_forces_s # ALL FORCES
+            else: b_mat_opts, s_mat_opts = all_forces_b, all_forces_s
 
             b_mat = {r: df_precalc[r].values for r in b_mat_opts}
             s_mat = {r: df_precalc[r].values for r in s_mat_opts}
             
-            dna_b = [random.sample(b_mat_opts, random.randint(1, 2 if s_id != "ALL_FORCES" else 1)) for _ in range(4)]
-            dna_s = [random.sample(s_mat_opts, random.randint(1, 2 if s_id != "ALL_FORCES" else 1)) for _ in range(4)]
+            # 🔥 FIX: ALL FORCES usa combinaciones profundas para sinergias (Hasta 3 algoritmos cruzados por cuadrante)
+            dna_b = [random.sample(b_mat_opts, random.randint(1, 3 if s_id == "ALL_FORCES" else 2)) for _ in range(4)]
+            dna_s = [random.sample(s_mat_opts, random.randint(1, 3 if s_id == "ALL_FORCES" else 2)) for _ in range(4)]
             dna_tp = [random.uniform(tp_min, tp_max) for _ in range(4)]
             dna_sl = [random.uniform(2.0, 15.0) for _ in range(4)]
             
@@ -523,9 +524,8 @@ def optimizar_ia(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_real
                     bp = {'b1': dna_b[0], 's1': dna_s[0], 'tp1': dna_tp[0], 'sl1': dna_sl[0], 'b2': dna_b[1], 's2': dna_s[1], 'tp2': dna_tp[1], 'sl2': dna_sl[1], 'b3': dna_b[2], 's3': dna_s[2], 'tp3': dna_tp[2], 'sl3': dna_sl[2], 'b4': dna_b[3], 's4': dna_s[3], 'tp4': dna_tp[3], 'sl4': dna_sl[3], 'wh': rwh, 'rd': rrd, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'comms': comms}
     return bp
 
-# 📋 EL OJO QUE TODO LO VE: REPORTE UNIVERSAL 📋
 def generar_reporte_universal(df_base, cap_ini, com_pct):
-    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V82.0)**\n\n"
+    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V83.0)**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_base)}\n\n"
     buy_hold_ret = ((df_base['Close'].iloc[-1] - df_base['Open'].iloc[0]) / df_base['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
@@ -554,7 +554,7 @@ def generar_reporte_universal(df_base, cap_ini, com_pct):
                 for rule in st.session_state.get(f'ui_{prefix}_r{r_idx}_s', []):
                     if rule in df_strat.columns: s_cond |= df_strat[rule].values
                 f_sell[mask] = s_cond[mask]
-                t_arr[mask] = st.session_state.get(f'ui_{prefix}_r{r_idx}_tp', 25.0)
+                t_arr[mask] = st.session_state.get(f'ui_{prefix}_r{r_idx}_tp', 50.0)
                 sl_arr[mask] = st.session_state.get(f'ui_{prefix}_r{r_idx}_sl', 5.0)
                 
             b_c_arr = np.asarray(f_buy, dtype=bool)
@@ -677,7 +677,6 @@ if not df_global.empty:
         
         ret_pct = (net / capital_inicial) * 100
         
-        # Puntuación Matemática (Premia rentabilidad y penaliza si no hay trades)
         if ret_pct > 0 and nt > 0:
             score = ret_pct * (1 + np.log1p(nt))
         else:
@@ -898,7 +897,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             df_strat['Active_SL'] = st.session_state[f'ui_sl_{s_id}']
             eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state[f'ui_reinv_{s_id}'], comision_pct)
 
-        # --- SECCIÓN COMÚN (MÉTRICAS) ---
+        # --- SECCIÓN COMÚN (MÉTRICAS Y BLOCK NOTE) ---
         df_strat['Total_Portfolio'] = eq_curve
         ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
         buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
@@ -927,6 +926,19 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
         c5.metric("Profit Factor", f"{pf_val:.2f}x")
         c6.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
         c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
+
+        # 📝 BLOCK NOTE INDIVIDUAL
+        with st.expander("📝 BLOCK NOTE INDIVIDUAL"):
+            b_note = f"⚔️ **{s_id}** {'[✅ Optimizada]' if is_opt else ''}\n"
+            b_note += f"Net Profit: ${eq_curve[-1]-capital_inicial:,.2f} ({ret_pct:.2f}%)\n"
+            b_note += f"ALPHA vs Hold: {alpha_pct:.2f}%\n"
+            b_note += f"Trades: {tt} | PF: {pf_val:.2f}x | MDD: {mdd:.2f}%\n"
+            if s_id in ["GENESIS", "ROCKET", "ALL_FORCES"]:
+                prefix = "gen" if s_id == "GENESIS" else "roc" if s_id == "ROCKET" else "allf"
+                b_note += f"⚙️ TP: Dyn% | SL: Dyn% | R: {st.session_state[f'ui_{prefix}_rd']} | W: {st.session_state[f'ui_{prefix}_wh']}\n"
+            else:
+                b_note += f"⚙️ TP: {st.session_state[f'ui_tp_{s_id}']}% | SL: {st.session_state[f'ui_sl_{s_id}']}% | R: {st.session_state[f'ui_rd_{s_id}']} | W: {st.session_state[f'ui_wh_{s_id}']}\n"
+            st.code(b_note, language="text")
 
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
         fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
