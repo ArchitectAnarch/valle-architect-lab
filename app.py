@@ -82,7 +82,7 @@ ph_holograma = st.empty()
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V110.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V111.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     for s in estrategias: 
@@ -93,9 +93,9 @@ if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=Tr
     st.rerun()
 
 st.sidebar.markdown("---")
-# 🔥 BINANCE POR DEFECTO PARA ASEGURAR DESCARGA PROFUNDA DE DATOS 🔥
-exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["coinbase", "kucoin", "kraken", "binance"], index=3)
-ticker = st.sidebar.text_input("Símbolo Exacto", value="HNT/USDT")
+# Nota: Si escoge Binance, no use HNT/USDT porque fue deslistado.
+exchange_sel = st.sidebar.selectbox("🏦 Exchange", ["coinbase", "kucoin", "kraken", "binance"], index=0)
+ticker = st.sidebar.text_input("Símbolo Exacto", value="HNT/USD")
 utc_offset = st.sidebar.number_input("🌍 Zona Horaria", value=-5.0, step=0.5)
 
 intervalos = {"1 Minuto": "1m", "5 Minutos": "5m", "7 Minutos": "7m", "13 Minutos": "13m", "15 Minutos": "15m", "23 Minutos": "23m", "30 Minutos": "30m", "45 Minutos": "45m", "1 Hora": "1h", "4 Horas": "4h", "1 Día": "1d"}
@@ -114,7 +114,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 style='text-align: center; color: lime;'>🤖 PILOTO AUTOMÁTICO EXTREMO</h3>", unsafe_allow_html=True)
 global_epochs = st.sidebar.slider("Épocas de Evolución (x3000)", 1, 500, 10, help="500 Épocas = 1,500,000 modelos procesados a hiper-velocidad.")
 
-@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Malla Tensorial (Quantum Pre-calc)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Conectando con Exchange...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -131,9 +131,20 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         all_ohlcv, current_ts = [], start_ts
         fetch_limit = 720 if exchange_id == 'kraken' else 1000
         
+        # 🔥 CORTACIRCUITOS: Evita bucles infinitos si la moneda no existe 🔥
+        error_count = 0 
+        
         while current_ts < end_ts:
-            try: ohlcv = ex_class.fetch_ohlcv(sym, base_tf, since=current_ts, limit=fetch_limit)
-            except Exception: time.sleep(1); continue
+            try: 
+                ohlcv = ex_class.fetch_ohlcv(sym, base_tf, since=current_ts, limit=fetch_limit)
+                error_count = 0 # Resetea el contador si tuvo éxito
+            except Exception as e: 
+                error_count += 1
+                if error_count >= 3:
+                    return pd.DataFrame(), f"❌ ERROR FATAL: El exchange '{exchange_id}' rechazó el símbolo '{sym}'. Verifica si existe o si la API está caída. Detalles: {e}"
+                time.sleep(1)
+                continue
+                
             if not ohlcv or len(ohlcv) == 0: break
             if all_ohlcv and ohlcv[0][0] <= all_ohlcv[-1][0]:
                 ohlcv = [candle for candle in ohlcv if candle[0] > all_ohlcv[-1][0]]
@@ -143,7 +154,9 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
             current_ts = ohlcv[-1][0] + 1
             if len(all_ohlcv) > 100000: break
             
-        if not all_ohlcv: return pd.DataFrame(), f"El Exchange devolvió 0 velas."
+        if not all_ohlcv: return pd.DataFrame(), f"El Exchange devolvió 0 velas para {sym}."
+        
+        # Pre-cálculo Cuántico
         df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
         df.set_index('timestamp', inplace=True)
@@ -204,7 +217,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['dist_sup'] = (c_val - df['Target_Lock_Sup'].values) / c_val * 100
         df['dist_res'] = (df['Target_Lock_Res'].values - c_val) / c_val * 100
         
-        # 🔥 PRE-CÁLCULO DEL MURO TÉRMICO
         sr_val = df['ATR'].values * 2.0
         ceil_w, floor_w = np.zeros(len(df)), np.zeros(len(df))
         for p_col, w in [('PL30', 1), ('PH30', 1), ('PL100', 3), ('PH100', 3), ('PL300', 5), ('PH300', 5)]:
@@ -217,7 +229,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         gc.collect()
         return df, "OK"
     except Exception as e: 
-        return pd.DataFrame(), str(e)
+        return pd.DataFrame(), f"❌ ERROR FATAL GENERAL: {str(e)}"
 
 df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, utc_offset)
 
@@ -230,7 +242,7 @@ else:
     st.stop()
 
 # ==========================================
-# 🔥 PURE NUMPY BACKEND (V110 - High Frequency) 🔥
+# 🔥 PURE NUMPY BACKEND (V111 - High Frequency) 🔥
 # ==========================================
 a_c = df_global['Close'].values
 a_o = df_global['Open'].values
@@ -479,7 +491,7 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
             
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
-# 🧠 DEEP MINE TRACKER (ADO PROTOCOL V110) 🧠
+# 🧠 DEEP MINE TRACKER (ADO PROTOCOL V111.0) 🧠
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, epochs=1, is_meta=False, cur_fit=-float('inf')):
     best_fit = cur_fit 
     best_net_live = 0.0
@@ -569,7 +581,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             net, pf, nt, mdd = simular_crecimiento_exponencial(a_h, a_l, a_c, a_o, b_c_arr, s_c_arr, t_arr, sl_arr, float(cap_ini), float(com_pct), float(reinv_q))
             alpha_money = net - buy_hold_money
             
-            # 🔥 V110.0 ADO FITNESS: Fuerza bruta para conseguir trades constantes 🔥
+            # 🔥 V111.0 ADO FITNESS 🔥
             if nt >= 1: 
                 if net > 0: 
                     ado_ratio = float(nt) / target_nt
@@ -612,7 +624,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             <div class="rocket">🚀</div>
             <div class="prog-text">DEEP MINE: {s_id}</div>
             <div class="hud-text" style="color: white;">Progreso: {pct_done}%</div>
-            <div class="hud-text" style="color: white;">Combos (V110): {combos:,}</div>
+            <div class="hud-text" style="color: white;">Combos (V111.0): {combos:,}</div>
             <div class="hud-text" style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Hallazgo Campeón: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x | Trds: {best_nt_live}</div>
             <div class="hud-text" style="color: yellow; margin-top: 15px;">ETA: {eta:.1f} segs</div>
         </div>
@@ -689,20 +701,14 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
         if s_id == "ALL_FORCES":
             st.markdown(f"### 🌟 ALL FORCES ALGO (Global Matrix) {opt_badge}", unsafe_allow_html=True)
-            st.info("El Director Supremo. Equipado con el **Protocolo ADO V110** que penaliza la escasez de operaciones de forma agresiva.")
+            st.info("El Director Supremo. Equipado con el **Protocolo Anti-Bucle V111**.")
             
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
-            
-            # Controles Virtuales
-            new_ado = c_ia1.slider("🎯 Target ADO (Trades/Día)", 0.5, 20.0, value=float(st.session_state.get(f'ui_{s_id}_ado', vault['ado'])), key=f"w_ado_{s_id}", step=0.5)
-            st.session_state[f'ui_{s_id}_ado'] = new_ado
-            
-            new_reinv = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'ui_{s_id}_reinv', vault['reinv'])), key=f"w_reinv_{s_id}", step=5.0)
-            st.session_state[f'ui_{s_id}_reinv'] = new_reinv
+            st.session_state[f'ui_{s_id}_ado'] = c_ia1.slider("🎯 Target ADO (Trades/Día)", 0.5, 20.0, value=float(st.session_state.get(f'ui_{s_id}_ado', vault['ado'])), key=f"ui_{s_id}_ado_w", step=0.5)
+            st.session_state[f'ui_{s_id}_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'ui_{s_id}_reinv', vault['reinv'])), key=f"ui_{s_id}_reinv_w", step=5.0)
 
             with st.expander("⚙️ Calibración del ADN Base (Lectura Vault)"):
-                c_adv1, c_adv2 = st.columns(2)
-                st.info("Estos parámetros están blindados. Solo la IA o la edición de la Bóveda pueden alterarlos para prevenir reseteos.")
+                st.info("Estos parámetros están blindados. Solo la IA o la edición de la Bóveda pueden alterarlos.")
                 st.write(f"🎯 Target Lock Hitbox: **{vault['hitbox']}%**")
                 st.write(f"🌡️ Thermal Wall Weight: **{vault['therm_w']}**")
                 st.write(f"🚀 Defcon/Ping ADX Threshold: **{vault['adx_th']}**")
@@ -723,7 +729,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
                 
-                bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, new_reinv, new_ado, dias_reales, buy_hold_money, epochs=global_epochs, is_meta=True, cur_fit=vault['fit'])
+                bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, st.session_state[f'ui_{s_id}_reinv'], st.session_state[f'ui_{s_id}_ado'], dias_reales, buy_hold_money, epochs=global_epochs, is_meta=True, cur_fit=vault['fit'])
                 
                 if bp: 
                     save_champion(s_id, bp)
@@ -739,11 +745,8 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             st.markdown(f"### {'🌌 GÉNESIS (The Matrix)' if s_id == 'GENESIS' else '👑 ROCKET PROTOCOL (The Matrix)'} {opt_badge}", unsafe_allow_html=True)
             
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
-            new_ado = c_ia1.slider("🎯 Target ADO (Trades/Día)", 0.5, 20.0, value=float(st.session_state.get(f'ui_{s_id}_ado', vault['ado'])), key=f"w_ado_{s_id}", step=0.5)
-            st.session_state[f'ui_{s_id}_ado'] = new_ado
-            
-            new_reinv = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'ui_{s_id}_reinv', vault['reinv'])), key=f"w_reinv_{s_id}", step=5.0)
-            st.session_state[f'ui_{s_id}_reinv'] = new_reinv
+            st.session_state[f'ui_{s_id}_ado'] = c_ia1.slider("🎯 Target ADO (Trades/Día)", 0.5, 20.0, value=float(st.session_state.get(f'ui_{s_id}_ado', vault['ado'])), key=f"ui_{s_id}_ado_w", step=0.5)
+            st.session_state[f'ui_{s_id}_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'ui_{s_id}_reinv', vault['reinv'])), key=f"ui_{s_id}_reinv_w", step=5.0)
 
             with st.expander("⚙️ Calibración del ADN Base (Lectura Vault)"):
                 st.write(f"🎯 Target Lock Hitbox: **{vault['hitbox']}%**")
@@ -778,7 +781,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
                 
-                bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, new_reinv, new_ado, dias_reales, buy_hold_money, epochs=global_epochs, is_meta=True, cur_fit=vault['fit'])
+                bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, st.session_state[f'ui_{s_id}_reinv'], st.session_state[f'ui_{s_id}_ado'], dias_reales, buy_hold_money, epochs=global_epochs, is_meta=True, cur_fit=vault['fit'])
                 
                 if bp: 
                     save_champion(s_id, bp)
@@ -794,17 +797,14 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             st.markdown(f"### ⚙️ {s_id} (Truth Engine) {opt_badge}", unsafe_allow_html=True)
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             
-            new_ado = c_ia1.slider("🎯 Target ADO (Trades/Día)", 0.5, 20.0, value=float(st.session_state.get(f'ui_{s_id}_ado', vault['ado'])), key=f"w_ado_{s_id}", step=0.5)
-            st.session_state[f'ui_{s_id}_ado'] = new_ado
-            
-            new_reinv = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'ui_{s_id}_reinv', vault['reinv'])), key=f"w_reinv_{s_id}", step=5.0)
-            st.session_state[f'ui_{s_id}_reinv'] = new_reinv
+            st.session_state[f'ui_{s_id}_ado'] = c_ia1.slider("🎯 Target ADO (Trades/Día)", 0.5, 20.0, value=float(st.session_state.get(f'ui_{s_id}_ado', vault['ado'])), key=f"ui_{s_id}_ado_w", step=0.5)
+            st.session_state[f'ui_{s_id}_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'ui_{s_id}_reinv', vault['reinv'])), key=f"ui_{s_id}_reinv_w", step=5.0)
 
             if c_ia3.button(f"🚀 DEEP MINE INDIVIDUAL ({global_epochs*3}k)", type="primary", key=f"btn_opt_{s_id}"):
                 buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
                 
-                bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, new_reinv, new_ado, dias_reales, buy_hold_money, epochs=global_epochs, cur_fit=vault['fit'])
+                bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, st.session_state[f'ui_{s_id}_reinv'], st.session_state[f'ui_{s_id}_ado'], dias_reales, buy_hold_money, epochs=global_epochs, cur_fit=vault['fit'])
                 if bp:
                     save_champion(s_id, bp)
                     st.session_state[f'opt_status_{s_id}'] = True
