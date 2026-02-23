@@ -22,7 +22,7 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Forge", layout="wide", initial_sidebar_state="expanded")
 
 # ==========================================
-# 🧠 UTILIDADES NUMPY Y RÉPLICAS TRADINGVIEW
+# 🧠 UTILIDADES NUMPY Y RÉPLICAS TV
 # ==========================================
 def npshift(arr, num, fill_value=np.nan):
     result = np.empty_like(arr)
@@ -31,8 +31,14 @@ def npshift(arr, num, fill_value=np.nan):
     else: result[:] = arr
     return result
 
+def npshift_bool(arr, num, fill_value=False):
+    result = np.empty_like(arr, dtype=bool)
+    if num > 0: result[:num] = fill_value; result[num:] = arr[:-num]
+    elif num < 0: result[num:] = fill_value; result[:num] = arr[-num:]
+    else: result[:] = arr
+    return result
+
 def get_tv_pivot(series, left, right, is_high=True):
-    # Réplica exacta de ta.pivotlow y ta.pivothigh de TradingView
     window = left + right + 1
     roll = series.rolling(window).max() if is_high else series.rolling(window).min()
     is_pivot = series.shift(right) == roll
@@ -48,7 +54,7 @@ estrategias = [
 ]
 
 tab_id_map = {
-    "👑 ROCKET ULTRA V55": "ROCKET_ULTRA",
+    "👑 ROCKET ULTRA": "ROCKET_ULTRA",
     "🚀 ROCKET COMMANDER": "ROCKET_COMMANDER",
     "⚡ APEX ABSOLUTO": "APEX_HYBRID",
     "🔫 MERCENARY": "MERCENARY",
@@ -59,13 +65,41 @@ tab_id_map = {
     "🌟 ALL FORCES": "ALL_FORCES"
 }
 
+base_b = ['Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Jugg_Buy', 'Trinity_Buy', 'Commander_Buy', 'Lev_Buy']
+base_s = ['Ping_Sell', 'Climax_Sell', 'Thermal_Sell', 'Lock_Sell', 'Squeeze_Sell', 'Defcon_Sell', 'Jugg_Sell', 'Trinity_Sell', 'Commander_Sell', 'Lev_Sell']
+quadrix_b = ['Q_Pink_Whale_Buy', 'Q_Lock_Bounce', 'Q_Lock_Break', 'Q_Neon_Up', 'Q_Defcon_Buy', 'Q_Therm_Bounce', 'Q_Therm_Vacuum', 'Q_Nuclear_Buy', 'Q_Early_Buy', 'Q_Rebound_Buy']
+quadrix_s = ['Q_Lock_Reject', 'Q_Lock_Breakd', 'Q_Neon_Dn', 'Q_Defcon_Sell', 'Q_Therm_Wall_Sell', 'Q_Therm_Panic_Sell', 'Q_Nuclear_Sell', 'Q_Early_Sell']
+
+pine_map = {
+    'Ping_Buy': 'ping_b', 'Ping_Sell': 'ping_s', 'Squeeze_Buy': 'squeeze_b', 'Squeeze_Sell': 'squeeze_s',
+    'Thermal_Buy': 'therm_b', 'Thermal_Sell': 'therm_s', 'Climax_Buy': 'climax_b', 'Climax_Sell': 'climax_s',
+    'Lock_Buy': 'lock_b', 'Lock_Sell': 'lock_s', 'Defcon_Buy': 'defcon_b', 'Defcon_Sell': 'defcon_s',
+    'Jugg_Buy': 'jugg_b', 'Jugg_Sell': 'jugg_s', 'Trinity_Buy': 'trinity_b', 'Trinity_Sell': 'trinity_s',
+    'Lev_Buy': 'lev_b', 'Lev_Sell': 'lev_s', 'Commander_Buy': 'commander_b', 'Commander_Sell': 'commander_s',
+    'Q_Pink_Whale_Buy': 'r_Pink_Whale_Buy', 'Q_Lock_Bounce': 'r_Lock_Bounce', 'Q_Lock_Break': 'r_Lock_Break',
+    'Q_Neon_Up': 'r_Neon_Up', 'Q_Defcon_Buy': 'r_Defcon_Buy', 'Q_Therm_Bounce': 'r_Therm_Bounce',
+    'Q_Therm_Vacuum': 'r_Therm_Vacuum', 'Q_Nuclear_Buy': 'r_Nuclear_Buy', 'Q_Early_Buy': 'r_Early_Buy',
+    'Q_Rebound_Buy': 'r_Rebound_Buy', 'Q_Lock_Reject': 'r_Lock_Reject', 'Q_Lock_Breakd': 'r_Lock_Breakd',
+    'Q_Neon_Dn': 'r_Neon_Dn', 'Q_Defcon_Sell': 'r_Defcon_Sell', 'Q_Therm_Wall_Sell': 'r_Therm_Wall_Sell',
+    'Q_Therm_Panic_Sell': 'r_Therm_Panic_Sell', 'Q_Nuclear_Sell': 'r_Nuclear_Sell', 'Q_Early_Sell': 'r_Early_Sell'
+}
+
 # ==========================================
 # 🧬 THE DNA VAULT
 # ==========================================
 for s_id in estrategias:
     if f'opt_status_{s_id}' not in st.session_state: st.session_state[f'opt_status_{s_id}'] = False
     if f'champion_{s_id}' not in st.session_state:
-        st.session_state[f'champion_{s_id}'] = {'tp': 20.0, 'sl': 5.0, 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0}
+        if s_id == "ALL_FORCES":
+            st.session_state[f'champion_{s_id}'] = {'b_team': ['Commander_Buy', 'Squeeze_Buy'], 's_team': ['Commander_Sell'], 'macro': "All-Weather", 'vol': "All-Weather", 'tp': 20.0, 'sl': 5.0, 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0}
+        elif s_id in ["GENESIS", "ROCKET", "QUADRIX"]:
+            v = {'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0}
+            opts_b = quadrix_b if s_id == "QUADRIX" else base_b
+            opts_s = quadrix_s if s_id == "QUADRIX" else base_s
+            for r_idx in range(1, 5): v.update({f'r{r_idx}_b': [opts_b[0]], f'r{r_idx}_s': [opts_s[0]], f'r{r_idx}_tp': 20.0, f'r{r_idx}_sl': 5.0})
+            st.session_state[f'champion_{s_id}'] = v
+        else:
+            st.session_state[f'champion_{s_id}'] = {'tp': 20.0, 'sl': 5.0, 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0}
 
 def save_champion(s_id, bp):
     if bp is None: return
@@ -83,7 +117,7 @@ def wipe_ui_cache():
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V117.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V118.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear(); wipe_ui_cache(); gc.collect(); st.rerun()
 
@@ -111,11 +145,11 @@ st.sidebar.markdown("<h3 style='text-align: center; color: lime;'>🤖 SUPERCOMP
 global_epochs = st.sidebar.slider("Épocas de Evolución (x3000)", 1, 1000, 50)
 
 # 🌐 BOTÓN DE OPTIMIZACIÓN GLOBAL RESTAURADO
-if st.sidebar.button(f"🧠 DEEP MINE GLOBAL ({global_epochs*3}k Combos)", type="primary", use_container_width=True):
+if st.sidebar.button(f"🧠 DEEP MINE GLOBAL ({global_epochs*3}k)", type="primary", use_container_width=True):
     st.session_state['run_global'] = True
     st.rerun()
 
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V117)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V118)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -205,8 +239,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['RSI_Cross_Dn'] = (df['RSI'] < df['RSI_MA']) & (df['RSI'].shift(1) >= df['RSI_MA'].shift(1))
         df['Macro_Bull'] = df['Close'] >= df['EMA_200']
         
-        # 🚀 CÁLCULO ALGEBRAICO DE PENDIENTE (SOLUCIÓN DEL ERROR DROPNA)
-        # Pendiente de 5 puntos exacta = (2*y4 + y3 - y1 - 2*y0) / 10
+        # 🚀 ÁLGEBRA EXACTA PARA PENDIENTE PING PONG (Zero DropNa Error)
         df['PP_Slope'] = (2*df['Close'] + df['Close'].shift(1) - df['Close'].shift(3) - 2*df['Close'].shift(4)) / 10.0
         
         gc.collect()
@@ -235,7 +268,7 @@ else: st.info("La bóveda está vacía. Inicie una Forja individual o Global par
 st.markdown("---")
 
 # ==========================================
-# 🔥 PURE NUMPY BACKEND (V117.0) 🔥
+# 🔥 PURE NUMPY BACKEND (V118.0) 🔥
 # ==========================================
 a_c = df_global['Close'].values
 a_o = df_global['Open'].values
@@ -299,7 +332,7 @@ def calcular_señales_numpy(s_id, hitbox, therm_w, adx_th, whale_f):
     n_len = len(a_c)
     s_dict = {}
     
-    # Asignación Estructural (Pivot o Lowest dependiendo del Bot)
+    # Asignación Estructural
     if s_id in ["ROCKET_ULTRA", "MERCENARY", "ALL_FORCES", "GENESIS", "ROCKET", "QUADRIX"]:
         a_tsup = np.maximum(a_pl30_l, np.maximum(a_pl100_l, a_pl300_l))
         a_tres = np.minimum(a_ph30_l, np.minimum(a_ph100_l, a_ph300_l))
@@ -444,6 +477,28 @@ def calcular_señales_numpy(s_id, hitbox, therm_w, adx_th, whale_f):
     s_dict['RC_Sell_Q4'] = cond_defcon_sell | cond_therm_sell_panic
 
     regime = np.where(a_mb & (a_adx >= adx_th), 1, np.where(a_mb & (a_adx < adx_th), 2, np.where(~a_mb & (a_adx >= adx_th), 3, 4)))
+    
+    # Quadrix
+    s_dict['Q_Pink_Whale_Buy'] = cond_pink_whale_buy
+    s_dict['Q_Lock_Bounce'] = cond_lock_buy_bounce
+    s_dict['Q_Lock_Break'] = cond_lock_buy_break
+    s_dict['Q_Neon_Up'] = neon_up
+    s_dict['Q_Defcon_Buy'] = cond_defcon_buy
+    s_dict['Q_Therm_Bounce'] = cond_therm_buy_bounce
+    s_dict['Q_Therm_Vacuum'] = cond_therm_buy_vacuum
+    s_dict['Q_Nuclear_Buy'] = is_magenta & ((a_wt1 < -60) | ((a_wt1 > a_wt2) & (a_wt1_s1 <= a_wt2_s1)))
+    s_dict['Q_Early_Buy'] = is_magenta
+    s_dict['Q_Rebound_Buy'] = a_rcu & ~is_magenta
+
+    s_dict['Q_Lock_Reject'] = cond_lock_sell_reject
+    s_dict['Q_Lock_Breakd'] = cond_lock_sell_breakd
+    s_dict['Q_Neon_Dn'] = neon_dn
+    s_dict['Q_Defcon_Sell'] = cond_defcon_sell
+    s_dict['Q_Therm_Wall_Sell'] = cond_therm_sell_wall
+    s_dict['Q_Therm_Panic_Sell'] = cond_therm_sell_panic
+    s_dict['Q_Nuclear_Sell'] = (a_rsi > 70) & ((a_wt1 > 60) | ((a_wt1 < a_wt2) & (a_wt1_s1 >= a_wt2_s1)))
+    s_dict['Q_Early_Sell'] = (a_rsi > 70) & a_vr
+    
     return s_dict, regime
 
 @njit(fastmath=True)
@@ -535,14 +590,12 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
     n_len = len(a_c)
     target_nt = max(1.0, target_ado * dias_reales)
 
-    f_buy = np.empty(n_len, dtype=bool)
-    f_sell = np.empty(n_len, dtype=bool)
-    f_tp = np.empty(n_len, dtype=np.float64)
-    f_sl = np.empty(n_len, dtype=np.float64)
+    f_buy = np.empty(n_len, dtype=bool); f_sell = np.empty(n_len, dtype=bool)
+    f_tp = np.empty(n_len, dtype=np.float64); f_sl = np.empty(n_len, dtype=np.float64)
 
     for c in range(chunks):
         if st.session_state.get('abort_opt', False): 
-            st.warning("🛑 OPTIMIZACIÓN ABORTADA. Guardando progreso...")
+            st.warning("🛑 OPTIMIZACIÓN ABORTADA. Guardando progreso de esta estrategia...")
             break
 
         for _ in range(chunk_size): 
@@ -554,8 +607,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             s_dict, regime_arr = calcular_señales_numpy(s_id, r_hitbox, r_therm, r_adx, r_whale)
             
             if s_id in ["ROCKET_ULTRA", "ROCKET_COMMANDER"]:
-                f_buy[:] = s_dict['RC_Buy_Q1'] & (regime_arr == 1) | s_dict['RC_Buy_Q2'] & (regime_arr == 2) | s_dict['RC_Buy_Q3'] & (regime_arr == 3) | s_dict['RC_Buy_Q4'] & (regime_arr == 4)
-                f_sell[:] = s_dict['RC_Sell_Q1'] & (regime_arr == 1) | s_dict['RC_Sell_Q2'] & (regime_arr == 2) | s_dict['RC_Sell_Q3'] & (regime_arr == 3) | s_dict['RC_Sell_Q4'] & (regime_arr == 4)
+                f_buy[:] = (s_dict['RC_Buy_Q1'] & (regime_arr == 1)) | (s_dict['RC_Buy_Q2'] & (regime_arr == 2)) | (s_dict['RC_Buy_Q3'] & (regime_arr == 3)) | (s_dict['RC_Buy_Q4'] & (regime_arr == 4))
+                f_sell[:] = (s_dict['RC_Sell_Q1'] & (regime_arr == 1)) | (s_dict['RC_Sell_Q2'] & (regime_arr == 2)) | (s_dict['RC_Sell_Q3'] & (regime_arr == 3)) | (s_dict['RC_Sell_Q4'] & (regime_arr == 4))
                 f_tp.fill(rtp); f_sl.fill(rsl)
             elif s_id == "JUGGERNAUT":
                 f_buy[:] = s_dict['JUGGERNAUT_BUY_V356']; f_sell[:] = s_dict['JUGGERNAUT_SELL_V356']
@@ -567,8 +620,26 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 f_buy[:] = (s_dict['MERC_PING'] | s_dict['MERC_JUGG'] | s_dict['MERC_CLIM']) & (a_mb) & (a_adx < r_adx)
                 f_sell[:] = s_dict['MERC_SELL']
                 f_tp.fill(rtp); f_sl.fill(rsl)
+            elif s_id == "ALL_FORCES":
+                # Simplificado en Python para el Demo
+                f_buy[:] = s_dict['Commander_Buy'] & a_mb & (a_adx < r_adx)
+                f_sell[:] = s_dict['Commander_Sell']
+                f_tp.fill(rtp); f_sl.fill(rsl)
+            elif s_id in ["GENESIS", "ROCKET", "QUADRIX"]:
+                opts_b = quadrix_b if s_id == "QUADRIX" else rocket_b if s_id == "ROCKET" else base_b
+                opts_s = quadrix_s if s_id == "QUADRIX" else rocket_s if s_id == "ROCKET" else base_s
+                dna_b = [random.sample(opts_b, 1) for _ in range(4)]
+                dna_s = [random.sample(opts_s, 1) for _ in range(4)]
+                dna_tp = [random.uniform(tp_min, tp_max) for _ in range(4)]
+                dna_sl = [random.uniform(0.5, 20.0) for _ in range(4)]
+                for idx in range(4):
+                    mask = (regime_arr == (idx + 1))
+                    f_buy[mask] = s_dict[dna_b[idx][0]][mask]
+                    f_sell[mask] = s_dict[dna_s[idx][0]][mask]
+                    f_tp[mask] = dna_tp[idx]
+                    f_sl[mask] = dna_sl[idx]
             else:
-                f_buy[:] = s_dict['MERC_PING']; f_sell[:] = s_dict['MERC_SELL'] # Fallback
+                f_buy[:] = s_dict['Ping_Buy']; f_sell[:] = s_dict['Ping_Sell']
                 f_tp.fill(rtp); f_sl.fill(rsl)
 
             net, pf, nt, mdd = simular_crecimiento_exponencial(a_h, a_l, a_c, a_o, f_buy, f_sell, f_tp, f_sl, float(cap_ini), float(com_pct), float(reinv_q))
@@ -583,7 +654,10 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 
             if fit > best_fit:
                 best_fit, best_net_live, best_pf_live, best_nt_live = fit, net, pf, nt
-                bp = {'tp': rtp, 'sl': rsl, 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit, 'net': net, 'winrate': 0.0}
+                if s_id in ["GENESIS", "ROCKET", "QUADRIX"]:
+                    bp = {'r1_b': dna_b[0], 'r1_s': dna_s[0], 'r1_tp': dna_tp[0], 'r1_sl': dna_sl[0], 'r2_b': dna_b[1], 'r2_s': dna_s[1], 'r2_tp': dna_tp[1], 'r2_sl': dna_sl[1], 'r3_b': dna_b[2], 'r3_s': dna_s[2], 'r3_tp': dna_tp[2], 'r3_sl': dna_sl[2], 'r4_b': dna_b[3], 'r4_s': dna_s[3], 'r4_tp': dna_tp[3], 'r4_sl': dna_sl[3], 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit, 'net': net, 'winrate': 0.0}
+                else:
+                    bp = {'tp': rtp, 'sl': rsl, 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit, 'net': net, 'winrate': 0.0}
                 st.session_state[f'temp_bp_{s_id}'] = bp 
         
         elapsed = time.time() - start_time
@@ -599,7 +673,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
         </style>
         <div class="loader-container">
             <div class="rocket">🚀</div>
-            <div class="prog-text">OMNI-FORGE V117: {s_id}</div>
+            <div class="prog-text">OMNI-FORGE V118: {s_id}</div>
             <div class="hud-text" style="color: white;">Progreso: {pct_done}%</div>
             <div class="hud-text" style="color: white;">Combos: {combos:,}</div>
             <div class="hud-text" style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Hallazgo: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x | Trds: {best_nt_live}</div>
@@ -618,8 +692,8 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     f_buy, f_sell = np.zeros(n_len, dtype=bool), np.zeros(n_len, dtype=bool)
 
     if s_id in ["ROCKET_ULTRA", "ROCKET_COMMANDER"]:
-        f_buy[:] = s_dict['RC_Buy_Q1'] & (regime_arr == 1) | s_dict['RC_Buy_Q2'] & (regime_arr == 2) | s_dict['RC_Buy_Q3'] & (regime_arr == 3) | s_dict['RC_Buy_Q4'] & (regime_arr == 4)
-        f_sell[:] = s_dict['RC_Sell_Q1'] & (regime_arr == 1) | s_dict['RC_Sell_Q2'] & (regime_arr == 2) | s_dict['RC_Sell_Q3'] & (regime_arr == 3) | s_dict['RC_Sell_Q4'] & (regime_arr == 4)
+        f_buy[:] = (s_dict['RC_Buy_Q1'] & (regime_arr == 1)) | (s_dict['RC_Buy_Q2'] & (regime_arr == 2)) | (s_dict['RC_Buy_Q3'] & (regime_arr == 3)) | (s_dict['RC_Buy_Q4'] & (regime_arr == 4))
+        f_sell[:] = (s_dict['RC_Sell_Q1'] & (regime_arr == 1)) | (s_dict['RC_Sell_Q2'] & (regime_arr == 2)) | (s_dict['RC_Sell_Q3'] & (regime_arr == 3)) | (s_dict['RC_Sell_Q4'] & (regime_arr == 4))
     elif s_id == "JUGGERNAUT":
         f_buy[:], f_sell[:] = s_dict['JUGGERNAUT_BUY_V356'], s_dict['JUGGERNAUT_SELL_V356']
     elif s_id == "APEX_HYBRID":
@@ -627,6 +701,13 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     elif s_id == "MERCENARY":
         f_buy[:] = (s_dict['MERC_PING'] | s_dict['MERC_JUGG'] | s_dict['MERC_CLIM']) & (a_mb) & (a_adx < vault['adx_th'])
         f_sell[:] = s_dict['MERC_SELL']
+    elif s_id in ["GENESIS", "ROCKET", "QUADRIX"]:
+        for idx_q in range(1, 5):
+            mask = (regime_arr == idx_q)
+            f_buy[mask] = s_dict[vault[f'r{idx_q}_b'][0]][mask]
+            f_sell[mask] = s_dict[vault[f'r{idx_q}_s'][0]][mask]
+            f_tp[mask] = vault[f'r{idx_q}_tp']
+            f_sl[mask] = vault[f'r{idx_q}_sl']
 
     df_strat = df_global.copy()
     df_strat['Signal_Buy'], df_strat['Signal_Sell'] = f_buy, f_sell
@@ -652,7 +733,7 @@ vol_ma100 = ta.sma(volume, 100), rvol = vol_ma100 > 0 ? volume / vol_ma100 : 1
 basis = ta.sma(close, 20), dev   = 2.0 * ta.stdev(close, 20), bbu   = basis + dev, bbl   = basis - dev
 vela_verde = close > open, macro_bull = close >= ema200
 ping_buy = (adx < adx_trend) and (close < bbl) and vela_verde
-jugg_buy = macro_bull and (close > ema50) and (close[1] < nz(ema50[1])) and vela_verde and not is_falling_knife
+jugg_buy = macro_bull and (close > ema50) and nz(close[1] < ema50[1]) and vela_verde and not is_falling_knife
 climax_buy = (rvol > whale_factor) and (lower_wick > (body_size * 2.0)) and (rsi < 35) and vela_verde
 strike_team_buy = ping_buy or jugg_buy or climax_buy
 global_macro = macro_bull, global_vol = adx < adx_trend
@@ -722,6 +803,9 @@ if strategy.position_size > 0
     entry_price = strategy.position_avg_price
     strategy.exit("EXIT_LONG", "APEX_LONG", limit=entry_price * (1 + (tp_pct / 100)), stop=entry_price * (1 - (sl_pct / 100)), alert_message=wt_exit_long)
 """
+    elif s_id == "ROCKET_ULTRA":
+        return """// ROCKET PROTOCOL ULTRA [V55.0] ORIGINAL
+// Copie y pegue su Pine Script original en TradingView. La configuración adaptativa de TF se hace desde el propio TradingView."""
     return "// PINE SCRIPT GENÉRICO - (Seleccione ULTRA, APEX o MERCENARY para un código más específico)"
 
 # ==========================================
@@ -751,9 +835,9 @@ if not df_global.empty:
                 l_cols[c_idx % 5].metric(s, f"Pts: {f:,.0f}", f"Neto: {v.get('net',0):,.2f}")
                 c_idx += 1
 
-tabs = st.tabs(list(tab_id_map.keys())[:4])
+tabs = st.tabs(list(tab_id_map.keys())[:9])
 
-for idx, tab_name in enumerate(list(tab_id_map.keys())[:4]):
+for idx, tab_name in enumerate(list(tab_id_map.keys())[:9]):
     with tabs[idx]:
         if df_global.empty: continue
         s_id = tab_id_map[tab_name]
