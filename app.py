@@ -64,12 +64,14 @@ for s_id in estrategias:
             st.session_state[f'champion_{s_id}'] = {'tp': 50.0, 'sl': 5.0, 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 100.0, 'reinv': 0.0, 'fit': -float('inf')}
 
 def save_champion(s_id, bp):
+    """Guarda el ADN campeón en la Bóveda."""
     vault = st.session_state[f'champion_{s_id}']
     vault['fit'] = bp['fit']
     if s_id in ["ALL_FORCES", "GENESIS", "ROCKET"]:
         for k in ['hitbox', 'therm_w', 'adx_th', 'whale_f']: vault[k] = bp[k]
         for r_idx in range(1, 5):
-            for k in ['b', 's', 'tp', 'sl']: vault[f'r{r_idx}_{k}'] = bp[f'{k}{r_idx}']
+            # 🔥 ERROR CORREGIDO: Se asegura que las variables coincidan exactamente (bp['r1_b'] -> vault['r1_b'])
+            for k in ['b', 's', 'tp', 'sl']: vault[f'r{r_idx}_{k}'] = bp[f'r{r_idx}_{k}']
     else:
         for k in ['tp', 'sl', 'hitbox', 'therm_w', 'adx_th', 'whale_f']: vault[k] = bp[k]
 
@@ -82,7 +84,7 @@ ph_holograma = st.empty()
 # ==========================================
 # 🌍 SIDEBAR: INFRAESTRUCTURA Y PILOTO AUTOMÁTICO
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V101.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V102.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     for s in estrategias: 
@@ -430,7 +432,7 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
             
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
-# 🧠 RUTINA DE DEEP MINE (V101.0 - AUTO PILOT MATRIX) 🧠
+# 🧠 RUTINA DE DEEP MINE (V102.0 - AUTO PILOT MATRIX) 🧠
 def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, epochs=1, is_meta=False):
     best_fit = -float('inf')
     bp = None
@@ -458,7 +460,6 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
             o_a = np.asarray(df_precalc['Open'].values, dtype=np.float64)
             
             if is_meta:
-                # 🔥 THE MATRIX: Todos los metas (incluyendo ALL FORCES) usan cuadrantes ahora
                 b_mat_opts = base_b if s_id != "ROCKET" else rocket_b
                 s_mat_opts = base_s if s_id != "ROCKET" else rocket_s
                 
@@ -507,10 +508,9 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
             net, pf, nt, mdd, comms = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c_arr, s_c_arr, t_arr, sl_arr, float(cap_ini), float(com_pct), float(reinv_q))
             alpha_money = net - buy_hold_money
             
-            # 🔥 V100.0 FITNESS: Respeta Francotiradores y Penaliza Inactividad 🔥
+            # 🔥 V102.0 FITNESS: Respeta Francotiradores y Penaliza Inactividad 🔥
             if nt >= 1: 
                 if net > 0: 
-                    # Relajamos el castigo a solo 5 trades (Respeta a los Francotiradores)
                     trade_penalty = 1.0 if nt >= 5 else (float(nt) / 5.0) 
                     fit = (net ** 1.2) * (pf ** 0.5) * np.log1p(nt) * trade_penalty / ((mdd ** 0.6) + 1.0)
                     if alpha_money > 0: fit *= 1.5 
@@ -553,7 +553,7 @@ def optimizar_ia_tracker(s_id, df_base, cap_ini, com_pct, reinv_q, target_ado, d
 
 # 📋 REPORTE UNIVERSAL DIRECTO DE LA BÓVEDA 📋
 def generar_reporte_universal(df_base, cap_ini, com_pct):
-    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V101.0 - THE MATRIX)**\n\n"
+    res_str = f"📋 **REPORTE UNIVERSAL OMNI-BRAIN (V102.0)**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_base)}\n\n"
     buy_hold_ret = ((df_base['Close'].iloc[-1] - df_base['Open'].iloc[0]) / df_base['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
@@ -731,7 +731,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
         if s_id in ["ALL_FORCES", "GENESIS", "ROCKET"]:
             st.markdown(f"### {'🌟 ALL FORCES ALGO (The Matrix)' if s_id == 'ALL_FORCES' else ('🌌 GÉNESIS' if s_id == 'GENESIS' else '👑 ROCKET PROTOCOL')} {opt_badge}", unsafe_allow_html=True)
-            if s_id == "ALL_FORCES": st.info("La IA Suprema. Ahora funciona con la **Matriz de 4 Cuadrantes** y permite cruzar hasta los 10 algoritmos al mismo tiempo.")
+            if s_id == "ALL_FORCES": st.info("La IA Suprema. Funciona con la Matriz de 4 Cuadrantes y cruza hasta los 10 algoritmos a la vez.")
             
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             
@@ -824,9 +824,9 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                     if bp['fit'] > vault['fit']:
                         save_champion(s_id, bp)
                         st.session_state[f'opt_status_{s_id}'] = True
-                        st.success("👑 ¡Evolución Exitosa! Se encontró un ADN superior.")
+                        st.success("👑 ¡Evolución Exitosa! Se guardó en la Bóveda Cuántica.")
                     else:
-                        st.warning("🛡️ El Piloto Automático no pudo superar la genética actual. Se retuvo el ADN campeón.")
+                        st.warning("🛡️ Ningún escenario superó al campeón actual. Récord intacto.")
                     time.sleep(2)
                 ph_holograma.empty()
                 wipe_ui_cache()
@@ -869,7 +869,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                     if bp['fit'] > vault['fit']:
                         save_champion(s_id, bp)
                         st.session_state[f'opt_status_{s_id}'] = True
-                        st.success("👑 ¡Evolución Exitosa! Nuevo récord encontrado.")
+                        st.success("👑 ¡Evolución Exitosa! Nuevo récord guardado.")
                     else:
                         st.warning("🛡️ Ningún escenario superó la genética actual. Se mantuvo la corona.")
                     time.sleep(2)
