@@ -90,7 +90,7 @@ def wipe_ui_cache():
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V113.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V114.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     for s in estrategias: 
@@ -116,7 +116,7 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 style='text-align: center; color: lime;'>🤖 SUPERCOMPUTADORA</h3>", unsafe_allow_html=True)
 global_epochs = st.sidebar.slider("Épocas de Evolución (x3000)", 1, 1000, 50, help="1000 Épocas = 3 Millones de Modelos.")
 
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal (V113)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal (V114)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -148,7 +148,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df = df[~df.index.duplicated(keep='first')]
         if len(df) < 50: return pd.DataFrame(), f"❌ Solo {len(df)} velas."
             
-        # INDICADORES BASE
         df['EMA_200'] = df['Close'].ewm(span=200, min_periods=1, adjust=False).mean()
         df['EMA_100'] = df['Close'].ewm(span=100, min_periods=1, adjust=False).mean()
         df['EMA_50'] = df['Close'].ewm(span=50, min_periods=1, adjust=False).mean()
@@ -163,12 +162,14 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['RSI_MA'] = df['RSI'].rolling(14, min_periods=1).mean()
         df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
         
-        # BANDAS Y CANALES
         df['Basis'] = df['Close'].rolling(20, min_periods=1).mean()
         dev = df['Close'].rolling(20, min_periods=1).std(ddof=0).replace(0, 1) 
         df['BBU'] = df['Basis'] + (2.0 * dev)
         df['BBL'] = df['Basis'] - (2.0 * dev)
+        
+        # 🔥 VARIABLES RESTAURADAS PARA PREVENIR EL NAMERROR 🔥
         df['BB_Width'] = (df['BBU'] - df['BBL']) / df['Basis'].replace(0, 1)
+        df['BB_Width_Avg'] = df['BB_Width'].rolling(20, min_periods=1).mean()
         df['BB_Delta'] = df['BB_Width'] - df['BB_Width'].shift(1).fillna(0)
         df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10, min_periods=1).mean()
         
@@ -177,18 +178,16 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['KC_Lower'] = kc_basis - (df['ATR'] * 1.5)
         df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
         
-        df['Z_Score'] = (df['Close'] - df['Basis']) / dev
+        df['Z_Score'] = (df['Close'] - df['Basis']) / dev.replace(0, 1)
         df['RSI_BB_Basis'] = df['RSI'].rolling(14, min_periods=1).mean()
         df['RSI_BB_Dev'] = df['RSI'].rolling(14, min_periods=1).std(ddof=0).replace(0,1) * 2.0
         
-        # PRICE ACTION
         df['Vela_Verde'] = df['Close'] > df['Open']
         df['Vela_Roja'] = df['Close'] < df['Open']
         df['body_size'] = abs(df['Close'] - df['Open']).replace(0, 0.0001)
         df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
         df['is_falling_knife'] = (df['Open'].shift(1) - df['Close'].shift(1)) > (df['ATR'].shift(1) * 1.5)
         
-        # PIVOTS Y GRAVEDAD
         df['PL30'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
         df['PH30'] = df['High'].shift(1).rolling(30, min_periods=1).max()
         df['PL100'] = df['Low'].shift(1).rolling(100, min_periods=1).min()
@@ -229,7 +228,7 @@ else:
     st.stop()
 
 # ==========================================
-# 🔥 CEREBRO NUMPY (V113 - RESTAURACIÓN JUGGERNAUT V356) 🔥
+# 🔥 CEREBRO NUMPY (V114 - RESTAURACIÓN TOTAL) 🔥
 # ==========================================
 a_c = df_global['Close'].values
 a_o = df_global['Open'].values
@@ -240,6 +239,11 @@ a_rsi_ma = df_global['RSI_MA'].values
 a_adx = df_global['ADX'].values
 a_bbl = df_global['BBL'].values
 a_bbu = df_global['BBU'].values
+
+# 🔥 EXTRACCIÓN CORRECTA DE VARIABLES PARA SQUEEZE BUY 🔥
+a_bw = df_global['BB_Width'].values
+a_bwa_s1 = npshift(df_global['BB_Width_Avg'].values, 1, -1.0)
+
 a_ema50 = df_global['EMA_50'].values
 a_ema200 = df_global['EMA_200'].values
 a_atr = df_global['ATR'].values
@@ -277,10 +281,8 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     n_len = len(a_c)
     s_dict = {}
     
-    # 🛡️ 1. ESCUDO AEGIS (Para JUGGERNAUT V356)
     trinity_safe = a_mb & ~a_fk
 
-    # 🚀 2. NÚCLEO DEFCON V329
     neon_break_up = a_sqz_on & (a_c >= a_bbu * 0.999) & a_vv
     neon_break_dn = a_sqz_on & (a_c <= a_bbl * 1.001) & a_vr
     
@@ -297,7 +299,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     cond_defcon_buy = (defcon_level <= 2) & neon_break_up
     cond_defcon_sell = (defcon_level <= 2) & neon_break_dn
 
-    # 🌡️ 3. NÚCLEO TERMÓMETRO V331
     is_abyss = a_fw == 0
     is_hard_wall = a_cw >= therm_w
     cond_therm_buy_bounce = (a_fw >= therm_w) & a_rcu & ~is_hard_wall
@@ -305,7 +306,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     cond_therm_sell_wall = (a_cw >= therm_w) & a_rcd
     cond_therm_sell_panic = is_abyss & a_vr
 
-    # 🎯 4. NÚCLEO TARGET LOCK V332
     tol = a_atr * 0.5
     is_grav_sup = a_dsup < hitbox
     is_grav_res = a_dres < hitbox
@@ -318,7 +318,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     cond_lock_sell_reject = is_grav_res & (a_h >= a_tres - tol) & (a_c < a_tres) & a_vr
     cond_lock_sell_breakd = is_grav_sup & cross_dn_sup & a_vr
 
-    # 🐋 5. PINK WHALE DEEPS
     flash_vol = (a_rvol > whale_f * 0.8) & (np.abs(a_c - a_o) > a_atr * 0.3)
     whale_buy = flash_vol & a_vv
     whale_sell = flash_vol & a_vr
@@ -343,17 +342,16 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     buy_score += np.where(div_bull, 15.0, 0.0)
     buy_score += np.where(k_break_up & ~retro_peak, 15.0, 0.0)
     buy_score += np.where(a_zscore < -2.0, 15.0, 0.0)
-    buy_score += 15.0 # Bias simulado BTC alcista para backtest individual
+    buy_score += 15.0 
     buy_score = np.where(buy_score > 99, 99.0, buy_score)
 
     is_magenta = (buy_score >= 70) | retro_peak
     cond_pink_whale_buy = is_magenta & is_whale_icon
 
-    # ⚔️ ASIGNACIÓN JUGGERNAUT V356 EXACTA
+    # Asignaciones Finales
     s_dict['JUGGERNAUT_BUY_V356'] = (trinity_safe & (cond_defcon_buy | cond_therm_buy_bounce | cond_therm_buy_vacuum | cond_lock_buy_bounce | cond_lock_buy_break)) | cond_pink_whale_buy
     s_dict['JUGGERNAUT_SELL_V356'] = cond_defcon_sell | cond_therm_sell_wall | cond_therm_sell_panic | cond_lock_sell_reject | cond_lock_sell_breakd
 
-    # Componentes Simples (Para el resto de las estrategias)
     s_dict['Ping_Buy'] = (a_adx < adx_th) & (a_c < a_bbl) & a_vv
     s_dict['Ping_Sell'] = (a_c > a_bbu) | (a_rsi > 70)
     s_dict['Squeeze_Buy'] = (a_bw < a_bwa_s1) & (a_c > a_bbu) & a_vv & (a_rsi < 60)
@@ -489,9 +487,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
 
     for c in range(chunks):
         for _ in range(chunk_size): 
-            f_buy.fill(False)
-            f_sell.fill(False)
-            
+            f_buy.fill(False); f_sell.fill(False)
             rtp = round(random.uniform(tp_min, tp_max), 1)
             rsl = round(random.uniform(0.5, 20.0), 1)
             r_hitbox = round(random.uniform(0.5, 3.0), 1)   
@@ -504,8 +500,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             if s_id == "JUGGERNAUT":
                 f_buy[:] = s_dict['JUGGERNAUT_BUY_V356']
                 f_sell[:] = s_dict['JUGGERNAUT_SELL_V356']
-                f_tp.fill(rtp)
-                f_sl.fill(rsl)
+                f_tp.fill(rtp); f_sl.fill(rsl)
             elif s_id == "ALL_FORCES":
                 dna_b_team = random.sample(base_b, random.randint(1, len(base_b)))
                 dna_s_team = random.sample(base_s, random.randint(1, len(base_s)))
@@ -521,11 +516,9 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 else: vol_mask.fill(True)
                 
                 for r in dna_b_team: f_buy |= s_dict[r]
-                f_buy &= macro_mask
-                f_buy &= vol_mask
+                f_buy &= macro_mask; f_buy &= vol_mask
                 for r in dna_s_team: f_sell |= s_dict[r]
-                f_tp.fill(rtp)
-                f_sl.fill(rsl)
+                f_tp.fill(rtp); f_sl.fill(rsl)
                 
             elif s_id in ["GENESIS", "ROCKET"]:
                 dna_b = [random.sample(rocket_b if s_id == "ROCKET" else base_b, random.randint(1, 2)) for _ in range(4)]
@@ -545,14 +538,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                     f_tp[mask] = dna_tp[idx]
                     f_sl[mask] = dna_sl[idx]
             else:
-                try:
-                    f_buy[:], f_sell[:] = s_dict[f"{s_id.split('_')[0].capitalize()}_Buy"], s_dict[f"{s_id.split('_')[0].capitalize()}_Sell"]
-                except:
-                    if s_id == "TARGET_LOCK": f_buy[:], f_sell[:] = s_dict["Lock_Buy"], s_dict["Lock_Sell"]
-                    elif s_id == "NEON_SQUEEZE": f_buy[:], f_sell[:] = s_dict["Squeeze_Buy"], s_dict["Squeeze_Sell"]
-                    elif s_id == "PINK_CLIMAX": f_buy[:], f_sell[:] = s_dict["Climax_Buy"], s_dict["Climax_Sell"]
-                f_tp.fill(rtp)
-                f_sl.fill(rsl)
+                f_buy[:], f_sell[:] = s_dict[f"{s_id.split('_')[0].capitalize()}_Buy"], s_dict[f"{s_id.split('_')[0].capitalize()}_Sell"]
+                f_tp.fill(rtp); f_sl.fill(rsl)
 
             net, pf, nt, mdd = simular_crecimiento_exponencial(a_h, a_l, a_c, a_o, f_buy, f_sell, f_tp, f_sl, float(cap_ini), float(com_pct), float(reinv_q))
             alpha_money = net - buy_hold_money
@@ -593,7 +580,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
         </style>
         <div class="loader-container">
             <div class="rocket">🚀</div>
-            <div class="prog-text">OMNI-FORGE V113: {s_id}</div>
+            <div class="prog-text">OMNI-FORGE V114: {s_id}</div>
             <div class="hud-text" style="color: white;">Progreso: {pct_done}%</div>
             <div class="hud-text" style="color: white;">Combos: {combos:,}</div>
             <div class="hud-text" style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Hallazgo: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x | Trds: {best_nt_live}</div>
@@ -637,11 +624,7 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
             f_tp[mask] = vault[f'r{idx_q}_tp']
             f_sl[mask] = vault[f'r{idx_q}_sl']
     else:
-        try: f_buy, f_sell = s_dict[f"{s_id.split('_')[0].capitalize()}_Buy"], s_dict[f"{s_id.split('_')[0].capitalize()}_Sell"]
-        except:
-            if s_id == "TARGET_LOCK": f_buy, f_sell = s_dict["Lock_Buy"], s_dict["Lock_Sell"]
-            elif s_id == "NEON_SQUEEZE": f_buy, f_sell = s_dict["Squeeze_Buy"], s_dict["Squeeze_Sell"]
-            elif s_id == "PINK_CLIMAX": f_buy, f_sell = s_dict["Climax_Buy"], s_dict["Climax_Sell"]
+        f_buy, f_sell = s_dict[f"{s_id.split('_')[0].capitalize()}_Buy"], s_dict[f"{s_id.split('_')[0].capitalize()}_Sell"]
 
     df_strat = df_global.copy()
     df_strat['Signal_Buy'], df_strat['Signal_Sell'] = f_buy, f_sell
@@ -649,13 +632,10 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault['reinv']), com_pct)
     return df_strat, eq_curve, t_log, total_comms
 
-# ==========================================
-# 🛠️ PINE SCRIPT GENERATOR (BOT FORGE)
-# ==========================================
 def generar_pine_script(s_id, vault, sym, tf):
     if s_id == "JUGGERNAUT":
         return f"""// This source code is subject to the terms of the Mozilla Public License 2.0
-// © Valle_Architect_Lab | AUTO-GENERATED BY OMNI-FORGE V113
+// © Valle_Architect_Lab | AUTO-GENERATED BY OMNI-FORGE V114
 
 //@version=5
 strategy("VALLE ARCHITECT [JUGGERNAUT V356] - {sym}", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_type=strategy.commission.percent, commission_value=0.25)
@@ -709,11 +689,10 @@ ceil_w += (pl_3 > close and pl_3 <= close + scan_range) ? 5 : 0
 ceil_w += (ph_3 > close and ph_3 <= close + scan_range) ? 5 : 0
 
 is_gravity_zone = false, target_lock_price = na, max_grav_weight = 0
-// Simplificación de Radar para Pine Script (Mismas lógicas)
 if floor_w >= 3
-    is_gravity_zone := true, target_lock_price := close - (atr_val)
+    is_gravity_zone := true, target_lock_price := close - atr_val
 if ceil_w >= 3
-    is_gravity_zone := true, target_lock_price := close + (atr_val)
+    is_gravity_zone := true, target_lock_price := close + atr_val
 
 macro_ema = ta.ema(close, 200), is_macro_safe = close > macro_ema
 is_falling_knife = (open[1] - close[1]) > (atr_val[1] * 1.5)
@@ -785,7 +764,7 @@ plotchar(do_buy, title="COMPRA", char="🚀", location=location.belowbar, color=
 """
 
     ps = f"""// This source code is subject to the terms of the Mozilla Public License 2.0
-// © Valle_Architect_Lab | AUTO-GENERATED BY OMNI-FORGE V113
+// © Valle_Architect_Lab | AUTO-GENERATED BY OMNI-FORGE V114
 
 //@version=5
 strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_value=0.25)
@@ -914,26 +893,10 @@ float active_sl = 0.0
         v_cond = "(adx >= adx_trend)" if vault['vol'] == "Trend (ADX Alto)" else "(adx < adx_trend)" if vault['vol'] == "Range (ADX Bajo)" else "true"
         b_cond = " or ".join([pine_map[x] for x in vault['b_team']]) if vault['b_team'] else "false"
         s_cond = " or ".join([pine_map[x] for x in vault['s_team']]) if vault['s_team'] else "false"
-        
-        ps += f"""
-bool signal_buy = ({b_cond}) and {m_cond} and {v_cond}
-bool signal_sell = {s_cond}
-float active_tp = {vault['tp']} / 100.0
-float active_sl = {vault['sl']} / 100.0
-"""
+        ps += f"\nbool signal_buy = ({b_cond}) and {m_cond} and {v_cond}\nbool signal_sell = {s_cond}\nfloat active_tp = {vault['tp']} / 100.0\nfloat active_sl = {vault['sl']} / 100.0\n"
     else:
-        try: b_cond, s_cond = pine_map[f"{s_id.split('_')[0].capitalize()}_Buy"], pine_map[f"{s_id.split('_')[0].capitalize()}_Sell"]
-        except:
-            if s_id == "TARGET_LOCK": b_cond, s_cond = pine_map["Lock_Buy"], pine_map["Lock_Sell"]
-            elif s_id == "NEON_SQUEEZE": b_cond, s_cond = pine_map["Squeeze_Buy"], pine_map["Squeeze_Sell"]
-            elif s_id == "PING_PONG": b_cond, s_cond = pine_map["Ping_Buy"], pine_map["Ping_Sell"]
-            elif s_id == "PINK_CLIMAX": b_cond, s_cond = pine_map["Climax_Buy"], pine_map["Climax_Sell"]
-            else: b_cond, s_cond = "false", "false"
-        
-        ps += f"""
-bool signal_buy = {b_cond}
-bool signal_sell = {s_cond}
-"""
+        b_cond, s_cond = pine_map[f"{s_id.split('_')[0].capitalize()}_Buy"], pine_map[f"{s_id.split('_')[0].capitalize()}_Sell"]
+        ps += f"\nbool signal_buy = {b_cond}\nbool signal_sell = {s_cond}\n"
 
     ps += """
 // ==========================================
@@ -1020,7 +983,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 else: st.warning("🛡️ Ningún escenario superó al actual.")
                 time.sleep(2); ph_holograma.empty(); wipe_ui_cache(); st.rerun()
 
-        # --- DIBUJADO DE GRÁFICO (Lectura desde el Vault) ---
+        # --- DIBUJADO DE GRÁFICO ---
         df_strat, eq_curve, t_log, total_comms = run_backtest_eval(s_id, capital_inicial, comision_pct)
         df_strat['Total_Portfolio'] = eq_curve
         ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
