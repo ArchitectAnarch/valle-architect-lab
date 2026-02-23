@@ -21,6 +21,9 @@ except ImportError:
 
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Forge", layout="wide", initial_sidebar_state="expanded")
 
+# 🔥 EL HOLOGRAMA RESTAURADO (El causante del error solucionado) 🔥
+ph_holograma = st.empty()
+
 # ==========================================
 # 🧠 UTILIDADES NUMPY Y RÉPLICAS TV
 # ==========================================
@@ -73,7 +76,6 @@ tab_id_map = {
     "👑 COMMANDER": "COMMANDER"
 }
 
-# DOCTRINAS (Descripciones Tácticas)
 doctrinas = {
     "ROCKET_ULTRA": "Cazador Adaptativo (V55). Interpola temporalidades (desde 1m hasta 1D) para mutar sus parámetros. Usa Trailing Stop dinámico rastreando el precio máximo histórico (Highest Price) de la operación.",
     "ROCKET_COMMANDER": "El Almirante (V60.2). Cruza el Radar de Gravedad con Osciladores WaveTrend. Detecta anomalías 'Magenta' filtrando el ruido con exigencias estrictas de volumen y mechas (Wick Rejection).",
@@ -146,7 +148,7 @@ def wipe_ui_cache():
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V120.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V121.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); wipe_ui_cache(); gc.collect(); st.rerun()
 
@@ -177,7 +179,7 @@ if st.sidebar.button(f"🧠 DEEP MINE GLOBAL ({global_epochs*3}k)", type="primar
     st.session_state['run_global'] = True
     st.rerun()
 
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V120)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V121)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -247,6 +249,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
         df['is_falling_knife'] = (df['Open'].shift(1) - df['Close'].shift(1)) > (df['ATR'].shift(1) * 1.5)
         
+        # 🟢 TV PIVOTS (Para APEX, Juggernaut, Commander)
         df['PL30_P'] = get_tv_pivot(df['Low'], 30, 3, False)
         df['PH30_P'] = get_tv_pivot(df['High'], 30, 3, True)
         df['PL100_P'] = get_tv_pivot(df['Low'], 100, 5, False)
@@ -254,6 +257,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['PL300_P'] = get_tv_pivot(df['Low'], 300, 5, False)
         df['PH300_P'] = get_tv_pivot(df['High'], 300, 5, True)
         
+        # 🟡 ROLLING LOWEST (Para ULTRA y Mercenary)
         df['PL30_L'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
         df['PH30_L'] = df['High'].shift(1).rolling(30, min_periods=1).max()
         df['PL100_L'] = df['Low'].shift(1).rolling(100, min_periods=1).min()
@@ -265,6 +269,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['RSI_Cross_Dn'] = (df['RSI'] < df['RSI_MA']) & (df['RSI'].shift(1) >= df['RSI_MA'].shift(1))
         df['Macro_Bull'] = df['Close'] >= df['EMA_200']
         
+        # 🚀 ÁLGEBRA EXACTA PARA PENDIENTE PING PONG (Zero DropNa Error)
         df['PP_Slope'] = (2*df['Close'] + df['Close'].shift(1) - df['Close'].shift(3) - 2*df['Close'].shift(4)) / 10.0
         
         gc.collect()
@@ -282,7 +287,7 @@ else:
 # 📊 REPORTE UNIVERSAL DIRECTO
 # ==========================================
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V120**\n\n"
+    res_str = f"📋 **REPORTE OMNI-FORGE V121.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_global)}\n\n"
     buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
@@ -293,7 +298,6 @@ def generar_reporte_universal(cap_ini, com_pct):
         res_str += f"⚔️ **{s_id}** [{opt_icon}]\nNet Profit: ${v.get('net',0):,.2f} \nWin Rate: {v.get('winrate',0):.1f}%\n---\n"
     return res_str
 
-# 🛑 BOTÓN DE REPORTE (CON KEY ÚNICA PARA EVITAR ERROR) 🛑
 if st.sidebar.button("📊 GENERAR REPORTE UNIVERSAL", use_container_width=True, key="btn_univ_report"):
     st.sidebar.text_area("Copia tu Reporte:", value=generar_reporte_universal(capital_inicial, comision_pct), height=400)
 
@@ -312,7 +316,7 @@ else: st.info("La bóveda está vacía. Inicie una Forja individual o Global par
 st.markdown("---")
 
 # ==========================================
-# 🔥 PURE NUMPY BACKEND (V120.0) 🔥
+# 🔥 PURE NUMPY BACKEND (V121.0) 🔥
 # ==========================================
 a_c = df_global['Close'].values
 a_o = df_global['Open'].values
@@ -714,14 +718,13 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                     f_sell[mask] = s_dict[dna_s[idx][0]][mask]
                     f_tp[mask] = dna_tp[idx]
                     f_sl[mask] = dna_sl[idx]
-            else: # ESTRATEGIAS BASE
+            else:
                 b_key, s_key = "", ""
                 if s_id == "TARGET_LOCK": b_key, s_key = "Lock_Buy", "Lock_Sell"
                 elif s_id == "NEON_SQUEEZE": b_key, s_key = "Squeeze_Buy", "Squeeze_Sell"
                 elif s_id == "PINK_CLIMAX": b_key, s_key = "Climax_Buy", "Climax_Sell"
                 elif s_id == "PING_PONG": b_key, s_key = "Ping_Buy", "Ping_Sell"
                 else: b_key, s_key = f"{s_id.split('_')[0].capitalize()}_Buy", f"{s_id.split('_')[0].capitalize()}_Sell"
-                
                 f_buy[:] = s_dict[b_key]; f_sell[:] = s_dict[s_key]
                 f_tp.fill(rtp); f_sl.fill(rsl)
 
@@ -758,7 +761,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
         </style>
         <div class="loader-container">
             <div class="rocket">🚀</div>
-            <div class="prog-text">OMNI-FORGE V120: {s_id}</div>
+            <div class="prog-text">OMNI-FORGE V121: {s_id}</div>
             <div class="hud-text" style="color: white;">Progreso: {pct_done}%</div>
             <div class="hud-text" style="color: white;">Combos: {combos:,}</div>
             <div class="hud-text" style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Hallazgo: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x | Trds: {best_nt_live}</div>
@@ -803,7 +806,7 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
             f_sell[mask] = s_dict[vault[f'r{idx_q}_s'][0]][mask]
             f_tp[mask] = vault[f'r{idx_q}_tp']
             f_sl[mask] = vault[f'r{idx_q}_sl']
-    else: # ESTRATEGIAS BASE
+    else: 
         b_key, s_key = "", ""
         if s_id == "TARGET_LOCK": b_key, s_key = "Lock_Buy", "Lock_Sell"
         elif s_id == "NEON_SQUEEZE": b_key, s_key = "Squeeze_Buy", "Squeeze_Sell"
@@ -885,7 +888,7 @@ pl_2 = ta.pivotlow(low, 100, 5), ph_2 = ta.pivothigh(high, 100, 5)
 pl_3 = ta.pivotlow(low, 300, 5), ph_3 = ta.pivothigh(high, 300, 5)
 is_gravity_zone = false, target_lock_price = na, max_grav_weight = 0
 if not na(pl_3) or not na(pl_2) or not na(pl_1) or not na(ph_1) or not na(ph_2) or not na(ph_3)
-    target_lock_price := close - atr_val // Simplificado
+    target_lock_price := close - atr_val 
     is_gravity_zone := true
 tolerance = atr_val * 0.5
 raw_bounce_up = is_gravity_zone and (low <= target_lock_price + tolerance) and (close > target_lock_price) and (close > open)
@@ -917,7 +920,7 @@ if strategy.position_size > 0
 // Copie y pegue su Pine Script original en TradingView."""
     else:
         ps = f"""// This source code is subject to the terms of the Mozilla Public License 2.0
-// © Valle_Architect_Lab | AUTO-GENERATED BY OMNI-FORGE V120
+// © Valle_Architect_Lab | AUTO-GENERATED BY OMNI-FORGE V121
 
 //@version=5
 strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_value=0.25)
@@ -936,7 +939,7 @@ therm_wall   = {vault['therm_w']}
 adx_trend    = {vault['adx_th']}
 whale_factor = {vault['whale_f']}
 """
-        if s_id not in ["GENESIS", "ROCKET", "QUADRIX", "ALL_FORCES", "JUGGERNAUT", "ROCKET_COMMANDER"]:
+        if s_id not in ["GENESIS", "ROCKET", "QUADRIX", "ALL_FORCES"]:
             ps += f"\nactive_tp = {vault['tp']} / 100.0\nactive_sl = {vault['sl']} / 100.0\n"
 
         ps += """
