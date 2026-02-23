@@ -45,7 +45,7 @@ def get_tv_pivot(series, left, right, is_high=True):
     return series.shift(right).where(is_pivot, np.nan).ffill()
 
 # ==========================================
-# 🧠 CATÁLOGOS Y ARQUITECTURA DE ESTADO
+# 🧠 CATÁLOGOS Y DOCTRINAS TÁCTICAS
 # ==========================================
 estrategias = [
     "ROCKET_ULTRA", "ROCKET_COMMANDER", "APEX_HYBRID", "MERCENARY",
@@ -71,6 +71,27 @@ tab_id_map = {
     "🏓 PING_PONG": "PING_PONG", 
     "🐛 NEON_SQUEEZE": "NEON_SQUEEZE", 
     "👑 COMMANDER": "COMMANDER"
+}
+
+# DOCTRINAS (Descripciones Tácticas)
+doctrinas = {
+    "ROCKET_ULTRA": "Cazador Adaptativo (V55). Interpola temporalidades (desde 1m hasta 1D) para mutar sus parámetros. Usa Trailing Stop dinámico rastreando el precio máximo histórico (Highest Price) de la operación.",
+    "ROCKET_COMMANDER": "El Almirante (V60.2). Cruza el Radar de Gravedad con Osciladores WaveTrend. Detecta anomalías 'Magenta' filtrando el ruido con exigencias estrictas de volumen y mechas (Wick Rejection).",
+    "APEX_HYBRID": "El Depredador Absoluto (V337). Combina la precisión del Escudo Aegis y Target Lock con el poder explosivo del motor Defcon. Ignora caídas a menos que detecte una Vela Rosa (Whale Anomaly).",
+    "MERCENARY": "Francotirador de Alta Frecuencia (1.1). Entra y sale rápido del mercado basándose en micro-tendencias (ADX), compresión de Bandas de Bollinger y cierres implacables bajo la EMA 50.",
+    "QUADRIX": "Matriz Cuádruple. Combina el oscilador WaveTrend (WT1/WT2) con Z-Score y regresiones lineales para detectar reversiones exactas en el precio. Especialista en cazar rebotes profundos.",
+    "JUGGERNAUT": "El Tanque Blindado (V356). Su Escudo Aegis bloquea compras en caídas libres (>1.5 ATR). Suma puntajes (hasta 99%) considerando Muros Térmicos y divergencias para disparar con seguridad masiva.",
+    "GENESIS": "La Matriz Original. Analiza 4 Cuadrantes (Alcista/Bajista cruzado con Rango/Tendencia) y asigna un equipo de algoritmos, Take Profit y Stop Loss diferente para cada clima del mercado.",
+    "ROCKET": "Variante Agresiva de la Matriz. Similar a Genesis, pero sus Cuadrantes priorizan armas de ruptura de volatilidad (Squeeze, Defcon, Climax) buscando explosiones direccionales.",
+    "ALL_FORCES": "El Enjambre. Pone a todos los algoritmos base a operar al mismo tiempo bajo un filtro macro global. Busca maximizar el ADO (Trades por día) saturando el mercado de órdenes lógicas.",
+    "TRINITY": "Gatillo de Reversión. Compra cuando el precio cae fuerte pero el RSI marca sobreventa profunda (< 35) y rechaza la caída (sin patrón de cuchillo cayendo).",
+    "DEFCON": "Buscador de Squeeze (V329). Opera exclusivamente cuando las Bandas de Bollinger se comprimen dentro del Canal de Keltner y el precio rompe con furia alcista acompañada de ADX.",
+    "TARGET_LOCK": "Radar Gravitacional (V332). Detecta niveles históricos de soporte/resistencia (Pivotes de 30, 100 y 300) y opera rebotes precisos usando una tolerancia matemática calculada por el ATR.",
+    "THERMAL": "Termómetro de Muros (V331). Asigna un peso (1 a 5) a los soportes cercanos. Si el 'Suelo' pesa más de 4, asume que es irrompible y entra en la operación al primer cruce de RSI.",
+    "PINK_CLIMAX": "Cazador de Ballenas. Dispara solo cuando detecta un volumen relativo masivo (RVol extremo) acompañado de una mecha inferior gigante y RSI estrangulado.",
+    "PING_PONG": "Física de Regresión Lineal. Usa el álgebra pura para calcular la pendiente de los últimos 5 cierres. Entra y sale del mercado rebotando dentro del canal de desviación estándar.",
+    "NEON_SQUEEZE": "Expansión Ligera. Caza rupturas de volatilidad comparando el ancho de las Bandas de Bollinger actuales contra su promedio histórico.",
+    "COMMANDER": "Infantería Pesada. Agrupa Climax, Thermal y Target Lock en un solo escuadrón. Una señal de cualquiera de los tres ejecuta la operación."
 }
 
 base_b = ['Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Jugg_Buy', 'Trinity_Buy', 'Commander_Buy', 'Lev_Buy']
@@ -125,12 +146,13 @@ def wipe_ui_cache():
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V119.0</h2>", unsafe_allow_html=True)
-if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V120.0</h2>", unsafe_allow_html=True)
+if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); wipe_ui_cache(); gc.collect(); st.rerun()
 
 st.sidebar.markdown("---")
-if st.sidebar.button("🛑 ABORTAR OPTIMIZACIÓN", use_container_width=True):
+# 🛑 BOTÓN DE PÁNICO 🛑
+if st.sidebar.button("🛑 ABORTAR OPTIMIZACIÓN", use_container_width=True, key="btn_abort"):
     st.session_state['abort_opt'] = True
     st.rerun()
 
@@ -151,11 +173,11 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 style='text-align: center; color: lime;'>🤖 SUPERCOMPUTADORA</h3>", unsafe_allow_html=True)
 global_epochs = st.sidebar.slider("Épocas de Evolución (x3000)", 1, 1000, 50)
 
-if st.sidebar.button(f"🧠 DEEP MINE GLOBAL ({global_epochs*3}k)", type="primary", use_container_width=True):
+if st.sidebar.button(f"🧠 DEEP MINE GLOBAL ({global_epochs*3}k)", type="primary", use_container_width=True, key="btn_global"):
     st.session_state['run_global'] = True
     st.rerun()
 
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V119)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V120)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -225,7 +247,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
         df['is_falling_knife'] = (df['Open'].shift(1) - df['Close'].shift(1)) > (df['ATR'].shift(1) * 1.5)
         
-        # 🟢 TV PIVOTS (Para APEX, Juggernaut, Commander)
         df['PL30_P'] = get_tv_pivot(df['Low'], 30, 3, False)
         df['PH30_P'] = get_tv_pivot(df['High'], 30, 3, True)
         df['PL100_P'] = get_tv_pivot(df['Low'], 100, 5, False)
@@ -233,7 +254,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['PL300_P'] = get_tv_pivot(df['Low'], 300, 5, False)
         df['PH300_P'] = get_tv_pivot(df['High'], 300, 5, True)
         
-        # 🟡 ROLLING LOWEST (Para ULTRA y Mercenary)
         df['PL30_L'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
         df['PH30_L'] = df['High'].shift(1).rolling(30, min_periods=1).max()
         df['PL100_L'] = df['Low'].shift(1).rolling(100, min_periods=1).min()
@@ -245,7 +265,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['RSI_Cross_Dn'] = (df['RSI'] < df['RSI_MA']) & (df['RSI'].shift(1) >= df['RSI_MA'].shift(1))
         df['Macro_Bull'] = df['Close'] >= df['EMA_200']
         
-        # 🚀 ÁLGEBRA EXACTA PARA PENDIENTE PING PONG
         df['PP_Slope'] = (2*df['Close'] + df['Close'].shift(1) - df['Close'].shift(3) - 2*df['Close'].shift(4)) / 10.0
         
         gc.collect()
@@ -263,17 +282,19 @@ else:
 # 📊 REPORTE UNIVERSAL DIRECTO
 # ==========================================
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V119.0**\n\n"
+    res_str = f"📋 **REPORTE OMNI-FORGE V120**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_global)}\n\n"
     buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
+    
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
         opt_icon = "✅" if st.session_state.get(f'opt_status_{s_id}', False) else "➖"
         res_str += f"⚔️ **{s_id}** [{opt_icon}]\nNet Profit: ${v.get('net',0):,.2f} \nWin Rate: {v.get('winrate',0):.1f}%\n---\n"
     return res_str
 
-if st.sidebar.button("📊 GENERAR REPORTE UNIVERSAL", use_container_width=True):
+# 🛑 BOTÓN DE REPORTE (CON KEY ÚNICA PARA EVITAR ERROR) 🛑
+if st.sidebar.button("📊 GENERAR REPORTE UNIVERSAL", use_container_width=True, key="btn_univ_report"):
     st.sidebar.text_area("Copia tu Reporte:", value=generar_reporte_universal(capital_inicial, comision_pct), height=400)
 
 # ==========================================
@@ -291,7 +312,7 @@ else: st.info("La bóveda está vacía. Inicie una Forja individual o Global par
 st.markdown("---")
 
 # ==========================================
-# 🔥 PURE NUMPY BACKEND (V119.0) 🔥
+# 🔥 PURE NUMPY BACKEND (V120.0) 🔥
 # ==========================================
 a_c = df_global['Close'].values
 a_o = df_global['Open'].values
@@ -469,7 +490,6 @@ def calcular_señales_numpy(s_id, hitbox, therm_w, adx_th, whale_f):
     wt_oversold = a_wt1 < -60
     wt_overbought = a_wt1 > 60
 
-    # 🧱 RESTAURACIÓN DE LAS PIEZAS MAESTRAS (LAS 17 AL ALCANCE) 🧱
     s_dict['Ping_Buy'] = (a_adx < adx_th) & (a_c < a_bbl) & a_vv
     s_dict['Ping_Sell'] = (a_c > a_bbu) | (a_rsi > 70)
     s_dict['Squeeze_Buy'] = neon_up
@@ -550,8 +570,7 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
     g_profit, g_loss, num_trades, max_dd, peak = 0.0, 0.0, 0, 0.0, cap_ini
     for i in range(len(h_arr)):
         if en_pos:
-            tp_p = p_ent * (1.0 + tp_act/100.0)
-            sl_p = p_ent * (1.0 - sl_act/100.0)
+            tp_p = p_ent * (1.0 + tp_act/100.0); sl_p = p_ent * (1.0 - sl_act/100.0)
             if l_arr[i] <= sl_p:
                 gross = pos_size * (1.0 - sl_act/100.0); net = gross - (gross * com_pct); profit = net - invest_amt
                 if profit > 0: reinv = profit * (reinvest_pct / 100.0); divs += (profit - reinv); cap_act += reinv
@@ -695,7 +714,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                     f_sell[mask] = s_dict[dna_s[idx][0]][mask]
                     f_tp[mask] = dna_tp[idx]
                     f_sl[mask] = dna_sl[idx]
-            else: # ESTRATEGIAS BASE Y RESTAURADAS
+            else: # ESTRATEGIAS BASE
                 b_key, s_key = "", ""
                 if s_id == "TARGET_LOCK": b_key, s_key = "Lock_Buy", "Lock_Sell"
                 elif s_id == "NEON_SQUEEZE": b_key, s_key = "Squeeze_Buy", "Squeeze_Sell"
@@ -739,7 +758,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
         </style>
         <div class="loader-container">
             <div class="rocket">🚀</div>
-            <div class="prog-text">OMNI-FORGE V119: {s_id}</div>
+            <div class="prog-text">OMNI-FORGE V120: {s_id}</div>
             <div class="hud-text" style="color: white;">Progreso: {pct_done}%</div>
             <div class="hud-text" style="color: white;">Combos: {combos:,}</div>
             <div class="hud-text" style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Hallazgo: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x | Trds: {best_nt_live}</div>
@@ -784,7 +803,7 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
             f_sell[mask] = s_dict[vault[f'r{idx_q}_s'][0]][mask]
             f_tp[mask] = vault[f'r{idx_q}_tp']
             f_sl[mask] = vault[f'r{idx_q}_sl']
-    else: # ESTRATEGIAS BASE Y RESTAURADAS
+    else: # ESTRATEGIAS BASE
         b_key, s_key = "", ""
         if s_id == "TARGET_LOCK": b_key, s_key = "Lock_Buy", "Lock_Sell"
         elif s_id == "NEON_SQUEEZE": b_key, s_key = "Squeeze_Buy", "Squeeze_Sell"
@@ -890,9 +909,15 @@ if strategy.position_size > 0
     elif s_id == "ROCKET_ULTRA":
         return """// ROCKET PROTOCOL ULTRA [V55.0] ORIGINAL
 // Copie y pegue su Pine Script original en TradingView. La configuración adaptativa de TF se hace desde el propio TradingView."""
+    elif s_id == "ROCKET_COMMANDER":
+        return """// ROCKET COMMANDER [V60.2] ORIGINAL
+// Copie y pegue su Pine Script original en TradingView."""
+    elif s_id == "JUGGERNAUT":
+        return """// JUGGERNAUT [V356] ORIGINAL
+// Copie y pegue su Pine Script original en TradingView."""
     else:
         ps = f"""// This source code is subject to the terms of the Mozilla Public License 2.0
-// © Valle_Architect_Lab | AUTO-GENERATED BY OMNI-FORGE V119
+// © Valle_Architect_Lab | AUTO-GENERATED BY OMNI-FORGE V120
 
 //@version=5
 strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_value=0.25)
@@ -927,7 +952,6 @@ is_falling_knife = (open[1] - close[1]) > (atr[1] * 1.5)
 vol_ma100 = ta.sma(volume, 100)
 rvol = vol_ma100 > 0 ? volume / vol_ma100 : 1
 
-// WaveTrend para Quadrix
 ap = hlc3 
 esa = ta.ema(ap, 10)
 d_wt = ta.ema(math.abs(ap - esa), 10)
@@ -1051,10 +1075,6 @@ float active_sl = 0.0
             b_cond = " or ".join([pine_map[x] for x in vault['b_team']]) if vault['b_team'] else "false"
             s_cond = " or ".join([pine_map[x] for x in vault['s_team']]) if vault['s_team'] else "false"
             ps += f"\nbool signal_buy = ({b_cond}) and {m_cond} and {v_cond}\nbool signal_sell = {s_cond}\nfloat active_tp = {vault['tp']} / 100.0\nfloat active_sl = {vault['sl']} / 100.0\n"
-        elif s_id == "ROCKET_COMMANDER":
-            ps += "// EXPORTACIÓN COMMANDER A PINE SCRIPT (Requiere plantilla completa V320)"
-        elif s_id == "JUGGERNAUT":
-            ps += "// EXPORTACIÓN JUGGERNAUT A PINE SCRIPT (Requiere plantilla completa V356)"
         else:
             b_key, s_key = "", ""
             if s_id == "TARGET_LOCK": b_key, s_key = pine_map["Lock_Buy"], pine_map["Lock_Sell"]
@@ -1089,22 +1109,6 @@ plotchar(signal_buy, title="COMPRA", char="🚀", location=location.belowbar, co
             ps += 'bgcolor(regime == 1 ? color.new(color.green, 90) : regime == 2 ? color.new(color.yellow, 90) : regime == 3 ? color.new(color.red, 90) : color.new(color.orange, 90), title="Regime Matrix")\n'
         
         return ps
-
-def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V119.0**\n\n"
-    res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_global)}\n\n"
-    buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
-    res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
-    
-    for s_id in estrategias:
-        v = st.session_state.get(f'champion_{s_id}', {})
-        opt_icon = "✅" if st.session_state.get(f'opt_status_{s_id}', False) else "➖"
-        res_str += f"⚔️ **{s_id}** [{opt_icon}]\nNet Profit: ${v.get('net',0):,.2f} \nWin Rate: {v.get('winrate',0):.1f}%\n---\n"
-    return res_str
-
-if not df_global.empty:
-    if st.sidebar.button("📊 GENERAR REPORTE UNIVERSAL", use_container_width=True):
-        st.sidebar.text_area("Copia tu Reporte:", value=generar_reporte_universal(capital_inicial, comision_pct), height=400)
 
 # ==========================================
 # 🛑 EJECUCIÓN GLOBAL Y PANTALLA PRINCIPAL
@@ -1144,6 +1148,9 @@ for idx, tab_name in enumerate(list(tab_id_map.keys())):
         vault = st.session_state[f'champion_{s_id}']
 
         st.markdown(f"### {tab_name} {opt_badge}", unsafe_allow_html=True)
+        # 📜 DOCTRINA TÁCTICA
+        st.info(f"📜 **Doctrina Táctica:** {doctrinas.get(s_id, 'Motor estándar de cacería de mercado.')}")
+        
         c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
         st.session_state[f'champion_{s_id}']['ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(vault['ado']), key=f"ui_{s_id}_ado_w", step=0.5)
         st.session_state[f'champion_{s_id}']['reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(vault['reinv']), key=f"ui_{s_id}_reinv_w", step=5.0)
