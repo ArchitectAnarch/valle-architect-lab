@@ -41,42 +41,81 @@ tab_id_map = {
     "🌌 GENESIS": "GENESIS", "👑 ROCKET": "ROCKET"
 }
 
-def init_state(key, default):
-    if key not in st.session_state: st.session_state[key] = default
-
+# ==========================================
+# 🧬 THE DNA VAULT & SYNC PROTOCOL (V105.0)
+# ==========================================
 for s_id in estrategias:
-    init_state(f"{s_id}_ado", 100.0)
-    init_state(f"{s_id}_reinv", 0.0)
-    init_state(f"{s_id}_hitbox", 1.5)
-    init_state(f"{s_id}_therm_w", 4.0)
-    init_state(f"{s_id}_adx_th", 25.0)
-    init_state(f"{s_id}_whale_f", 2.5)
-    
-    if s_id == "ALL_FORCES":
-        init_state(f"{s_id}_macro", "All-Weather")
-        init_state(f"{s_id}_vol", "All-Weather")
-        init_state(f"{s_id}_b_team", ['Commander_Buy', 'Squeeze_Buy', 'Ping_Buy'])
-        init_state(f"{s_id}_s_team", ['Commander_Sell', 'Squeeze_Sell'])
-        init_state(f"{s_id}_tp", 50.0)
-        init_state(f"{s_id}_sl", 5.0)
-    elif s_id in ["GENESIS", "ROCKET"]:
-        for r in range(1, 5):
-            init_state(f"{s_id}_r{r}_b", ['Squeeze_Buy'])
-            init_state(f"{s_id}_r{r}_s", ['Squeeze_Sell'])
-            init_state(f"{s_id}_r{r}_tp", 50.0)
-            init_state(f"{s_id}_r{r}_sl", 5.0)
-    else:
-        init_state(f"{s_id}_tp", 50.0)
-        init_state(f"{s_id}_sl", 5.0)
+    if f'opt_status_{s_id}' not in st.session_state: 
+        st.session_state[f'opt_status_{s_id}'] = False
+        
+    if f'champion_{s_id}' not in st.session_state:
+        if s_id == "ALL_FORCES":
+            st.session_state[f'champion_{s_id}'] = {
+                'b_team': ['Commander_Buy', 'Squeeze_Buy', 'Ping_Buy'], 's_team': ['Commander_Sell', 'Squeeze_Sell'],
+                'macro': "All-Weather", 'vol': "All-Weather", 'tp': 50.0, 'sl': 5.0, 
+                'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 100.0, 'reinv': 0.0, 'fit': -float('inf')
+            }
+        elif s_id in ["GENESIS", "ROCKET"]:
+            vault = {'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 100.0, 'reinv': 0.0, 'fit': -float('inf')}
+            for r_idx in range(1, 5):
+                vault.update({f'r{r_idx}_b': ['Squeeze_Buy'], f'r{r_idx}_s': ['Squeeze_Sell'], f'r{r_idx}_tp': 50.0, f'r{r_idx}_sl': 5.0})
+            st.session_state[f'champion_{s_id}'] = vault
+        else:
+            st.session_state[f'champion_{s_id}'] = {
+                'tp': 50.0, 'sl': 5.0, 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 
+                'ado': 100.0, 'reinv': 0.0, 'fit': -float('inf')
+            }
 
+def sync_vault_to_ui():
+    """Vierte el ADN de la bóveda en la memoria de la interfaz de usuario con prefijos correctos."""
+    for s_id in estrategias:
+        vault = st.session_state[f'champion_{s_id}']
+        for k, v in vault.items():
+            if k != 'fit':
+                ui_key = f'ui_{s_id}_{k}'
+                if ui_key not in st.session_state:
+                    st.session_state[ui_key] = v
+
+def wipe_widget_cache():
+    """Borra solo los widgets temporales de Streamlit (los que empiezan por w_)"""
+    for key in list(st.session_state.keys()):
+        if key.startswith("w_"): 
+            del st.session_state[key]
+
+def save_champion(s_id, bp):
+    vault = st.session_state[f'champion_{s_id}']
+    vault['fit'] = bp['fit']
+    for k in bp.keys():
+        if k in vault: vault[k] = bp[k]
+    # Sincronizar Inmediatamente con la UI
+    for k, v in vault.items():
+        if k != 'fit': st.session_state[f'ui_{s_id}_{k}'] = v
+
+sync_vault_to_ui()
+
+css_spinner = """
+<style>
+.loader-container { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; text-align: center; background: rgba(0,0,0,0.85); padding: 35px; border-radius: 20px; border: 2px solid cyan; box-shadow: 0 0 30px cyan;}
+.rocket { font-size: 7rem; animation: spin 1s linear infinite; filter: drop-shadow(0 0 15px cyan); }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.prog-text { color: cyan; font-size: 1.6rem; font-weight: bold; margin-top: 15px; text-shadow: 0 0 5px cyan;}
+.hud-text { color: lime; font-size: 1.2rem; margin-top: 8px; font-family: monospace; }
+</style>
+"""
 ph_holograma = st.empty()
 
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V104.0</h2>", unsafe_allow_html=True)
-if st.sidebar.button("🔄 Purgar Memoria Global", use_container_width=True): 
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 TRUTH ENGINE V105.0</h2>", unsafe_allow_html=True)
+if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
+    for s in estrategias: 
+        st.session_state[f'opt_status_{s}'] = False
+        if f'champion_{s}' in st.session_state: del st.session_state[f'champion_{s}']
+        for k in list(st.session_state.keys()):
+            if k.startswith(f"ui_{s}_"): del st.session_state[k]
+    wipe_widget_cache()
     gc.collect()
     st.rerun()
 
@@ -98,7 +137,7 @@ capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0,
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("<h3 style='text-align: center; color: lime;'>🤖 PILOTO AUTOMÁTICO (NUMPY PURE)</h3>", unsafe_allow_html=True)
+st.sidebar.markdown("<h3 style='text-align: center; color: lime;'>🤖 PILOTO AUTOMÁTICO</h3>", unsafe_allow_html=True)
 global_epochs = st.sidebar.slider("Épocas de Evolución (x3000)", 1, 50, 10, help="50 Épocas = 150,000 modelos procesados a hiper-velocidad.")
 
 @st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Topología (Pre-Cálculo Cuántico)...")
@@ -187,7 +226,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['dist_sup'] = (c_val - df['Target_Lock_Sup'].values) / c_val * 100
         df['dist_res'] = (df['Target_Lock_Res'].values - c_val) / c_val * 100
         
-        # 🔥 PRE-CÁLCULO DEL MURO TÉRMICO (Evita 150k ciclos pesados)
+        # 🔥 PRE-CÁLCULO DEL MURO TÉRMICO
         sr_val = df['ATR'].values * 2.0
         ceil_w, floor_w = np.zeros(len(df)), np.zeros(len(df))
         for p_col, w in [('PL30', 1), ('PH30', 1), ('PL100', 3), ('PH100', 3), ('PL300', 5), ('PH300', 5)]:
@@ -213,9 +252,8 @@ else:
     st.stop()
 
 # ==========================================
-# 🔥 EVALUACIÓN PURE NUMPY (V104 - 1000x Speed) 🔥
+# 🔥 PURE NUMPY BACKEND (V105 - 1000x Speed) 🔥
 # ==========================================
-# Pre-extraemos los arrays para inyectarlos directo en el C++ Backend de Numpy
 a_c = df_global['Close'].values
 a_o = df_global['Open'].values
 a_h = df_global['High'].values
@@ -246,7 +284,6 @@ a_fk = df_global['is_falling_knife'].values
 a_c_s1 = df_global['Close'].shift(1).fillna(0.0).values
 
 def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
-    """Calcula todas las señales en 0.001 segundos usando Numpy"""
     s_dict = {}
     s_dict['Ping_Buy'] = (a_adx < adx_th) & (a_c < a_bbl) & a_vv
     s_dict['Ping_Sell'] = (a_c > a_bbu) | (a_rsi > 70)
@@ -286,7 +323,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Commander_Sell'] = t_sell | (a_c < a_ema50)
     
     regime = np.where(a_mb & (a_adx >= adx_th), 1, np.where(a_mb & (a_adx < adx_th), 2, np.where(~a_mb & (a_adx >= adx_th), 3, 4)))
-    
     return s_dict, regime
 
 @njit(fastmath=True)
@@ -313,7 +349,6 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
                 g_loss += abs(profit)
                 num_trades += 1
                 en_pos = False
-                
             elif h_arr[i] >= tp_p:
                 gross = pos_size * (1.0 + tp_act/100.0)
                 net = gross - (gross * com_pct)
@@ -327,7 +362,6 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
                 else: g_loss += abs(profit)
                 num_trades += 1
                 en_pos = False
-                
             elif s_c[i]:
                 ret = (c_arr[i] - p_ent) / p_ent
                 gross = pos_size * (1.0 + ret)
@@ -364,16 +398,16 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
     pf = g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0)
     return total_net, pf, num_trades, max_dd
 
-# 🧠 RUTINA DE DEEP MINE (V104.0 - PURE NUMPY AUTO PILOT) 🧠
+# 🧠 DEEP MINE TRACKER (AUTO PILOT) 🧠
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, epochs=1, is_meta=False, cur_fit=-float('inf')):
-    best_fit = cur_fit # Arrancamos con el fit de la Bóveda para ahorrar recursos
+    best_fit = cur_fit 
     best_net_live = 0.0
     best_pf_live = 0.0
     bp = None
     tp_min, tp_max = (5.0, 150.0) 
     
     iters = 3000 * epochs
-    chunks = min(iters, 20) # Actualizar UI solo 20 veces para no ahogar Streamlit
+    chunks = min(iters, 20)
     chunk_size = iters // chunks
     start_time = time.time()
     n_len = len(a_c)
@@ -389,35 +423,45 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             
             s_dict, regime_arr = calcular_señales_numpy(r_hitbox, r_therm, r_adx, r_whale)
             
-            if is_meta:
-                b_opts = base_b if s_id != "ROCKET" else rocket_b
-                s_opts = base_s if s_id != "ROCKET" else rocket_s
-                
-                max_b = len(b_opts) if s_id == "ALL_FORCES" else 2
-                max_s = len(s_opts) if s_id == "ALL_FORCES" else 2
-                
-                dna_b = [random.sample(b_opts, random.randint(1, max_b)) for _ in range(4)]
-                dna_s = [random.sample(s_opts, random.randint(1, max_s)) for _ in range(4)]
+            if s_id == "ALL_FORCES":
+                b_opts, s_opts = base_b, base_s
+                dna_b = [random.sample(b_opts, random.randint(1, len(b_opts))) for _ in range(4)]
+                dna_s = [random.sample(s_opts, random.randint(1, len(s_opts))) for _ in range(4)]
                 dna_tp = [random.uniform(tp_min, tp_max) for _ in range(4)]
                 dna_sl = [random.uniform(2.0, 20.0) for _ in range(4)]
                 
                 f_buy, f_sell = np.zeros(n_len, dtype=bool), np.zeros(n_len, dtype=bool)
                 f_tp, f_sl = np.zeros(n_len, dtype=np.float64), np.zeros(n_len, dtype=np.float64)
-                
                 for idx in range(4):
                     mask = (regime_arr == (idx + 1))
                     if not mask.any(): continue
                     r_b_cond = np.zeros(n_len, dtype=bool)
                     for r in dna_b[idx]: r_b_cond |= s_dict[r]
                     f_buy[mask] = r_b_cond[mask]
-                    
                     r_s_cond = np.zeros(n_len, dtype=bool)
                     for r in dna_s[idx]: r_s_cond |= s_dict[r]
                     f_sell[mask] = r_s_cond[mask]
-                    
                     f_tp[mask] = dna_tp[idx]
                     f_sl[mask] = dna_sl[idx]
-
+            elif is_meta:
+                b_opts, s_opts = rocket_b, rocket_s
+                dna_b = [random.sample(b_opts, random.randint(1, 2)) for _ in range(4)]
+                dna_s = [random.sample(s_opts, random.randint(1, 2)) for _ in range(4)]
+                dna_tp = [random.uniform(tp_min, tp_max) for _ in range(4)]
+                dna_sl = [random.uniform(2.0, 20.0) for _ in range(4)]
+                f_buy, f_sell = np.zeros(n_len, dtype=bool), np.zeros(n_len, dtype=bool)
+                f_tp, f_sl = np.zeros(n_len, dtype=np.float64), np.zeros(n_len, dtype=np.float64)
+                for idx in range(4):
+                    mask = (regime_arr == (idx + 1))
+                    if not mask.any(): continue
+                    r_b_cond = np.zeros(n_len, dtype=bool)
+                    for r in dna_b[idx]: r_b_cond |= s_dict[r]
+                    f_buy[mask] = r_b_cond[mask]
+                    r_s_cond = np.zeros(n_len, dtype=bool)
+                    for r in dna_s[idx]: r_s_cond |= s_dict[r]
+                    f_sell[mask] = r_s_cond[mask]
+                    f_tp[mask] = dna_tp[idx]
+                    f_sl[mask] = dna_sl[idx]
             else:
                 b_c, s_c = np.zeros(n_len, dtype=bool), np.zeros(n_len, dtype=bool)
                 if s_id == "TRINITY": b_c, s_c = s_dict['Trinity_Buy'], s_dict['Trinity_Sell']
@@ -444,13 +488,13 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 else: 
                     fit = net * ((mdd ** 0.5) + 1.0) / (pf + 0.001)
             else:
-                fit = -999999.0 
+                fit = -999999.0
                 
             if fit > best_fit:
                 best_fit = fit
                 if net > best_net_live: best_net_live, best_pf_live = net, pf
                     
-                if is_meta:
+                if is_meta or s_id == "ALL_FORCES":
                     bp = {'r1_b': dna_b[0], 'r1_s': dna_s[0], 'r1_tp': dna_tp[0], 'r1_sl': dna_sl[0], 'r2_b': dna_b[1], 'r2_s': dna_s[1], 'r2_tp': dna_tp[1], 'r2_sl': dna_sl[1], 'r3_b': dna_b[2], 'r3_s': dna_s[2], 'r3_tp': dna_tp[2], 'r3_sl': dna_sl[2], 'r4_b': dna_b[3], 'r4_s': dna_s[3], 'r4_tp': dna_tp[3], 'r4_sl': dna_sl[3], 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'fit': fit}
                 else:
                     bp = {'tp': rtp, 'sl': rsl, 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'reinv': reinv_q, 'net': net, 'pf': pf, 'nt': nt, 'alpha': alpha_money, 'mdd': mdd, 'fit': fit}
@@ -472,7 +516,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             <div class="rocket">🚀</div>
             <div class="prog-text">DEEP MINE: {s_id}</div>
             <div class="hud-text" style="color: white;">Progreso: {pct_done}%</div>
-            <div class="hud-text" style="color: white;">Combos (V104 PURE C++): {combos:,}</div>
+            <div class="hud-text" style="color: white;">Combos (V105 PURE C++): {combos:,}</div>
             <div class="hud-text" style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Hallazgo Actual: ${best_net_live:.2f} | {best_pf_live:.1f}x</div>
             <div class="hud-text" style="color: yellow; margin-top: 15px;">ETA: {eta:.1f} segs</div>
         </div>
@@ -482,8 +526,29 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
     return bp
 
 def calcular_señales_df(df_sim, hitbox, therm_w, adx_th, whale_f):
-    """Para visualización final y cálculos de métricas del dataframe"""
-    return inyectar_adn(df_sim.copy(), hitbox, therm_w, adx_th, whale_f)
+    df_sim['Regime'] = np.where(df_sim['Macro_Bull'] & (df_sim['ADX'] >= adx_th), 1, np.where(df_sim['Macro_Bull'] & (df_sim['ADX'] < adx_th), 2, np.where(~df_sim['Macro_Bull'] & (df_sim['ADX'] >= adx_th), 3, 4)))
+    df_sim['Ping_Buy'] = (df_sim['ADX'] < adx_th) & (df_sim['Close'] < df_sim['BBL']) & df_sim['Vela_Verde']
+    df_sim['Ping_Sell'] = (df_sim['Close'] > df_sim['BBU']) | (df_sim['RSI'] > 70)
+    df_sim['Neon_Up'] = (df_sim['BB_Width'] < df_sim['BB_Width_Avg'].shift(1).fillna(-1.0)) & (df_sim['Close'] > df_sim['BBU']) & df_sim['Vela_Verde'] & (df_sim['RSI'] < 60)
+    df_sim['Squeeze_Buy'] = df_sim['Neon_Up']
+    df_sim['Squeeze_Sell'] = (df_sim['Close'] < df_sim['EMA_50'])
+    df_sim['Thermal_Buy'] = (df_sim['floor_w'] >= therm_w) & df_sim['Vela_Verde'] & df_sim['RSI_Cross_Up']
+    df_sim['Thermal_Sell'] = (df_sim['ceil_w'] >= therm_w) & df_sim['Vela_Roja'] & df_sim['RSI_Cross_Dn']
+    df_sim['Climax_Buy'] = (df_sim['RVol'] > whale_f) & (df_sim['lower_wick'] > (df_sim['body_size'] * 2.0)) & (df_sim['RSI'] < 35) & df_sim['Vela_Verde']
+    df_sim['Climax_Sell'] = (df_sim['RSI'] > 80)
+    df_sim['Lock_Buy'] = (df_sim['dist_sup'] < hitbox) & df_sim['Vela_Verde'] & df_sim['RSI_Cross_Up']
+    df_sim['Lock_Sell'] = (df_sim['dist_res'] < hitbox) | (df_sim['High'] >= df_sim['Target_Lock_Res'])
+    df_sim['Defcon_Buy'] = df_sim['Squeeze_On'].shift(1).fillna(False) & (df_sim['Close'] > df_sim['BBU']) & (df_sim['ADX'] > adx_th)
+    df_sim['Defcon_Sell'] = (df_sim['Close'] < df_sim['EMA_50'])
+    df_sim['Jugg_Buy'] = df_sim['Macro_Bull'] & (df_sim['Close'] > df_sim['EMA_50']) & (df_sim['Close'].shift(1) < df_sim['EMA_50']) & df_sim['Vela_Verde'] & ~df_sim['is_falling_knife']
+    df_sim['Jugg_Sell'] = (df_sim['Close'] < df_sim['EMA_50'])
+    df_sim['Trinity_Buy'] = df_sim['Macro_Bull'] & (df_sim['RSI'] < 35) & df_sim['Vela_Verde'] & ~df_sim['is_falling_knife']
+    df_sim['Trinity_Sell'] = (df_sim['RSI'] > 75) | (df_sim['Close'] < df_sim['EMA_200'])
+    df_sim['Lev_Buy'] = df_sim['Macro_Bull'] & df_sim['RSI_Cross_Up'] & (df_sim['RSI'] < 45)
+    df_sim['Lev_Sell'] = (df_sim['Close'] < df_sim['EMA_200'])
+    df_sim['Commander_Buy'] = df_sim['Climax_Buy'] | df_sim['Thermal_Buy'] | df_sim['Lock_Buy']
+    df_sim['Commander_Sell'] = df_sim['Thermal_Sell'] | (df_sim['Close'] < df_sim['EMA_50'])
+    return df_sim
 
 def run_backtest_eval(s_id, df_strat, vault, cap_ini, com_pct):
     if s_id in ["ALL_FORCES", "GENESIS", "ROCKET"]:
@@ -524,54 +589,50 @@ def run_backtest_eval(s_id, df_strat, vault, cap_ini, com_pct):
     df_strat['Signal_Buy'], df_strat['Signal_Sell'] = b_c_arr, s_c_arr
     df_strat['Active_TP'], df_strat['Active_SL'] = t_arr, sl_arr
     
-    h_a, l_a, c_a, o_a = np.asarray(df_strat['High'].values, dtype=np.float64), np.asarray(df_strat['Low'].values, dtype=np.float64), np.asarray(df_strat['Close'].values, dtype=np.float64), np.asarray(df_strat['Open'].values, dtype=np.float64)
-    net, pf, nt, mdd = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c_arr, s_c_arr, t_arr, sl_arr, float(cap_ini), float(com_pct), float(vault['reinv']))
-    return df_strat, net, pf, nt, mdd
+    eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault['reinv']), com_pct)
+    return df_strat, eq_curve, t_log, total_comms
 
 def get_current_ui_fitness(s_id, cap_ini, com_pct, buy_hold_money):
-    """Calcula el fitness de lo que el usuario ha movido manualmente en la pantalla"""
     r_hitbox = st.session_state[f'ui_{s_id}_hitbox']
     r_therm = st.session_state[f'ui_{s_id}_therm_w']
     r_adx = st.session_state[f'ui_{s_id}_adx_th']
     r_whale = st.session_state[f'ui_{s_id}_whale_f']
     r_reinv = st.session_state[f'ui_{s_id}_reinv']
     
-    df_precalc = inyectar_adn(df_global.copy(), r_hitbox, r_therm, r_adx, r_whale)
-    h_a, l_a, c_a, o_a = np.asarray(df_precalc['High'].values, dtype=np.float64), np.asarray(df_precalc['Low'].values, dtype=np.float64), np.asarray(df_precalc['Close'].values, dtype=np.float64), np.asarray(df_precalc['Open'].values, dtype=np.float64)
+    s_dict, regime_arr = calcular_señales_numpy(r_hitbox, r_therm, r_adx, r_whale)
     
-    is_meta = s_id in ["ALL_FORCES", "GENESIS", "ROCKET"]
-    if is_meta:
-        f_buy, f_sell = np.zeros(len(df_precalc), dtype=bool), np.zeros(len(df_precalc), dtype=bool)
-        f_tp, f_sl = np.zeros(len(df_precalc), dtype=np.float64), np.zeros(len(df_precalc), dtype=np.float64)
-        regime_arr = df_precalc['Regime'].values
+    if s_id in ["ALL_FORCES", "GENESIS", "ROCKET"]:
+        f_buy, f_sell = np.zeros(len(a_c), dtype=bool), np.zeros(len(a_c), dtype=bool)
+        f_tp, f_sl = np.zeros(len(a_c), dtype=np.float64), np.zeros(len(a_c), dtype=np.float64)
         for idx in range(1, 5):
             mask = (regime_arr == idx)
-            r_b_cond = np.zeros(len(df_precalc), dtype=bool)
-            for r in st.session_state[f'ui_{s_id}_r{idx}_b']: r_b_cond |= df_precalc[r].values
+            if not mask.any(): continue
+            r_b_cond = np.zeros(len(a_c), dtype=bool)
+            for r in st.session_state[f'ui_{s_id}_r{idx}_b']: r_b_cond |= s_dict[r]
             f_buy[mask] = r_b_cond[mask]
-            r_s_cond = np.zeros(len(df_precalc), dtype=bool)
-            for r in st.session_state[f'ui_{s_id}_r{idx}_s']: r_s_cond |= df_precalc[r].values
+            r_s_cond = np.zeros(len(a_c), dtype=bool)
+            for r in st.session_state[f'ui_{s_id}_r{idx}_s']: r_s_cond |= s_dict[r]
             f_sell[mask] = r_s_cond[mask]
             f_tp[mask] = st.session_state[f'ui_{s_id}_r{idx}_tp']
             f_sl[mask] = st.session_state[f'ui_{s_id}_r{idx}_sl']
         b_c_arr, s_c_arr = np.asarray(f_buy, dtype=bool), np.asarray(f_sell, dtype=bool)
         t_arr, sl_arr = np.asarray(f_tp, dtype=np.float64), np.asarray(f_sl, dtype=np.float64)
     else:
-        b_c, s_c = np.zeros(len(df_precalc), dtype=bool), np.zeros(len(df_precalc), dtype=bool)
-        if s_id == "TRINITY": b_c, s_c = df_precalc['Trinity_Buy'].values, df_precalc['Trinity_Sell']
-        elif s_id == "JUGGERNAUT": b_c, s_c = df_precalc['Jugg_Buy'].values, df_precalc['Jugg_Sell']
-        elif s_id == "DEFCON": b_c, s_c = df_precalc['Defcon_Buy'].values, df_precalc['Defcon_Sell']
-        elif s_id == "TARGET_LOCK": b_c, s_c = df_precalc['Lock_Buy'].values, df_precalc['Lock_Sell']
-        elif s_id == "THERMAL": b_c, s_c = df_precalc['Thermal_Buy'].values, df_precalc['Thermal_Sell']
-        elif s_id == "PINK_CLIMAX": b_c, s_c = df_precalc['Climax_Buy'].values, df_precalc['Climax_Sell']
-        elif s_id == "PING_PONG": b_c, s_c = df_precalc['Ping_Buy'].values, df_precalc['Ping_Sell']
-        elif s_id == "NEON_SQUEEZE": b_c, s_c = df_precalc['Squeeze_Buy'].values, df_precalc['Squeeze_Sell']
-        elif s_id == "COMMANDER": b_c, s_c = df_precalc['Commander_Buy'].values, df_precalc['Commander_Sell']
+        b_c, s_c = np.zeros(len(a_c), dtype=bool), np.zeros(len(a_c), dtype=bool)
+        if s_id == "TRINITY": b_c, s_c = s_dict['Trinity_Buy'], s_dict['Trinity_Sell']
+        elif s_id == "JUGGERNAUT": b_c, s_c = s_dict['Jugg_Buy'], s_dict['Jugg_Sell']
+        elif s_id == "DEFCON": b_c, s_c = s_dict['Defcon_Buy'], s_dict['Defcon_Sell']
+        elif s_id == "TARGET_LOCK": b_c, s_c = s_dict['Lock_Buy'], s_dict['Lock_Sell']
+        elif s_id == "THERMAL": b_c, s_c = s_dict['Thermal_Buy'], s_dict['Thermal_Sell']
+        elif s_id == "PINK_CLIMAX": b_c, s_c = s_dict['Climax_Buy'], s_dict['Climax_Sell']
+        elif s_id == "PING_PONG": b_c, s_c = s_dict['Ping_Buy'], s_dict['Ping_Sell']
+        elif s_id == "NEON_SQUEEZE": b_c, s_c = s_dict['Squeeze_Buy'], s_dict['Squeeze_Sell']
+        elif s_id == "COMMANDER": b_c, s_c = s_dict['Commander_Buy'], s_dict['Commander_Sell']
         b_c_arr, s_c_arr = np.asarray(b_c, dtype=bool), np.asarray(s_c, dtype=bool)
-        t_arr = np.asarray(np.full(len(df_precalc), float(st.session_state[f'ui_{s_id}_tp'])), dtype=np.float64)
-        sl_arr = np.asarray(np.full(len(df_precalc), float(st.session_state[f'ui_{s_id}_sl'])), dtype=np.float64)
+        t_arr = np.asarray(np.full(len(a_c), float(st.session_state[f'ui_{s_id}_tp'])), dtype=np.float64)
+        sl_arr = np.asarray(np.full(len(a_c), float(st.session_state[f'ui_{s_id}_sl'])), dtype=np.float64)
 
-    net, pf, nt, mdd = simular_crecimiento_exponencial(h_a, l_a, c_a, o_a, b_c_arr, s_c_arr, t_arr, sl_arr, float(cap_ini), float(com_pct), float(r_reinv))
+    net, pf, nt, mdd = simular_crecimiento_exponencial(a_h, a_l, a_c, a_o, b_c_arr, s_c_arr, t_arr, sl_arr, float(cap_ini), float(com_pct), float(r_reinv))
     alpha_money = net - buy_hold_money
     if nt >= 1: 
         if net > 0: 
@@ -599,16 +660,16 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             if s_id == "ALL_FORCES": st.info("El Director Supremo. Libertad total en la Matriz de 4 Cuadrantes (1 a 10 algoritmos simultáneos). Ejecución 1000x Numpy.")
             
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
-            st.session_state[f'ui_{s_id}_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state[f'ui_{s_id}_ado']), key=f"w_ado_{s_id}", step=0.5)
-            st.session_state[f'ui_{s_id}_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state[f'ui_{s_id}_reinv']), key=f"w_reinv_{s_id}", step=5.0)
+            st.session_state[f'ui_{s_id}_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get(f'ui_{s_id}_ado', 100.0)), key=f"w_ado_{s_id}", step=0.5)
+            st.session_state[f'ui_{s_id}_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'ui_{s_id}_reinv', 0.0)), key=f"w_reinv_{s_id}", step=5.0)
 
             with st.expander("⚙️ Calibración del ADN Base"):
                 c_adv1, c_adv2 = st.columns(2)
-                st.session_state[f'ui_{s_id}_hitbox'] = c_adv1.slider("🎯 Target Lock Hitbox (%)", 0.5, 3.0, value=float(st.session_state[f'ui_{s_id}_hitbox']), key=f"w_hit_{s_id}", step=0.1)
-                st.session_state[f'ui_{s_id}_therm_w'] = c_adv2.slider("🌡️ Thermal Wall Weight", 3.0, 8.0, value=float(st.session_state[f'ui_{s_id}_therm_w']), key=f"w_tw_{s_id}", step=1.0)
+                st.session_state[f'ui_{s_id}_hitbox'] = c_adv1.slider("🎯 Target Lock Hitbox (%)", 0.5, 3.0, value=float(st.session_state.get(f'ui_{s_id}_hitbox', 1.5)), key=f"w_hit_{s_id}", step=0.1)
+                st.session_state[f'ui_{s_id}_therm_w'] = c_adv2.slider("🌡️ Thermal Wall Weight", 3.0, 8.0, value=float(st.session_state.get(f'ui_{s_id}_therm_w', 4.0)), key=f"w_tw_{s_id}", step=1.0)
                 c_f1, c_f2 = st.columns(2)
-                st.session_state[f'ui_{s_id}_adx_th'] = c_f1.slider("🚀 Defcon/Ping ADX Threshold", 15.0, 35.0, value=float(st.session_state[f'ui_{s_id}_adx_th']), key=f"w_adx_{s_id}", step=1.0)
-                st.session_state[f'ui_{s_id}_whale_f'] = c_f2.slider("🐋 Climax Whale Factor", 1.5, 4.0, value=float(st.session_state[f'ui_{s_id}_whale_f']), key=f"w_wh_{s_id}", step=0.1)
+                st.session_state[f'ui_{s_id}_adx_th'] = c_f1.slider("🚀 Defcon/Ping ADX Threshold", 15.0, 35.0, value=float(st.session_state.get(f'ui_{s_id}_adx_th', 25.0)), key=f"w_adx_{s_id}", step=1.0)
+                st.session_state[f'ui_{s_id}_whale_f'] = c_f2.slider("🐋 Climax Whale Factor", 1.5, 4.0, value=float(st.session_state.get(f'ui_{s_id}_whale_f', 2.5)), key=f"w_wh_{s_id}", step=0.1)
 
             st.markdown("---")
             c1, c2, c3, c4 = st.columns(4)
@@ -617,51 +678,38 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
             
             with c1:
                 st.markdown("<h5 style='color:lime;'>🟢 Bull Trend</h5>", unsafe_allow_html=True)
-                st.session_state[f'ui_{s_id}_r1_b'] = st.multiselect("Compras", opts_b, default=st.session_state[f'ui_{s_id}_r1_b'], key=f"w_r1b_{s_id}")
-                st.session_state[f'ui_{s_id}_r1_s'] = st.multiselect("Cierres", opts_s, default=st.session_state[f'ui_{s_id}_r1_s'], key=f"w_r1s_{s_id}")
-                st.session_state[f'ui_{s_id}_r1_tp'] = st.slider("TP %", 0.5, 150.0, value=float(st.session_state[f'ui_{s_id}_r1_tp']), key=f"w_r1tp_{s_id}", step=0.5)
-                st.session_state[f'ui_{s_id}_r1_sl'] = st.slider("SL %", 0.5, 25.0, value=float(st.session_state[f'ui_{s_id}_r1_sl']), key=f"w_r1sl_{s_id}", step=0.5)
+                st.session_state[f'ui_{s_id}_r1_b'] = st.multiselect("Compras", opts_b, default=st.session_state.get(f'ui_{s_id}_r1_b', []), key=f"w_r1b_{s_id}")
+                st.session_state[f'ui_{s_id}_r1_s'] = st.multiselect("Cierres", opts_s, default=st.session_state.get(f'ui_{s_id}_r1_s', []), key=f"w_r1s_{s_id}")
+                st.session_state[f'ui_{s_id}_r1_tp'] = st.slider("TP %", 0.5, 150.0, value=float(st.session_state.get(f'ui_{s_id}_r1_tp', 50.0)), key=f"w_r1tp_{s_id}", step=0.5)
+                st.session_state[f'ui_{s_id}_r1_sl'] = st.slider("SL %", 0.5, 25.0, value=float(st.session_state.get(f'ui_{s_id}_r1_sl', 5.0)), key=f"w_r1sl_{s_id}", step=0.5)
             with c2:
                 st.markdown("<h5 style='color:yellow;'>🟡 Bull Chop</h5>", unsafe_allow_html=True)
-                st.session_state[f'ui_{s_id}_r2_b'] = st.multiselect("Compras", opts_b, default=st.session_state[f'ui_{s_id}_r2_b'], key=f"w_r2b_{s_id}")
-                st.session_state[f'ui_{s_id}_r2_s'] = st.multiselect("Cierres", opts_s, default=st.session_state[f'ui_{s_id}_r2_s'], key=f"w_r2s_{s_id}")
-                st.session_state[f'ui_{s_id}_r2_tp'] = st.slider("TP %", 0.5, 150.0, value=float(st.session_state[f'ui_{s_id}_r2_tp']), key=f"w_r2tp_{s_id}", step=0.5)
-                st.session_state[f'ui_{s_id}_r2_sl'] = st.slider("SL %", 0.5, 25.0, value=float(st.session_state[f'ui_{s_id}_r2_sl']), key=f"w_r2sl_{s_id}", step=0.5)
+                st.session_state[f'ui_{s_id}_r2_b'] = st.multiselect("Compras", opts_b, default=st.session_state.get(f'ui_{s_id}_r2_b', []), key=f"w_r2b_{s_id}")
+                st.session_state[f'ui_{s_id}_r2_s'] = st.multiselect("Cierres", opts_s, default=st.session_state.get(f'ui_{s_id}_r2_s', []), key=f"w_r2s_{s_id}")
+                st.session_state[f'ui_{s_id}_r2_tp'] = st.slider("TP %", 0.5, 150.0, value=float(st.session_state.get(f'ui_{s_id}_r2_tp', 50.0)), key=f"w_r2tp_{s_id}", step=0.5)
+                st.session_state[f'ui_{s_id}_r2_sl'] = st.slider("SL %", 0.5, 25.0, value=float(st.session_state.get(f'ui_{s_id}_r2_sl', 5.0)), key=f"w_r2sl_{s_id}", step=0.5)
             with c3:
                 st.markdown("<h5 style='color:red;'>🔴 Bear Trend</h5>", unsafe_allow_html=True)
-                st.session_state[f'ui_{s_id}_r3_b'] = st.multiselect("Compras", opts_b, default=st.session_state[f'ui_{s_id}_r3_b'], key=f"w_r3b_{s_id}")
-                st.session_state[f'ui_{s_id}_r3_s'] = st.multiselect("Cierres", opts_s, default=st.session_state[f'ui_{s_id}_r3_s'], key=f"w_r3s_{s_id}")
-                st.session_state[f'ui_{s_id}_r3_tp'] = st.slider("TP %", 0.5, 150.0, value=float(st.session_state[f'ui_{s_id}_r3_tp']), key=f"w_r3tp_{s_id}", step=0.5)
-                st.session_state[f'ui_{s_id}_r3_sl'] = st.slider("SL %", 0.5, 25.0, value=float(st.session_state[f'ui_{s_id}_r3_sl']), key=f"w_r3sl_{s_id}", step=0.5)
+                st.session_state[f'ui_{s_id}_r3_b'] = st.multiselect("Compras", opts_b, default=st.session_state.get(f'ui_{s_id}_r3_b', []), key=f"w_r3b_{s_id}")
+                st.session_state[f'ui_{s_id}_r3_s'] = st.multiselect("Cierres", opts_s, default=st.session_state.get(f'ui_{s_id}_r3_s', []), key=f"w_r3s_{s_id}")
+                st.session_state[f'ui_{s_id}_r3_tp'] = st.slider("TP %", 0.5, 150.0, value=float(st.session_state.get(f'ui_{s_id}_r3_tp', 50.0)), key=f"w_r3tp_{s_id}", step=0.5)
+                st.session_state[f'ui_{s_id}_r3_sl'] = st.slider("SL %", 0.5, 25.0, value=float(st.session_state.get(f'ui_{s_id}_r3_sl', 5.0)), key=f"w_r3sl_{s_id}", step=0.5)
             with c4:
                 st.markdown("<h5 style='color:orange;'>🟠 Bear Chop</h5>", unsafe_allow_html=True)
-                st.session_state[f'ui_{s_id}_r4_b'] = st.multiselect("Compras", opts_b, default=st.session_state[f'ui_{s_id}_r4_b'], key=f"w_r4b_{s_id}")
-                st.session_state[f'ui_{s_id}_r4_s'] = st.multiselect("Cierres", opts_s, default=st.session_state[f'ui_{s_id}_r4_s'], key=f"w_r4s_{s_id}")
-                st.session_state[f'ui_{s_id}_r4_tp'] = st.slider("TP %", 0.5, 150.0, value=float(st.session_state[f'ui_{s_id}_r4_tp']), key=f"w_r4tp_{s_id}", step=0.5)
-                st.session_state[f'ui_{s_id}_r4_sl'] = st.slider("SL %", 0.5, 25.0, value=float(st.session_state[f'ui_{s_id}_r4_sl']), key=f"w_r4sl_{s_id}", step=0.5)
+                st.session_state[f'ui_{s_id}_r4_b'] = st.multiselect("Compras", opts_b, default=st.session_state.get(f'ui_{s_id}_r4_b', []), key=f"w_r4b_{s_id}")
+                st.session_state[f'ui_{s_id}_r4_s'] = st.multiselect("Cierres", opts_s, default=st.session_state.get(f'ui_{s_id}_r4_s', []), key=f"w_r4s_{s_id}")
+                st.session_state[f'ui_{s_id}_r4_tp'] = st.slider("TP %", 0.5, 150.0, value=float(st.session_state.get(f'ui_{s_id}_r4_tp', 50.0)), key=f"w_r4tp_{s_id}", step=0.5)
+                st.session_state[f'ui_{s_id}_r4_sl'] = st.slider("SL %", 0.5, 25.0, value=float(st.session_state.get(f'ui_{s_id}_r4_sl', 5.0)), key=f"w_r4sl_{s_id}", step=0.5)
 
             if c_ia3.button(f"🚀 DEEP MINE INDIVIDUAL ({global_epochs*3}k)", type="primary", key=f"btn_opt_{s_id}"):
                 buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
                 buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
                 
-                # 1. Obtenemos el fitness actual de la UI (Para que la IA sepa qué tiene que superar)
                 current_ui_fit = get_current_ui_fitness(s_id, capital_inicial, comision_pct, buy_hold_money)
-                
-                # 2. Corremos la Optimización
                 bp = optimizar_ia_tracker(s_id, df_global, capital_inicial, comision_pct, st.session_state[f'ui_{s_id}_reinv'], st.session_state[f'ui_{s_id}_ado'], dias_reales, buy_hold_money, epochs=global_epochs, is_meta=True, cur_fit=current_ui_fit)
                 
                 if bp: 
-                    save_champion(s_id, bp) # Guarda en la bóveda
-                    # Actualiza la UI para que se redibuje con el campeón
-                    st.session_state[f'ui_{s_id}_hitbox'] = bp['hitbox']
-                    st.session_state[f'ui_{s_id}_therm_w'] = bp['therm_w']
-                    st.session_state[f'ui_{s_id}_adx_th'] = bp['adx_th']
-                    st.session_state[f'ui_{s_id}_whale_f'] = bp['whale_f']
-                    for r_idx in range(1, 5):
-                        st.session_state[f'ui_{s_id}_r{r_idx}_b'] = bp[f'r{r_idx}_b']
-                        st.session_state[f'ui_{s_id}_r{r_idx}_s'] = bp[f'r{r_idx}_s']
-                        st.session_state[f'ui_{s_id}_r{r_idx}_tp'] = bp[f'r{r_idx}_tp']
-                        st.session_state[f'ui_{s_id}_r{r_idx}_sl'] = bp[f'r{r_idx}_sl']
+                    save_champion(s_id, bp) 
                     st.session_state[f'opt_status_{s_id}'] = True
                     st.success("👑 ¡Evolución Exitosa! El ADN ha mutado a una forma superior.")
                 else:
@@ -670,7 +718,6 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 ph_holograma.empty()
                 st.rerun() 
 
-            # DIBUJAMOS LA GRÁFICA BASADA EN LA UI
             vault_sim = {'reinv': st.session_state[f'ui_{s_id}_reinv']}
             for r in range(1, 5):
                 vault_sim[f'r{r}_b'] = st.session_state[f'ui_{s_id}_r{r}_b']
@@ -679,14 +726,14 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 vault_sim[f'r{r}_sl'] = st.session_state[f'ui_{s_id}_r{r}_sl']
             
             df_strat = calcular_señales_df(df_global, st.session_state[f'ui_{s_id}_hitbox'], st.session_state[f'ui_{s_id}_therm_w'], st.session_state[f'ui_{s_id}_adx_th'], st.session_state[f'ui_{s_id}_whale_f'])
-            df_strat, net, pf, nt, mdd = run_backtest_eval(s_id, df_strat, vault_sim, capital_inicial, comision_pct)
+            df_strat, eq_curve, t_log, total_comms = run_backtest_eval(s_id, df_strat, vault_sim, capital_inicial, comision_pct)
 
         else:
             st.markdown(f"### ⚙️ {s_id} (Truth Engine) {opt_badge}", unsafe_allow_html=True)
             c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
             
-            st.session_state[f'ui_{s_id}_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state[f'ui_{s_id}_ado']), key=f"w_ado_{s_id}", step=0.5)
-            st.session_state[f'ui_{s_id}_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state[f'ui_{s_id}_reinv']), key=f"w_reinv_{s_id}", step=5.0)
+            st.session_state[f'ui_{s_id}_ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(st.session_state.get(f'ui_{s_id}_ado', 100.0)), key=f"w_ado_{s_id}", step=0.5)
+            st.session_state[f'ui_{s_id}_reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(st.session_state.get(f'ui_{s_id}_reinv', 0.0)), key=f"w_reinv_{s_id}", step=5.0)
 
             if c_ia3.button(f"🚀 DEEP MINE INDIVIDUAL ({global_epochs*3}k)", type="primary", key=f"btn_opt_{s_id}"):
                 buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
@@ -696,12 +743,6 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
                 bp = optimizar_ia_tracker(s_id, df_global, capital_inicial, comision_pct, st.session_state[f'ui_{s_id}_reinv'], st.session_state[f'ui_{s_id}_ado'], dias_reales, buy_hold_money, epochs=global_epochs, is_meta=False, cur_fit=current_ui_fit)
                 if bp:
                     save_champion(s_id, bp)
-                    st.session_state[f'ui_{s_id}_hitbox'] = bp['hitbox']
-                    st.session_state[f'ui_{s_id}_therm_w'] = bp['therm_w']
-                    st.session_state[f'ui_{s_id}_adx_th'] = bp['adx_th']
-                    st.session_state[f'ui_{s_id}_whale_f'] = bp['whale_f']
-                    st.session_state[f'ui_{s_id}_tp'] = bp['tp']
-                    st.session_state[f'ui_{s_id}_sl'] = bp['sl']
                     st.session_state[f'opt_status_{s_id}'] = True
                     st.success("👑 ¡Evolución Exitosa! Nuevo récord encontrado.")
                 else:
@@ -712,21 +753,20 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
 
             with st.expander("🛠️ Ajuste Manual de Parámetros"):
                 c1, c2, c3, c4 = st.columns(4)
-                st.session_state[f'ui_{s_id}_tp'] = c1.slider("🎯 TP Base (%)", 0.5, 150.0, value=float(st.session_state[f'ui_{s_id}_tp']), key=f"w_tp_{s_id}", step=0.1)
-                st.session_state[f'ui_{s_id}_sl'] = c2.slider("🛑 SL (%)", 0.5, 25.0, value=float(st.session_state[f'ui_{s_id}_sl']), key=f"w_sl_{s_id}", step=0.1)
-                st.session_state[f'ui_{s_id}_hitbox'] = c3.slider("🎯 Target Lock Hitbox (%)", 0.5, 3.0, value=float(st.session_state[f'ui_{s_id}_hitbox']), key=f"w_hit_{s_id}", step=0.1)
-                st.session_state[f'ui_{s_id}_therm_w'] = c4.slider("🌡️ Thermal Wall Weight", 3.0, 8.0, value=float(st.session_state[f'ui_{s_id}_therm_w']), key=f"w_tw_{s_id}", step=1.0)
+                st.session_state[f'ui_{s_id}_tp'] = c1.slider("🎯 TP Base (%)", 0.5, 150.0, value=float(st.session_state.get(f'ui_{s_id}_tp', 50.0)), key=f"w_tp_{s_id}", step=0.1)
+                st.session_state[f'ui_{s_id}_sl'] = c2.slider("🛑 SL (%)", 0.5, 25.0, value=float(st.session_state.get(f'ui_{s_id}_sl', 5.0)), key=f"w_sl_{s_id}", step=0.1)
+                st.session_state[f'ui_{s_id}_hitbox'] = c3.slider("🎯 Target Lock Hitbox (%)", 0.5, 3.0, value=float(st.session_state.get(f'ui_{s_id}_hitbox', 1.5)), key=f"w_hit_{s_id}", step=0.1)
+                st.session_state[f'ui_{s_id}_therm_w'] = c4.slider("🌡️ Thermal Wall Weight", 3.0, 8.0, value=float(st.session_state.get(f'ui_{s_id}_therm_w', 4.0)), key=f"w_tw_{s_id}", step=1.0)
                 
                 c_f1, c_f2 = st.columns(2)
-                st.session_state[f'ui_{s_id}_adx_th'] = c_f1.slider("🚀 Defcon/Ping ADX Threshold", 15.0, 35.0, value=float(st.session_state[f'ui_{s_id}_adx_th']), key=f"w_adx_{s_id}", step=1.0)
-                st.session_state[f'ui_{s_id}_whale_f'] = c_f2.slider("🐋 Climax Whale Factor", 1.5, 4.0, value=float(st.session_state[f'ui_{s_id}_whale_f']), key=f"w_wh_{s_id}", step=0.1)
+                st.session_state[f'ui_{s_id}_adx_th'] = c_f1.slider("🚀 Defcon/Ping ADX Threshold", 15.0, 35.0, value=float(st.session_state.get(f'ui_{s_id}_adx_th', 25.0)), key=f"w_adx_{s_id}", step=1.0)
+                st.session_state[f'ui_{s_id}_whale_f'] = c_f2.slider("🐋 Climax Whale Factor", 1.5, 4.0, value=float(st.session_state.get(f'ui_{s_id}_whale_f', 2.5)), key=f"w_wh_{s_id}", step=0.1)
 
             vault_sim = {'reinv': st.session_state[f'ui_{s_id}_reinv'], 'tp': st.session_state[f'ui_{s_id}_tp'], 'sl': st.session_state[f'ui_{s_id}_sl']}
             df_strat = calcular_señales_df(df_global, st.session_state[f'ui_{s_id}_hitbox'], st.session_state[f'ui_{s_id}_therm_w'], st.session_state[f'ui_{s_id}_adx_th'], st.session_state[f'ui_{s_id}_whale_f'])
-            df_strat, net, pf, nt, mdd = run_backtest_eval(s_id, df_strat, vault_sim, capital_inicial, comision_pct)
+            df_strat, eq_curve, t_log, total_comms = run_backtest_eval(s_id, df_strat, vault_sim, capital_inicial, comision_pct)
 
         # --- SECCIÓN COMÚN (MÉTRICAS Y BLOCK NOTE) ---
-        eq_curve, divs, cap_act, t_log, pos_ab, total_comms = simular_visual(df_strat, capital_inicial, st.session_state[f'ui_{s_id}_reinv'], comision_pct)
         df_strat['Total_Portfolio'] = eq_curve
         ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
         buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
@@ -757,7 +797,7 @@ for idx, tab_name in enumerate(tab_id_map.keys()):
         c6.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
         c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
 
-        # 📝 BLOCK NOTE INDIVIDUAL (LEE DE LA PANTALLA ACTUAL)
+        # 📝 BLOCK NOTE INDIVIDUAL (CÓDIGO PINE SCRIPT)
         with st.expander("📝 BLOCK NOTE INDIVIDUAL (CÓDIGO PINE SCRIPT)", expanded=False):
             b_note = f"// ⚔️ {s_id} {'[✅ Optimizada]' if is_opt else '[➖ No Optimizada]'}\n"
             b_note += f"// Net Profit: ${eq_curve[-1]-capital_inicial:,.2f} ({ret_pct:.2f}%)\n"
