@@ -62,7 +62,7 @@ for s_id in estrategias:
     if f'opt_status_{s_id}' not in st.session_state: st.session_state[f'opt_status_{s_id}'] = False
     if f'champion_{s_id}' not in st.session_state:
         if s_id == "ALL_FORCES":
-            st.session_state[f'champion_{s_id}'] = {'b_team': ['Commander_Buy', 'Squeeze_Buy'], 's_team': ['Commander_Sell'], 'macro': "All-Weather", 'vol': "All-Weather", 'tp': 20.0, 'sl': 5.0, 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf')}
+            st.session_state[f'champion_{s_id}'] = {'b_team': ['Commander_Buy', 'Squeeze_Buy', 'Ping_Buy'], 's_team': ['Commander_Sell', 'Squeeze_Sell'], 'macro': "All-Weather", 'vol': "All-Weather", 'tp': 20.0, 'sl': 5.0, 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf')}
         elif s_id in ["GENESIS", "ROCKET"]:
             v = {'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf')}
             for r_idx in range(1, 5): v.update({f'r{r_idx}_b': ['Squeeze_Buy'], f'r{r_idx}_s': ['Squeeze_Sell'], f'r{r_idx}_tp': 20.0, f'r{r_idx}_sl': 5.0})
@@ -263,7 +263,7 @@ ph_holograma = st.empty()
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: #FF00FF;'>🚀 OMNI-FORGE V112.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: #FF00FF;'>🚀 OMNI-FORGE V112.1</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True): 
     st.cache_data.clear()
     for s in estrategias: 
@@ -345,21 +345,23 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['ATR'] = tr.ewm(alpha=1/14, min_periods=1, adjust=False).mean().fillna(df['High']-df['Low']).replace(0, 0.001)
         df['RSI'] = ta.rsi(df['Close'], length=14).fillna(50.0)
         df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
+        
+        # Corrección de asignación
         df['Basis'] = df['Close'].rolling(20, min_periods=1).mean()
         dev = df['Close'].rolling(20, min_periods=1).std(ddof=0).replace(0, 1) 
-        df['BBU'] = df['Basis'] + (2.0 * dev), df['BBL'] = df['Basis'] - (2.0 * dev)
-        df['BB_Width'] = (df['BBU'][0] - df['BBL'][0]) / df['Basis'].replace(0, 1) # Note: accessing tuple return correctly handled below
         df['BBU'] = df['Basis'] + (2.0 * dev)
         df['BBL'] = df['Basis'] - (2.0 * dev)
         df['BB_Width'] = (df['BBU'] - df['BBL']) / df['Basis'].replace(0, 1)
         df['BB_Width_Avg'] = df['BB_Width'].rolling(20, min_periods=1).mean()
+        
         kc_basis = df['Close'].rolling(20, min_periods=1).mean()
         df['KC_Upper'] = kc_basis + (df['ATR'] * 1.5)
         df['KC_Lower'] = kc_basis - (df['ATR'] * 1.5)
         df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
-        df['Vela_Verde'] = df['Close'] > df['Open'], df['Vela_Roja'] = df['Close'] < df['Open']
+        
         df['Vela_Verde'] = df['Close'] > df['Open']
         df['Vela_Roja'] = df['Close'] < df['Open']
+        
         df['body_size'] = abs(df['Close'] - df['Open']).replace(0, 0.0001)
         df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
         df['is_falling_knife'] = (df['Open'].shift(1) - df['Close'].shift(1)) > (df['ATR'].shift(1) * 1.5)
@@ -400,7 +402,7 @@ else:
     st.stop()
 
 # ==========================================
-# 🔥 PURE NUMPY BACKEND OPTIMIZADO (V112) 🔥
+# 🔥 PURE NUMPY BACKEND OPTIMIZADO (V112.1) 🔥
 # ==========================================
 a_c = df_global['Close'].values
 a_o = df_global['Open'].values
@@ -439,18 +441,22 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Squeeze_Sell'] = (a_c < a_ema50)
     t_buy = (a_fw >= therm_w) & a_vv & a_rcu
     t_sell = (a_cw >= therm_w) & a_vr & a_rcd
-    s_dict['Thermal_Buy'], s_dict['Thermal_Sell'] = t_buy, t_sell
+    s_dict['Thermal_Buy'] = t_buy
+    s_dict['Thermal_Sell'] = t_sell
     c_buy = (a_rvol > whale_f) & (a_lw > (a_bs * 2.0)) & (a_rsi < 35) & a_vv
-    s_dict['Climax_Buy'], s_dict['Climax_Sell'] = c_buy, (a_rsi > 80)
+    s_dict['Climax_Buy'] = c_buy
+    s_dict['Climax_Sell'] = (a_rsi > 80)
     l_buy = (a_dsup < hitbox) & a_vv & a_rcu
-    s_dict['Lock_Buy'], s_dict['Lock_Sell'] = l_buy, ((a_dres < hitbox) | (a_h >= a_tres))
+    s_dict['Lock_Buy'] = l_buy
+    s_dict['Lock_Sell'] = ((a_dres < hitbox) | (a_h >= a_tres))
     s_dict['Defcon_Buy'] = a_sqz_s1 & (a_c > a_bbu) & (a_adx > adx_th)
     s_dict['Defcon_Sell'] = (a_c < a_ema50)
     s_dict['Jugg_Buy'] = a_mb & (a_c > a_ema50) & (a_c_s1 < a_ema50) & a_vv & ~a_fk
     s_dict['Jugg_Sell'] = (a_c < a_ema50)
     s_dict['Trinity_Buy'] = a_mb & (a_rsi < 35) & a_vv & ~a_fk
     s_dict['Trinity_Sell'] = (a_rsi > 75) | (a_c < a_ema200)
-    s_dict['Lev_Buy'], s_dict['Lev_Sell'] = (a_mb & a_rcu & (a_rsi < 45)), (a_c < a_ema200)
+    s_dict['Lev_Buy'] = (a_mb & a_rcu & (a_rsi < 45))
+    s_dict['Lev_Sell'] = (a_c < a_ema200)
     s_dict['Commander_Buy'] = c_buy | t_buy | l_buy
     s_dict['Commander_Sell'] = t_sell | (a_c < a_ema50)
     regime = np.where(a_mb & (a_adx >= adx_th), 1, np.where(a_mb & (a_adx < adx_th), 2, np.where(~a_mb & (a_adx >= adx_th), 3, 4)))
@@ -459,8 +465,19 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 @njit(fastmath=True)
 def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr, sl_arr, cap_ini, com_pct, reinvest_pct):
     cap_act = cap_ini
-    divs, en_pos, p_ent, tp_act, sl_act, pos_size, invest_amt = 0.0, False, 0.0, 0.0, 0.0, 0.0, 0.0
-    g_profit, g_loss, num_trades, max_dd, peak = 0.0, 0.0, 0, 0.0, cap_ini
+    divs = 0.0
+    en_pos = False
+    p_ent = 0.0
+    tp_act = 0.0
+    sl_act = 0.0
+    pos_size = 0.0
+    invest_amt = 0.0
+    g_profit = 0.0
+    g_loss = 0.0
+    num_trades = 0
+    max_dd = 0.0
+    peak = cap_ini
+    
     for i in range(len(h_arr)):
         if en_pos:
             tp_p = p_ent * (1.0 + tp_act/100.0)
@@ -469,38 +486,66 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
                 gross = pos_size * (1.0 - sl_act/100.0)
                 net = gross - (gross * com_pct)
                 profit = net - invest_amt
-                if profit > 0: reinv = profit * (reinvest_pct / 100.0); divs += (profit - reinv); cap_act += reinv
-                else: cap_act += profit
-                g_loss += abs(profit); num_trades += 1; en_pos = False
+                if profit > 0:
+                    reinv = profit * (reinvest_pct / 100.0)
+                    divs += (profit - reinv)
+                    cap_act += reinv
+                else: 
+                    cap_act += profit
+                g_loss += abs(profit)
+                num_trades += 1
+                en_pos = False
             elif h_arr[i] >= tp_p:
                 gross = pos_size * (1.0 + tp_act/100.0)
                 net = gross - (gross * com_pct)
                 profit = net - invest_amt
-                if profit > 0: reinv = profit * (reinvest_pct / 100.0); divs += (profit - reinv); cap_act += reinv
-                else: cap_act += profit
-                if profit > 0: g_profit += profit 
-                else: g_loss += abs(profit)
-                num_trades += 1; en_pos = False
+                if profit > 0: 
+                    reinv = profit * (reinvest_pct / 100.0)
+                    divs += (profit - reinv)
+                    cap_act += reinv
+                else: 
+                    cap_act += profit
+                if profit > 0: 
+                    g_profit += profit 
+                else: 
+                    g_loss += abs(profit)
+                num_trades += 1
+                en_pos = False
             elif s_c[i]:
                 ret = (c_arr[i] - p_ent) / p_ent
                 gross = pos_size * (1.0 + ret)
                 net = gross - (gross * com_pct)
                 profit = net - invest_amt
-                if profit > 0: reinv = profit * (reinvest_pct / 100.0); divs += (profit - reinv); cap_act += reinv
-                else: cap_act += profit
-                if profit > 0: g_profit += profit 
-                else: g_loss += abs(profit)
-                num_trades += 1; en_pos = False
+                if profit > 0: 
+                    reinv = profit * (reinvest_pct / 100.0)
+                    divs += (profit - reinv)
+                    cap_act += reinv
+                else: 
+                    cap_act += profit
+                if profit > 0: 
+                    g_profit += profit 
+                else: 
+                    g_loss += abs(profit)
+                num_trades += 1
+                en_pos = False
+                
             total_equity = cap_act + divs
             if total_equity > peak: peak = total_equity
-            if peak > 0: dd = (peak - total_equity) / peak * 100.0; max_dd = max(max_dd, dd)
+            if peak > 0: 
+                dd = (peak - total_equity) / peak * 100.0
+                if dd > max_dd: max_dd = dd
             if cap_act <= 0: break
+            
         if not en_pos and b_c[i] and i+1 < len(h_arr):
             invest_amt = cap_act if reinvest_pct == 100.0 else cap_ini
             if invest_amt > cap_act: invest_amt = cap_act 
             comm_in = invest_amt * com_pct
             pos_size = invest_amt - comm_in 
-            p_ent = o_arr[i+1]; tp_act = t_arr[i]; sl_act = sl_arr[i]; en_pos = True
+            p_ent = o_arr[i+1]
+            tp_act = t_arr[i]
+            sl_act = sl_arr[i]
+            en_pos = True
+            
     return (cap_act + divs) - cap_ini, g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0), num_trades, max_dd
 
 def simular_visual(df_sim, cap_ini, reinvest, com_pct):
@@ -548,7 +593,7 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
         else: curva[i] = cap_act + divs
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
-# 🧠 RUTINA DE DEEP MINE (V112.0 - OMNI-FORGE) 🧠
+# 🧠 RUTINA DE DEEP MINE (V112.1 - OMNI-FORGE) 🧠
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, epochs=1, cur_fit=-float('inf')):
     best_fit = cur_fit 
     best_net_live = 0.0
@@ -780,7 +825,7 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
 # 📊 REPORTE UNIVERSAL DIRECTO
 # ==========================================
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V112.0**\n\n"
+    res_str = f"📋 **REPORTE OMNI-FORGE V112.1**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_global)}\n\n"
     buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
