@@ -21,7 +21,7 @@ except ImportError:
 
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Forge", layout="wide", initial_sidebar_state="expanded")
 
-# 🔥 EL HOLOGRAMA RESTAURADO (El causante del error solucionado) 🔥
+# 🔥 HOLOGRAMA PROTEGIDO 🔥
 ph_holograma = st.empty()
 
 # ==========================================
@@ -96,8 +96,11 @@ doctrinas = {
     "COMMANDER": "Infantería Pesada. Agrupa Climax, Thermal y Target Lock en un solo escuadrón. Una señal de cualquiera de los tres ejecuta la operación."
 }
 
+# 🔥 CATÁLOGOS COMPLETOS RESTAURADOS 🔥
 base_b = ['Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Jugg_Buy', 'Trinity_Buy', 'Commander_Buy', 'Lev_Buy']
 base_s = ['Ping_Sell', 'Climax_Sell', 'Thermal_Sell', 'Lock_Sell', 'Squeeze_Sell', 'Defcon_Sell', 'Jugg_Sell', 'Trinity_Sell', 'Commander_Sell', 'Lev_Sell']
+rocket_b = ['Trinity_Buy', 'Jugg_Buy', 'Defcon_Buy', 'Lock_Buy', 'Thermal_Buy', 'Climax_Buy', 'Ping_Buy', 'Squeeze_Buy', 'Lev_Buy', 'Commander_Buy']
+rocket_s = ['Trinity_Sell', 'Jugg_Sell', 'Defcon_Sell', 'Lock_Sell', 'Thermal_Sell', 'Climax_Sell', 'Ping_Sell', 'Squeeze_Sell', 'Lev_Sell', 'Commander_Sell']
 quadrix_b = ['Q_Pink_Whale_Buy', 'Q_Lock_Bounce', 'Q_Lock_Break', 'Q_Neon_Up', 'Q_Defcon_Buy', 'Q_Therm_Bounce', 'Q_Therm_Vacuum', 'Q_Nuclear_Buy', 'Q_Early_Buy', 'Q_Rebound_Buy']
 quadrix_s = ['Q_Lock_Reject', 'Q_Lock_Breakd', 'Q_Neon_Dn', 'Q_Defcon_Sell', 'Q_Therm_Wall_Sell', 'Q_Therm_Panic_Sell', 'Q_Nuclear_Sell', 'Q_Early_Sell']
 
@@ -125,8 +128,8 @@ for s_id in estrategias:
             st.session_state[f'champion_{s_id}'] = {'b_team': ['Commander_Buy', 'Squeeze_Buy'], 's_team': ['Commander_Sell'], 'macro': "All-Weather", 'vol': "All-Weather", 'tp': 20.0, 'sl': 5.0, 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0}
         elif s_id in ["GENESIS", "ROCKET", "QUADRIX"]:
             v = {'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0}
-            opts_b = quadrix_b if s_id == "QUADRIX" else base_b
-            opts_s = quadrix_s if s_id == "QUADRIX" else base_s
+            opts_b = quadrix_b if s_id == "QUADRIX" else rocket_b if s_id == "ROCKET" else base_b
+            opts_s = quadrix_s if s_id == "QUADRIX" else rocket_s if s_id == "ROCKET" else base_s
             for r_idx in range(1, 5): v.update({f'r{r_idx}_b': [opts_b[0]], f'r{r_idx}_s': [opts_s[0]], f'r{r_idx}_tp': 20.0, f'r{r_idx}_sl': 5.0})
             st.session_state[f'champion_{s_id}'] = v
         else:
@@ -148,7 +151,7 @@ def wipe_ui_cache():
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V121.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V122.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); wipe_ui_cache(); gc.collect(); st.rerun()
 
@@ -179,7 +182,7 @@ if st.sidebar.button(f"🧠 DEEP MINE GLOBAL ({global_epochs*3}k)", type="primar
     st.session_state['run_global'] = True
     st.rerun()
 
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V121)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V122)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -249,7 +252,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
         df['is_falling_knife'] = (df['Open'].shift(1) - df['Close'].shift(1)) > (df['ATR'].shift(1) * 1.5)
         
-        # 🟢 TV PIVOTS (Para APEX, Juggernaut, Commander)
         df['PL30_P'] = get_tv_pivot(df['Low'], 30, 3, False)
         df['PH30_P'] = get_tv_pivot(df['High'], 30, 3, True)
         df['PL100_P'] = get_tv_pivot(df['Low'], 100, 5, False)
@@ -257,7 +259,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['PL300_P'] = get_tv_pivot(df['Low'], 300, 5, False)
         df['PH300_P'] = get_tv_pivot(df['High'], 300, 5, True)
         
-        # 🟡 ROLLING LOWEST (Para ULTRA y Mercenary)
         df['PL30_L'] = df['Low'].shift(1).rolling(30, min_periods=1).min()
         df['PH30_L'] = df['High'].shift(1).rolling(30, min_periods=1).max()
         df['PL100_L'] = df['Low'].shift(1).rolling(100, min_periods=1).min()
@@ -269,7 +270,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['RSI_Cross_Dn'] = (df['RSI'] < df['RSI_MA']) & (df['RSI'].shift(1) >= df['RSI_MA'].shift(1))
         df['Macro_Bull'] = df['Close'] >= df['EMA_200']
         
-        # 🚀 ÁLGEBRA EXACTA PARA PENDIENTE PING PONG (Zero DropNa Error)
         df['PP_Slope'] = (2*df['Close'] + df['Close'].shift(1) - df['Close'].shift(3) - 2*df['Close'].shift(4)) / 10.0
         
         gc.collect()
@@ -287,7 +287,7 @@ else:
 # 📊 REPORTE UNIVERSAL DIRECTO
 # ==========================================
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V121.0**\n\n"
+    res_str = f"📋 **REPORTE OMNI-FORGE V122.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Velas: {len(df_global)}\n\n"
     buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
     res_str += f"📈 RENDIMIENTO DEL HOLD: **{buy_hold_ret:.2f}%**\n\n"
@@ -316,7 +316,7 @@ else: st.info("La bóveda está vacía. Inicie una Forja individual o Global par
 st.markdown("---")
 
 # ==========================================
-# 🔥 PURE NUMPY BACKEND (V121.0) 🔥
+# 🔥 PURE NUMPY BACKEND (V122.0) 🔥
 # ==========================================
 a_c = df_global['Close'].values
 a_o = df_global['Open'].values
@@ -387,7 +387,7 @@ def calcular_señales_numpy(s_id, hitbox, therm_w, adx_th, whale_f):
     else:
         a_tsup = np.maximum(a_pl30_p, np.maximum(a_pl100_p, a_pl300_p))
         a_tres = np.minimum(a_ph30_p, np.minimum(a_ph100_p, a_ph300_p))
-        pl30, ph30, pl100, ph100, pl300, ph300 = a_pl30_p, a_ph30_p, a_pl100_p, a_ph100_p, a_pl300_p, a_ph300_p
+        pl30, ph30, pl100, ph100, pl300, ph300 = a_pl30_p, a_ph30_p, a_pl100_p, a_ph100_p, a_pl30_p, a_ph300_p
 
     a_dsup = np.abs(a_c - a_tsup) / a_c * 100
     a_dres = np.abs(a_c - a_tres) / a_c * 100
@@ -574,7 +574,8 @@ def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr,
     g_profit, g_loss, num_trades, max_dd, peak = 0.0, 0.0, 0, 0.0, cap_ini
     for i in range(len(h_arr)):
         if en_pos:
-            tp_p = p_ent * (1.0 + tp_act/100.0); sl_p = p_ent * (1.0 - sl_act/100.0)
+            tp_p = p_ent * (1.0 + tp_act/100.0)
+            sl_p = p_ent * (1.0 - sl_act/100.0)
             if l_arr[i] <= sl_p:
                 gross = pos_size * (1.0 - sl_act/100.0); net = gross - (gross * com_pct); profit = net - invest_amt
                 if profit > 0: reinv = profit * (reinvest_pct / 100.0); divs += (profit - reinv); cap_act += reinv
@@ -718,13 +719,14 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                     f_sell[mask] = s_dict[dna_s[idx][0]][mask]
                     f_tp[mask] = dna_tp[idx]
                     f_sl[mask] = dna_sl[idx]
-            else:
+            else: # ESTRATEGIAS BASE
                 b_key, s_key = "", ""
                 if s_id == "TARGET_LOCK": b_key, s_key = "Lock_Buy", "Lock_Sell"
                 elif s_id == "NEON_SQUEEZE": b_key, s_key = "Squeeze_Buy", "Squeeze_Sell"
                 elif s_id == "PINK_CLIMAX": b_key, s_key = "Climax_Buy", "Climax_Sell"
                 elif s_id == "PING_PONG": b_key, s_key = "Ping_Buy", "Ping_Sell"
                 else: b_key, s_key = f"{s_id.split('_')[0].capitalize()}_Buy", f"{s_id.split('_')[0].capitalize()}_Sell"
+                
                 f_buy[:] = s_dict[b_key]; f_sell[:] = s_dict[s_key]
                 f_tp.fill(rtp); f_sl.fill(rsl)
 
@@ -761,7 +763,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
         </style>
         <div class="loader-container">
             <div class="rocket">🚀</div>
-            <div class="prog-text">OMNI-FORGE V121: {s_id}</div>
+            <div class="prog-text">OMNI-FORGE V122: {s_id}</div>
             <div class="hud-text" style="color: white;">Progreso: {pct_done}%</div>
             <div class="hud-text" style="color: white;">Combos: {combos:,}</div>
             <div class="hud-text" style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Hallazgo: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x | Trds: {best_nt_live}</div>
@@ -920,7 +922,7 @@ if strategy.position_size > 0
 // Copie y pegue su Pine Script original en TradingView."""
     else:
         ps = f"""// This source code is subject to the terms of the Mozilla Public License 2.0
-// © Valle_Architect_Lab | AUTO-GENERATED BY OMNI-FORGE V121
+// © Valle_Architect_Lab | AUTO-GENERATED BY OMNI-FORGE V122
 
 //@version=5
 strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_value=0.25)
