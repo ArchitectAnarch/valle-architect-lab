@@ -1029,4 +1029,42 @@ if strategy.position_size > 0
                 exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
                 tt = len(exs)
                 if tt > 0:
-                    ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_
+                    ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
+                    wr = (ws / tt) * 100
+                    gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum()
+                    gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
+                    pf_val = gpp / gll if gll > 0 else float('inf')
+            
+            vault['net'] = eq_curve[-1] - capital_inicial
+            vault['winrate'] = wr
+            mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
+            ado_val = tt / dias_reales if dias_reales > 0 else 0.0
+
+            c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+            c1.metric("Net Profit", f"${eq_curve[-1]-capital_inicial:,.2f}", f"{ret_pct:.2f}%")
+            c2.metric("ALPHA (Hold)", f"{alpha_pct:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
+            c3.metric("Trades", f"{tt}", f"ADO: {ado_val:.2f}")
+            c4.metric("Win Rate", f"{wr:.1f}%")
+            c5.metric("Profit Factor", f"{pf_val:.2f}x")
+            c6.metric("Max Drawdown", f"{mdd:.2f}%", delta_color="inverse")
+            c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
+
+            with st.expander("📝 PINE SCRIPT GENERATOR", expanded=False):
+                st.info("Exportación directa a TradingView. Ya incluye el Filtro de Fecha y los Webhooks.")
+                st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download), language="pine")
+
+            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+            fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
+            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='EMA 50', line=dict(color='yellow', width=2)), row=1, col=1)
+
+            if not dftr.empty:
+                ents = dftr[dftr['Tipo'] == 'ENTRY']
+                fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+                wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
+                fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+                loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
+                fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+
+            fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
+            fig.update_yaxes(side="right"); fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False)
+            st.plotly_chart(fig, use_container_width=True, key=f"chart_{s_id}")
