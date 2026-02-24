@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Forge", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V146':
+if st.session_state.get('app_version') != 'V147':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V146'
+    st.session_state['app_version'] = 'V147'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -206,7 +206,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V146.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V147.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -236,7 +236,6 @@ st.sidebar.markdown("<h3 style='text-align: center; color: lime;'>🤖 SUPERCOMP
 global_epochs = st.sidebar.slider("Épocas de Evolución (x3000)", 1, 1000, 50)
 target_strats = st.sidebar.multiselect("🎯 Estrategias a Forjar:", estrategias, default=estrategias)
 
-# 🔥 SISTEMA DE COLA ASÍNCRONA PARA EVITAR TIMEOUT DE STREAMLIT 🔥
 if st.sidebar.button(f"🧠 DEEP MINE GLOBAL", type="primary", use_container_width=True, key="btn_global"):
     st.session_state['global_queue'] = target_strats.copy()
     st.session_state['abort_opt'] = False
@@ -250,7 +249,8 @@ if st.sidebar.button("🤖 CREAR ALGORITMO IA", type="secondary", use_container_
     st.session_state['run_ai_mutant'] = new_id; st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V146.0**\n\n"
+    res_str = f"📋 **REPORTE OMNI-FORGE V147.0**\n\n"
+    res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
         opt_icon = "✅" if st.session_state.get(f'opt_status_{s_id}', False) else "➖"
@@ -267,7 +267,7 @@ st.sidebar.download_button(label="🐙 Exportar a GitHub (JSON)", data=json.dump
 # ==========================================
 # 🛑 5. EXTRACCIÓN DE VELAS Y ARRAYS MATEMÁTICOS 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal (V146)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal (V147)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     def _get_tv_pivot(series, left, right, is_high=True):
         window = left + right + 1
@@ -389,7 +389,6 @@ a_rsi_s1 = npshift(a_rsi, 1, 50.0); a_rsi_s5 = npshift(a_rsi, 5, 50.0)
 a_wt1_s1 = npshift(a_wt1, 1, 0.0); a_wt2_s1 = npshift(a_wt2, 1, 0.0)
 a_pp_slope_s1 = npshift(a_pp_slope, 1, 0.0)
 
-# 🔥 GENERADOR DE SEÑALES 🔥
 def calcular_señales_numpy(s_id, hitbox, therm_w, adx_th, whale_f):
     n_len = len(a_c); s_dict = {}
     use_lowest = s_id in ["ROCKET_ULTRA", "MERCENARY", "ALL_FORCES", "GENESIS", "ROCKET", "QUADRIX"] or s_id.startswith("AI_")
@@ -470,7 +469,6 @@ def calcular_señales_numpy(s_id, hitbox, therm_w, adx_th, whale_f):
 
     s_dict['APEX_BUY'] = cond_pink_whale_buy | (trinity_safe & (cond_defcon_buy | cond_lock_buy_bounce | cond_lock_buy_break))
     s_dict['APEX_SELL'] = cond_defcon_sell | cond_lock_sell_reject | cond_lock_sell_breakd
-    
     s_dict['JUGGERNAUT_BUY_V356'] = (trinity_safe & (cond_defcon_buy | cond_therm_buy_bounce | cond_therm_buy_vacuum | cond_lock_buy_bounce | cond_lock_buy_break)) | cond_pink_whale_buy
     s_dict['JUGGERNAUT_SELL_V356'] = cond_defcon_sell | cond_therm_sell_wall | cond_therm_sell_panic | cond_lock_sell_reject | cond_lock_sell_breakd
 
@@ -577,7 +575,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                     bp = {'r1_b': dna_b[0], 'r1_s': dna_s[0], 'r1_tp': dna_tp[0], 'r1_sl': dna_sl[0], 'r2_b': dna_b[1], 'r2_s': dna_s[1], 'r2_tp': dna_tp[1], 'r2_sl': dna_sl[1], 'r3_b': dna_b[2], 'r3_s': dna_s[2], 'r3_tp': dna_tp[2], 'r3_sl': dna_sl[2], 'r4_b': dna_b[3], 'r4_s': dna_s[3], 'r4_tp': dna_tp[3], 'r4_sl': dna_sl[3], 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit, 'net': net, 'winrate': 0.0}
                 else:
                     bp = {'tp': rtp, 'sl': rsl, 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit, 'net': net, 'winrate': 0.0}
-        
+                
         del s_dict; del regime_arr
         
         if c == 0 or c == (chunks - 1) or c % update_mod == 0:
@@ -591,13 +589,13 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             </style>
             <div class="loader-container">
                 <div class="rocket">🚀</div>
-                <div style="color: #FF00FF; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">OMNI-FORGE V146: {s_id}</div>
+                <div style="color: #FF00FF; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">OMNI-FORGE V147: {s_id}</div>
                 <div style="color: white; font-size: 1.3rem;">Progreso: {pct_done}% | Combos: {combos:,}</div>
                 <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Hallazgo: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x</div>
                 <div style="color: yellow; margin-top: 15px;">ETA: {eta:.1f} segs</div>
             </div>
             """, unsafe_allow_html=True)
-            time.sleep(0.05) # 🔥 MICRO-PAUSA DE DESAHOGO PARA EVITAR TIMEOUT DE WEBSOCKET 🔥
+            time.sleep(0.05) 
             
     return bp if bp else None
 
@@ -634,8 +632,12 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
             f_tp[mask] = float(vault.get(f'r{idx_q}_tp', 0.0))
             f_sl[mask] = float(vault.get(f'r{idx_q}_sl', 0.0))
     else: 
-        b_k = f"{s_id.split('_')[0].capitalize()}_Buy" if s_id not in ["TARGET_LOCK", "NEON_SQUEEZE", "PINK_CLIMAX", "PING_PONG"] else "Lock_Buy" if s_id == "TARGET_LOCK" else "Squeeze_Buy" if s_id == "NEON_SQUEEZE" else "Climax_Buy" if s_id == "PINK_CLIMAX" else "Ping_Buy"
-        s_k = f"{s_id.split('_')[0].capitalize()}_Sell" if s_id not in ["TARGET_LOCK", "NEON_SQUEEZE", "PINK_CLIMAX", "PING_PONG"] else "Lock_Sell" if s_id == "TARGET_LOCK" else "Squeeze_Sell" if s_id == "NEON_SQUEEZE" else "Climax_Sell" if s_id == "PINK_CLIMAX" else "Ping_Sell"
+        b_k, s_k = "", ""
+        if s_id == "TARGET_LOCK": b_k, s_k = "Lock_Buy", "Lock_Sell"
+        elif s_id == "NEON_SQUEEZE": b_k, s_k = "Squeeze_Buy", "Squeeze_Sell"
+        elif s_id == "PINK_CLIMAX": b_k, s_k = "Climax_Buy", "Climax_Sell"
+        elif s_id == "PING_PONG": b_k, s_k = "Ping_Buy", "Ping_Sell"
+        else: b_k, s_k = f"{s_id.split('_')[0].capitalize()}_Buy", f"{s_id.split('_')[0].capitalize()}_Sell"
         f_buy[:], f_sell[:] = s_dict.get(b_k, default_f), s_dict.get(s_k, default_f)
 
     df_strat = df_global.copy()
@@ -645,7 +647,7 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 0.0)), com_pct)
     return df_strat, eq_curve, t_log, total_comms
 
-# 🔥 PINE SCRIPT RESTAURADO: TRADUCCIÓN MATEMÁTICA PERFECTA 🔥
+# 🔥 PINE SCRIPT RESTAURADO: CON ÍCONOS REDUCIDOS Y NEXT BAR EXECUTION 🔥
 def generar_pine_script(s_id, vault, sym, tf):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0)
     v_adx = vault.get('adx_th', 25.0); v_wf = vault.get('whale_f', 2.5)
@@ -904,13 +906,15 @@ if strategy.position_size > 0
     entry_price = strategy.opentrades.entry_price(strategy.opentrades - 1)
     target_price = entry_price * (1 + active_tp), stop_price = entry_price * (1 - active_sl)
     strategy.exit("TP/SL", "In", limit=target_price, stop=stop_price, alert_message=wt_exit_long)
+
 plot(ema50, color=color.yellow, title="EMA 50")
-plotchar(signal_buy, title="COMPRA", char="🚀", location=location.belowbar, color=color.aqua, size=size.small)
+plotchar(signal_buy, title="COMPRA", char="🚀", location=location.belowbar, color=color.aqua, size=size.tiny)
+plotchar(signal_sell, title="VENTA", char="🛑", location=location.abovebar, color=color.red, size=size.tiny)
 """
     return ps_base + ps_indicators + ps_logic + ps_exec
 
 # ==========================================
-# 🛑 7. EJECUCIÓN GLOBAL (COLA ASÍNCRONA ANTI-TIMEOUT)
+# 🛑 7. EJECUCIÓN GLOBAL (COLA ASÍNCRONA)
 # ==========================================
 if 'global_queue' not in st.session_state:
     st.session_state['global_queue'] = []
