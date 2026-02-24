@@ -23,9 +23,9 @@ st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Forge", layout="wide", ini
 ph_holograma = st.empty()
 
 # 🔥 AUTO-PURGA DE CACHÉ SUCIA 🔥
-if st.session_state.get('app_version') != 'V129':
+if st.session_state.get('app_version') != 'V130':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V129'
+    st.session_state['app_version'] = 'V130'
 
 # ==========================================
 # 🧠 UTILIDADES NUMPY Y RÉPLICAS TV
@@ -118,6 +118,9 @@ pine_map = {
     'Q_Therm_Panic_Sell': 'r_Therm_Panic_Sell', 'Q_Nuclear_Sell': 'r_Nuclear_Sell', 'Q_Early_Sell': 'r_Early_Sell'
 }
 
+# ==========================================
+# 🧬 THE DNA VAULT
+# ==========================================
 for s_id in estrategias:
     if f'opt_status_{s_id}' not in st.session_state: st.session_state[f'opt_status_{s_id}'] = False
     if f'champion_{s_id}' not in st.session_state:
@@ -141,16 +144,12 @@ def save_champion(s_id, bp):
     vault['net'] = bp.get('net', 0.0)
     vault['winrate'] = bp.get('winrate', 0.0)
 
-def wipe_ui_cache():
-    for key in list(st.session_state.keys()):
-        if key.startswith("ui_"): del st.session_state[key]
-
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V129.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V130.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
-    st.cache_data.clear(); wipe_ui_cache()
+    st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
     for k in list(st.session_state.keys()):
         if k not in keys_to_keep: del st.session_state[k]
@@ -193,7 +192,7 @@ if st.sidebar.button("🤖 CREAR ALGORITMO IA", type="secondary", use_container_
 
 # 📊 BLOCK NOTE UNIVERSAL
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V129.0**\n\n"
+    res_str = f"📋 **REPORTE OMNI-FORGE V130.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -205,7 +204,7 @@ st.sidebar.markdown("---")
 if st.sidebar.button("📊 GENERAR REPORTE UNIVERSAL", use_container_width=True, key="btn_univ_report"):
     st.sidebar.text_area("Block Note Universal (Copia tu Reporte):", value=generar_reporte_universal(capital_inicial, comision_pct), height=400)
 
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V129)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V130)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -293,24 +292,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
 df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, utc_offset)
 if not df_global.empty: dias_reales = max((df_global.index[-1] - df_global.index[0]).days, 1)
 else: st.error(status_api); st.stop()
-
-# ==========================================
-# 🏆 SCOREBOARD (LEADERBOARD) PLEGABLE Y ORDENADO
-# ==========================================
-with st.expander("🏆 SALÓN DE LA FAMA (Ordenado por Rentabilidad Neta)", expanded=False):
-    st.info("La IA penaliza el riesgo en su Puntaje interno. Aquí ordenamos puramente por Ganancia Neta para ver los dólares reales.")
-    leaderboard_data = []
-    for s in estrategias:
-        v = st.session_state.get(f'champion_{s}', {})
-        fit = v.get('fit', -float('inf'))
-        if fit != -float('inf'):
-            net_val = v.get('net', 0)
-            leaderboard_data.append({"Estrategia": s, "Neto_Num": net_val, "Rentabilidad Neta": f"${net_val:,.2f} ({net_val/capital_inicial*100:.2f}%)", "WinRate": f"{v.get('winrate', 0):.1f}%", "Puntaje IA (Riesgo)": f"{fit:,.0f}"})
-    if leaderboard_data:
-        leaderboard_data.sort(key=lambda x: x['Neto_Num'], reverse=True)
-        for item in leaderboard_data: del item['Neto_Num']
-        st.table(pd.DataFrame(leaderboard_data))
-    else: st.write("La bóveda está vacía. Inicie una Forja individual o Global.")
 
 # ==========================================
 # 🔥 PURE NUMPY BACKEND CACHÉ 🔥
@@ -535,7 +516,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
     target_nt = max(1.0, target_ado * dias_reales)
 
     f_buy = np.empty(n_len, dtype=bool); f_sell = np.empty(n_len, dtype=bool)
-    f_tp = np.empty(n_len, dtype=np.float64); f_sl = np.empty(n_len, dtype=np.float64)
     macro_mask = np.empty(n_len, dtype=bool); vol_mask = np.empty(n_len, dtype=bool)
 
     hitbox_ops = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
@@ -556,7 +536,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             r_hitbox = random.choice(hitbox_ops); r_therm = random.choice(therm_ops)
             r_adx = random.choice(adx_ops); r_whale = random.choice(whale_ops)
             
-            # 🔥 BIFURCACIÓN DE CACHÉ SEGURA 🔥
+            # 🔥 EXTRACCIÓN PROTEGIDA (El origen del Error resuelto aquí) 🔥
+            vault = st.session_state[f'champion_{s_id}']
             use_lowest = s_id in ["ROCKET_ULTRA", "MERCENARY", "ALL_FORCES", "GENESIS", "ROCKET", "QUADRIX"] or s_id.startswith("AI_")
             c_key = (use_lowest, r_hitbox, r_therm, r_adx, r_whale)
             
@@ -564,38 +545,33 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 st.session_state['signal_cache'][c_key] = calcular_señales_numpy(s_id, r_hitbox, r_therm, r_adx, r_whale)
             s_dict, regime_arr = st.session_state['signal_cache'][c_key]
             
+            f_tp = np.full(n_len, rtp)
+            f_sl = np.full(n_len, rsl)
+
             if s_id in ["ROCKET_ULTRA", "ROCKET_COMMANDER"]:
                 f_buy[:] = (s_dict['RC_Buy_Q1'] & (regime_arr == 1)) | (s_dict['RC_Buy_Q2'] & (regime_arr == 2)) | (s_dict['RC_Buy_Q3'] & (regime_arr == 3)) | (s_dict['RC_Buy_Q4'] & (regime_arr == 4))
                 f_sell[:] = (s_dict['RC_Sell_Q1'] & (regime_arr == 1)) | (s_dict['RC_Sell_Q2'] & (regime_arr == 2)) | (s_dict['RC_Sell_Q3'] & (regime_arr == 3)) | (s_dict['RC_Sell_Q4'] & (regime_arr == 4))
-                f_tp.fill(rtp); f_sl.fill(rsl)
             elif s_id == "JUGGERNAUT":
                 f_buy[:] = s_dict['JUGGERNAUT_BUY_V356']; f_sell[:] = s_dict['JUGGERNAUT_SELL_V356']
-                f_tp.fill(rtp); f_sl.fill(rsl)
             elif s_id == "APEX_HYBRID":
                 f_buy[:] = s_dict['APEX_BUY']; f_sell[:] = s_dict['APEX_SELL']
-                f_tp.fill(rtp); f_sl.fill(rsl)
             elif s_id == "MERCENARY":
                 f_buy[:] = (s_dict['MERC_PING'] | s_dict['MERC_JUGG'] | s_dict['MERC_CLIM']) & (a_mb) & (a_adx < r_adx)
                 f_sell[:] = s_dict['MERC_SELL']
-                f_tp.fill(rtp); f_sl.fill(rsl)
             elif s_id == "ALL_FORCES" or s_id.startswith("AI_MUTANT"):
                 dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 3)) if s_id.startswith("AI_") else random.sample(base_b, random.randint(1, len(base_b)))
                 dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 3)) if s_id.startswith("AI_") else random.sample(base_s, random.randint(1, len(base_s)))
                 dna_macro = random.choice(["All-Weather", "Bull Only (Precio > EMA 200)", "Bear Only (Precio < EMA 200)"])
                 dna_vol = random.choice(["All-Weather", "Trend (ADX Alto)", "Range (ADX Bajo)"])
-                
                 if dna_macro == "Bull Only (Precio > EMA 200)": macro_mask[:] = a_mb
                 elif dna_macro == "Bear Only (Precio < EMA 200)": macro_mask[:] = ~a_mb
                 else: macro_mask.fill(True)
-                
                 if dna_vol == "Trend (ADX Alto)": vol_mask[:] = (a_adx >= r_adx)
                 elif dna_vol == "Range (ADX Bajo)": vol_mask[:] = (a_adx < r_adx)
                 else: vol_mask.fill(True)
-                
                 for r in dna_b_team: f_buy |= s_dict[r]
                 f_buy &= macro_mask; f_buy &= vol_mask
                 for r in dna_s_team: f_sell |= s_dict[r]
-                f_tp.fill(rtp); f_sl.fill(rsl)
             elif s_id in ["GENESIS", "ROCKET", "QUADRIX"]:
                 opts_b = quadrix_b if s_id == "QUADRIX" else rocket_b if s_id == "ROCKET" else base_b
                 opts_s = quadrix_s if s_id == "QUADRIX" else rocket_s if s_id == "ROCKET" else base_s
@@ -616,9 +592,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 elif s_id == "PINK_CLIMAX": b_key, s_key = "Climax_Buy", "Climax_Sell"
                 elif s_id == "PING_PONG": b_key, s_key = "Ping_Buy", "Ping_Sell"
                 else: b_key, s_key = f"{s_id.split('_')[0].capitalize()}_Buy", f"{s_id.split('_')[0].capitalize()}_Sell"
-                
                 f_buy[:] = s_dict[b_key]; f_sell[:] = s_dict[s_key]
-                f_tp.fill(rtp); f_sl.fill(rsl)
 
             net, pf, nt, mdd = simular_crecimiento_exponencial(a_h, a_l, a_c, a_o, f_buy, f_sell, f_tp, f_sl, float(cap_ini), float(com_pct), float(reinv_q))
             alpha_money = net - buy_hold_money
@@ -653,7 +627,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             </style>
             <div class="loader-container">
                 <div class="rocket">🚀</div>
-                <div class="prog-text">OMNI-FORGE V128: {s_id}</div>
+                <div class="prog-text">OMNI-FORGE V127: {s_id}</div>
                 <div class="hud-text" style="color: white;">Progreso: {pct_done}%</div>
                 <div class="hud-text" style="color: white;">Combos Procesados: {combos:,}</div>
                 <div class="hud-text" style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Hallazgo: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x | Trds: {best_nt_live}</div>
@@ -972,8 +946,6 @@ if strategy.position_size > 0
     strategy.exit("TP/SL", "In", limit=target_price, stop=stop_price, alert_message=wt_exit_long)
 """
         return ps
-
-tabs = st.tabs(list(tab_id_map.keys()))
 
 for idx, tab_name in enumerate(list(tab_id_map.keys())):
     with tabs[idx]:
