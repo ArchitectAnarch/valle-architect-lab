@@ -22,10 +22,10 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Forge", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 AUTO-PURGA DE CACHÉ SUCIA (AEGIS RESET) 🔥
-if st.session_state.get('app_version') != 'V128':
+# 🔥 AUTO-PURGA DE CACHÉ SUCIA 🔥
+if st.session_state.get('app_version') != 'V129':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V128'
+    st.session_state['app_version'] = 'V129'
 
 # ==========================================
 # 🧠 UTILIDADES NUMPY Y RÉPLICAS TV
@@ -148,10 +148,10 @@ def wipe_ui_cache():
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V128.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V129.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
-    st.cache_data.clear()
-    keys_to_keep = ['app_version']
+    st.cache_data.clear(); wipe_ui_cache()
+    keys_to_keep = ['app_version', 'ai_algos']
     for k in list(st.session_state.keys()):
         if k not in keys_to_keep: del st.session_state[k]
     gc.collect(); st.rerun()
@@ -193,7 +193,7 @@ if st.sidebar.button("🤖 CREAR ALGORITMO IA", type="secondary", use_container_
 
 # 📊 BLOCK NOTE UNIVERSAL
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V128.0**\n\n"
+    res_str = f"📋 **REPORTE OMNI-FORGE V129.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -205,7 +205,7 @@ st.sidebar.markdown("---")
 if st.sidebar.button("📊 GENERAR REPORTE UNIVERSAL", use_container_width=True, key="btn_univ_report"):
     st.sidebar.text_area("Block Note Universal (Copia tu Reporte):", value=generar_reporte_universal(capital_inicial, comision_pct), height=400)
 
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V128)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V129)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -295,7 +295,25 @@ if not df_global.empty: dias_reales = max((df_global.index[-1] - df_global.index
 else: st.error(status_api); st.stop()
 
 # ==========================================
-# 🔥 PURE NUMPY BACKEND (V128.0 CACHÉ) 🔥
+# 🏆 SCOREBOARD (LEADERBOARD) PLEGABLE Y ORDENADO
+# ==========================================
+with st.expander("🏆 SALÓN DE LA FAMA (Ordenado por Rentabilidad Neta)", expanded=False):
+    st.info("La IA penaliza el riesgo en su Puntaje interno. Aquí ordenamos puramente por Ganancia Neta para ver los dólares reales.")
+    leaderboard_data = []
+    for s in estrategias:
+        v = st.session_state.get(f'champion_{s}', {})
+        fit = v.get('fit', -float('inf'))
+        if fit != -float('inf'):
+            net_val = v.get('net', 0)
+            leaderboard_data.append({"Estrategia": s, "Neto_Num": net_val, "Rentabilidad Neta": f"${net_val:,.2f} ({net_val/capital_inicial*100:.2f}%)", "WinRate": f"{v.get('winrate', 0):.1f}%", "Puntaje IA (Riesgo)": f"{fit:,.0f}"})
+    if leaderboard_data:
+        leaderboard_data.sort(key=lambda x: x['Neto_Num'], reverse=True)
+        for item in leaderboard_data: del item['Neto_Num']
+        st.table(pd.DataFrame(leaderboard_data))
+    else: st.write("La bóveda está vacía. Inicie una Forja individual o Global.")
+
+# ==========================================
+# 🔥 PURE NUMPY BACKEND CACHÉ 🔥
 # ==========================================
 a_c = df_global['Close'].values; a_o = df_global['Open'].values; a_h = df_global['High'].values; a_l = df_global['Low'].values
 a_rsi = df_global['RSI'].values; a_rsi_ma = df_global['RSI_MA'].values; a_adx = df_global['ADX'].values
@@ -324,17 +342,17 @@ a_rsi_s1 = npshift(a_rsi, 1, 50.0); a_rsi_s5 = npshift(a_rsi, 5, 50.0)
 a_wt1_s1 = npshift(a_wt1, 1, 0.0); a_wt2_s1 = npshift(a_wt2, 1, 0.0)
 a_pp_slope_s1 = npshift(a_pp_slope, 1, 0.0)
 
-# 🔥 BIFURCACIÓN DE CACHÉ ESTRICTA 🔥
-def calcular_señales_numpy(use_lowest, hitbox, therm_w, adx_th, whale_f):
+if 'signal_cache' not in st.session_state: st.session_state['signal_cache'] = {}
+
+def calcular_señales_numpy(s_id, hitbox, therm_w, adx_th, whale_f):
     n_len = len(a_c); s_dict = {}
     
+    use_lowest = s_id in ["ROCKET_ULTRA", "MERCENARY", "ALL_FORCES", "GENESIS", "ROCKET", "QUADRIX"] or s_id.startswith("AI_")
     if use_lowest:
-        a_tsup = np.maximum(a_pl30_l, np.maximum(a_pl100_l, a_pl300_l))
-        a_tres = np.minimum(a_ph30_l, np.minimum(a_ph100_l, a_ph300_l))
+        a_tsup = np.maximum(a_pl30_l, np.maximum(a_pl100_l, a_pl300_l)); a_tres = np.minimum(a_ph30_l, np.minimum(a_ph100_l, a_ph300_l))
         pl30, ph30, pl100, ph100, pl300, ph300 = a_pl30_l, a_ph30_l, a_pl100_l, a_ph100_l, a_pl30_l, a_ph300_l
     else:
-        a_tsup = np.maximum(a_pl30_p, np.maximum(a_pl100_p, a_pl300_p))
-        a_tres = np.minimum(a_ph30_p, np.minimum(a_ph100_p, a_ph300_p))
+        a_tsup = np.maximum(a_pl30_p, np.maximum(a_pl100_p, a_pl300_p)); a_tres = np.minimum(a_ph30_p, np.minimum(a_ph100_p, a_ph300_p))
         pl30, ph30, pl100, ph100, pl300, ph300 = a_pl30_p, a_ph30_p, a_pl100_p, a_ph100_p, a_pl30_p, a_ph300_p
 
     a_dsup = np.abs(a_c - a_tsup) / a_c * 100; a_dres = np.abs(a_c - a_tres) / a_c * 100
@@ -505,9 +523,6 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
         else: curva[i] = cap_act + divs
     return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
 
-if 'signal_cache' not in st.session_state:
-    st.session_state['signal_cache'] = {}
-
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, epochs=1, cur_fit=-float('inf')):
     st.session_state['abort_opt'] = False
     best_fit, best_net_live, best_pf_live, best_nt_live, bp = cur_fit, 0.0, 0.0, 0, None
@@ -605,11 +620,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 f_buy[:] = s_dict[b_key]; f_sell[:] = s_dict[s_key]
                 f_tp.fill(rtp); f_sl.fill(rsl)
 
-            # 🔥 REPARACIÓN NUMBA (Conversión Escalar) 🔥
-            f_tp_arr = np.full(n_len, rtp) if np.isscalar(rtp) else f_tp
-            f_sl_arr = np.full(n_len, rsl) if np.isscalar(rsl) else f_sl
-
-            net, pf, nt, mdd = simular_crecimiento_exponencial(a_h, a_l, a_c, a_o, f_buy, f_sell, f_tp_arr, f_sl_arr, float(cap_ini), float(com_pct), float(reinv_q))
+            net, pf, nt, mdd = simular_crecimiento_exponencial(a_h, a_l, a_c, a_o, f_buy, f_sell, f_tp, f_sl, float(cap_ini), float(com_pct), float(reinv_q))
             alpha_money = net - buy_hold_money
             
             if nt >= 1: 
@@ -654,6 +665,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
 
 def run_backtest_eval(s_id, cap_ini, com_pct):
     vault = st.session_state[f'champion_{s_id}']
+    
     use_lowest = s_id in ["ROCKET_ULTRA", "MERCENARY", "ALL_FORCES", "GENESIS", "ROCKET", "QUADRIX"] or s_id.startswith("AI_")
     c_key = (use_lowest, vault['hitbox'], vault['therm_w'], vault['adx_th'], vault['whale_f'])
     if c_key not in st.session_state['signal_cache']:
@@ -960,6 +972,8 @@ if strategy.position_size > 0
     strategy.exit("TP/SL", "In", limit=target_price, stop=stop_price, alert_message=wt_exit_long)
 """
         return ps
+
+tabs = st.tabs(list(tab_id_map.keys()))
 
 for idx, tab_name in enumerate(list(tab_id_map.keys())):
     with tabs[idx]:
