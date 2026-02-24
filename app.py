@@ -23,9 +23,9 @@ st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Forge", layout="wide", ini
 ph_holograma = st.empty()
 
 # 🔥 AUTO-PURGA DE CACHÉ SUCIA 🔥
-if st.session_state.get('app_version') != 'V130':
+if st.session_state.get('app_version') != 'V131':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V130'
+    st.session_state['app_version'] = 'V131'
 
 # ==========================================
 # 🧠 UTILIDADES NUMPY Y RÉPLICAS TV
@@ -151,7 +151,7 @@ def wipe_ui_cache():
 # ==========================================
 # 🌍 SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V130.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V131.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); wipe_ui_cache()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -196,7 +196,7 @@ if st.sidebar.button("🤖 CREAR ALGORITMO IA", type="secondary", use_container_
 
 # 📊 BLOCK NOTE UNIVERSAL
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V130.0**\n\n"
+    res_str = f"📋 **REPORTE OMNI-FORGE V131.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -208,7 +208,7 @@ st.sidebar.markdown("---")
 if st.sidebar.button("📊 GENERAR REPORTE UNIVERSAL", use_container_width=True, key="btn_univ_report"):
     st.sidebar.text_area("Block Note Universal (Copia tu Reporte):", value=generar_reporte_universal(capital_inicial, comision_pct), height=400)
 
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V130)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal & WaveTrend (V131)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -449,42 +449,89 @@ def calcular_señales_numpy(s_id, hitbox, therm_w, adx_th, whale_f):
     regime = np.where(a_mb & (a_adx >= adx_th), 1, np.where(a_mb & (a_adx < adx_th), 2, np.where(~a_mb & (a_adx >= adx_th), 3, 4)))
     return s_dict, regime
 
+# 🔥 EL ERROR DE NUMBA FUE SOLUCIONADO AQUÍ (Asignación Escalar Correcta) 🔥
 @njit(fastmath=True)
 def simular_crecimiento_exponencial(h_arr, l_arr, c_arr, o_arr, b_c, s_c, t_arr, sl_arr, cap_ini, com_pct, reinvest_pct):
-    cap_act, divs, en_pos, p_ent, tp_act, sl_act, pos_size, invest_amt = cap_ini, 0.0, False, 0.0, 0.0, 0.0, 0.0, 0.0
-    g_profit, g_loss, num_trades, max_dd, peak = 0.0, 0.0, 0, 0.0, cap_ini
+    cap_act = cap_ini
+    divs = 0.0
+    en_pos = False
+    p_ent = 0.0
+    tp_act = 0.0  # SCALAR
+    sl_act = 0.0  # SCALAR
+    pos_size = 0.0
+    invest_amt = 0.0
+    g_profit = 0.0
+    g_loss = 0.0
+    num_trades = 0
+    max_dd = 0.0
+    peak = cap_ini
+    
     for i in range(len(h_arr)):
         if en_pos:
-            tp_p = p_ent * (1.0 + tp_act[i]/100.0); sl_p = p_ent * (1.0 - sl_act[i]/100.0)
+            tp_p = p_ent * (1.0 + tp_act / 100.0)
+            sl_p = p_ent * (1.0 - sl_act / 100.0)
             if l_arr[i] <= sl_p:
-                gross = pos_size * (1.0 - sl_act[i]/100.0); net = gross - (gross * com_pct); profit = net - invest_amt
-                if profit > 0: reinv = profit * (reinvest_pct / 100.0); divs += (profit - reinv); cap_act += reinv
-                else: cap_act += profit
-                g_loss += abs(profit); num_trades += 1; en_pos = False
+                gross = pos_size * (1.0 - sl_act / 100.0)
+                net = gross - (gross * com_pct)
+                profit = net - invest_amt
+                if profit > 0:
+                    reinv = profit * (reinvest_pct / 100.0)
+                    divs += (profit - reinv)
+                    cap_act += reinv
+                else:
+                    cap_act += profit
+                g_loss += abs(profit)
+                num_trades += 1
+                en_pos = False
             elif h_arr[i] >= tp_p:
-                gross = pos_size * (1.0 + tp_act[i]/100.0); net = gross - (gross * com_pct); profit = net - invest_amt
-                if profit > 0: reinv = profit * (reinvest_pct / 100.0); divs += (profit - reinv); cap_act += reinv
-                else: cap_act += profit
+                gross = pos_size * (1.0 + tp_act / 100.0)
+                net = gross - (gross * com_pct)
+                profit = net - invest_amt
+                if profit > 0:
+                    reinv = profit * (reinvest_pct / 100.0)
+                    divs += (profit - reinv)
+                    cap_act += reinv
+                else:
+                    cap_act += profit
                 if profit > 0: g_profit += profit 
                 else: g_loss += abs(profit)
-                num_trades += 1; en_pos = False
+                num_trades += 1
+                en_pos = False
             elif s_c[i]:
-                ret = (c_arr[i] - p_ent) / p_ent; gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
-                if profit > 0: reinv = profit * (reinvest_pct / 100.0); divs += (profit - reinv); cap_act += reinv
-                else: cap_act += profit
+                ret = (c_arr[i] - p_ent) / p_ent
+                gross = pos_size * (1.0 + ret)
+                net = gross - (gross * com_pct)
+                profit = net - invest_amt
+                if profit > 0:
+                    reinv = profit * (reinvest_pct / 100.0)
+                    divs += (profit - reinv)
+                    cap_act += reinv
+                else:
+                    cap_act += profit
                 if profit > 0: g_profit += profit 
                 else: g_loss += abs(profit)
-                num_trades += 1; en_pos = False
-            total_equity = cap_act + divs
-            if total_equity > peak: peak = total_equity
-            if peak > 0: dd = (peak - total_equity) / peak * 100.0; max_dd = max(max_dd, dd)
-            if cap_act <= 0: break
+                num_trades += 1
+                en_pos = False
+                
+        total_equity = cap_act + divs
+        if total_equity > peak: peak = total_equity
+        if peak > 0: 
+            dd = (peak - total_equity) / peak * 100.0
+            if dd > max_dd: max_dd = dd
+        if cap_act <= 0: break
+        
         if not en_pos and b_c[i] and i+1 < len(h_arr):
             invest_amt = cap_act if reinvest_pct == 100.0 else cap_ini
             if invest_amt > cap_act: invest_amt = cap_act 
-            comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
-            p_ent = o_arr[i+1]; tp_act[i+1] = t_arr[i]; sl_act[i+1] = sl_arr[i]; en_pos = True
-    return (cap_act + divs) - cap_ini, g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0), num_trades, max_dd
+            comm_in = invest_amt * com_pct
+            pos_size = invest_amt - comm_in 
+            p_ent = o_arr[i+1]
+            tp_act = t_arr[i]  # CORRECTO: Saca el float del array
+            sl_act = sl_arr[i] # CORRECTO: Saca el float del array
+            en_pos = True
+            
+    pf = g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0)
+    return (cap_act + divs) - cap_ini, pf, num_trades, max_dd
 
 def simular_visual(df_sim, cap_ini, reinvest, com_pct):
     registro_trades = []
@@ -541,8 +588,11 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
     f_tp = np.empty(n_len, dtype=np.float64); f_sl = np.empty(n_len, dtype=np.float64)
     macro_mask = np.empty(n_len, dtype=bool); vol_mask = np.empty(n_len, dtype=bool)
 
-    hitbox_ops = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]; therm_ops = [3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-    adx_ops = [15.0, 20.0, 25.0, 30.0, 35.0]; whale_ops = [1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
+    hitbox_ops = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+    therm_ops = [3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    adx_ops = [15.0, 20.0, 25.0, 30.0, 35.0]
+    whale_ops = [1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
+
     ui_update_interval = max(1, chunks // 5)
 
     for c in range(chunks):
@@ -582,15 +632,18 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 3)) if s_id.startswith("AI_") else random.sample(base_s, random.randint(1, len(base_s)))
                 dna_macro = random.choice(["All-Weather", "Bull Only (Precio > EMA 200)", "Bear Only (Precio < EMA 200)"])
                 dna_vol = random.choice(["All-Weather", "Trend (ADX Alto)", "Range (ADX Bajo)"])
+                
                 if dna_macro == "Bull Only (Precio > EMA 200)": macro_mask[:] = a_mb
                 elif dna_macro == "Bear Only (Precio < EMA 200)": macro_mask[:] = ~a_mb
                 else: macro_mask.fill(True)
+                
                 if dna_vol == "Trend (ADX Alto)": vol_mask[:] = (a_adx >= r_adx)
                 elif dna_vol == "Range (ADX Bajo)": vol_mask[:] = (a_adx < r_adx)
                 else: vol_mask.fill(True)
-                for r in dna_b_team: f_buy |= s_dict[r]
+                
+                for r in dna_b_team: f_buy |= s_dict.get(r, np.zeros(n_len, dtype=bool))
                 f_buy &= macro_mask; f_buy &= vol_mask
-                for r in dna_s_team: f_sell |= s_dict[r]
+                for r in dna_s_team: f_sell |= s_dict.get(r, np.zeros(n_len, dtype=bool))
                 f_tp.fill(rtp); f_sl.fill(rsl)
             elif s_id in ["GENESIS", "ROCKET", "QUADRIX"]:
                 opts_b = quadrix_b if s_id == "QUADRIX" else rocket_b if s_id == "ROCKET" else base_b
@@ -601,8 +654,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 dna_sl = [random.uniform(0.5, 20.0) for _ in range(4)]
                 for idx in range(4):
                     mask = (regime_arr == (idx + 1))
-                    f_buy[mask] = s_dict[dna_b[idx][0]][mask]
-                    f_sell[mask] = s_dict[dna_s[idx][0]][mask]
+                    f_buy[mask] = s_dict.get(dna_b[idx][0], np.zeros(n_len, dtype=bool))[mask]
+                    f_sell[mask] = s_dict.get(dna_s[idx][0], np.zeros(n_len, dtype=bool))[mask]
                     f_tp[mask] = dna_tp[idx]
                     f_sl[mask] = dna_sl[idx]
             else:
@@ -612,14 +665,12 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 elif s_id == "PINK_CLIMAX": b_k, s_k = "Climax_Buy", "Climax_Sell"
                 elif s_id == "PING_PONG": b_k, s_k = "Ping_Buy", "Ping_Sell"
                 else: b_k, s_k = f"{s_id.split('_')[0].capitalize()}_Buy", f"{s_id.split('_')[0].capitalize()}_Sell"
+                
                 f_buy[:] = s_dict.get(b_k, np.zeros(n_len, dtype=bool))
                 f_sell[:] = s_dict.get(s_k, np.zeros(n_len, dtype=bool))
                 f_tp.fill(rtp); f_sl.fill(rsl)
 
-            f_tp_arr = np.full(n_len, rtp) if np.isscalar(rtp) else f_tp
-            f_sl_arr = np.full(n_len, rsl) if np.isscalar(rsl) else f_sl
-
-            net, pf, nt, mdd = simular_crecimiento_exponencial(a_h, a_l, a_c, a_o, f_buy, f_sell, f_tp_arr, f_sl_arr, float(cap_ini), float(com_pct), float(reinv_q))
+            net, pf, nt, mdd = simular_crecimiento_exponencial(a_h, a_l, a_c, a_o, f_buy, f_sell, f_tp, f_sl, float(cap_ini), float(com_pct), float(reinv_q))
             alpha_money = net - buy_hold_money
             
             if nt >= 1: 
@@ -652,7 +703,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             </style>
             <div class="loader-container">
                 <div class="rocket">🚀</div>
-                <div class="prog-text">OMNI-FORGE V130: {s_id}</div>
+                <div class="prog-text">OMNI-FORGE V131: {s_id}</div>
                 <div class="hud-text" style="color: white;">Progreso: {pct_done}%</div>
                 <div class="hud-text" style="color: white;">Combos Procesados: {combos:,}</div>
                 <div class="hud-text" style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Hallazgo: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x | Trds: {best_nt_live}</div>
@@ -956,14 +1007,7 @@ float active_tp = 0.0, float active_sl = 0.0
             s_cond = " or ".join([pine_map.get(x, "false") for x in vault['s_team']]) if vault['s_team'] else "false"
             ps += f"\nbool signal_buy = ({b_cond}) and {m_cond} and {v_cond}\nbool signal_sell = {s_cond}\nfloat active_tp = {vault.get('tp', 0.0)} / 100.0\nfloat active_sl = {vault.get('sl', 0.0)} / 100.0\n"
         else:
-            b_k, s_k = "", ""
-            if s_id == "TARGET_LOCK": b_k, s_k = "Lock_Buy", "Lock_Sell"
-            elif s_id == "NEON_SQUEEZE": b_k, s_k = "Squeeze_Buy", "Squeeze_Sell"
-            elif s_id == "PINK_CLIMAX": b_k, s_k = "Climax_Buy", "Climax_Sell"
-            elif s_id == "PING_PONG": b_k, s_k = "Ping_Buy", "Ping_Sell"
-            else: b_k, s_k = f"{s_id.split('_')[0].capitalize()}_Buy", f"{s_id.split('_')[0].capitalize()}_Sell"
-            
-            b_key, s_key = pine_map.get(b_k, "false"), pine_map.get(s_k, "false")
+            b_key, s_key = pine_map.get(f"{s_id.split('_')[0].capitalize()}_Buy", "false"), pine_map.get(f"{s_id.split('_')[0].capitalize()}_Sell", "false")
             ps += f"\nbool signal_buy = {b_key}\nbool signal_sell = {s_key}\n"
 
         ps += """
@@ -978,52 +1022,11 @@ if strategy.position_size > 0
 """
         return ps
 
-# ==========================================
-# 🛑 EJECUCIÓN GLOBAL Y PANTALLA PRINCIPAL
-# ==========================================
-if st.session_state.get('run_global', False) and not df_global.empty:
-    st.session_state['run_global'] = False
-    buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
-    buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
-    for s_id in estrategias:
-        v = st.session_state[f'champion_{s_id}']
-        bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, v['reinv'], v['ado'], dias_reales, buy_hold_money, epochs=global_epochs, cur_fit=v['fit'])
-        if bp: save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True
-    wipe_ui_cache(); ph_holograma.empty(); st.sidebar.success("✅ ¡Forja Evolutiva Global Completada!"); time.sleep(1); st.rerun()
+tab_names = list(tab_id_map.keys())
+ui_tabs = st.tabs(tab_names)
 
-if st.session_state.get('run_ai_mutant', False) and not df_global.empty:
-    mutant_id = st.session_state['run_ai_mutant']
-    st.session_state['run_ai_mutant'] = False
-    buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
-    buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
-    v = st.session_state[f'champion_{mutant_id}']
-    bp = optimizar_ia_tracker(mutant_id, capital_inicial, comision_pct, v['reinv'], v['ado'], dias_reales, buy_hold_money, epochs=global_epochs, cur_fit=v['fit'])
-    if bp: save_champion(mutant_id, bp); st.session_state[f'opt_status_{mutant_id}'] = True
-    wipe_ui_cache(); ph_holograma.empty(); st.sidebar.success(f"🤖 ¡Mutante {mutant_id} Creado y Forjado!"); time.sleep(1); st.rerun()
-
-st.title("🛡️ The Omni-Brain Lab")
-
-# 🏆 SCOREBOARD 
-if not df_global.empty:
-    with st.expander("🏆 SALÓN DE LA FAMA (Ordenado por Rentabilidad Neta)", expanded=False):
-        st.info("La IA penaliza el riesgo en su Puntaje interno. Aquí ordenamos puramente por Ganancia Neta para ver los dólares reales.")
-        leaderboard_data = []
-        for s in estrategias:
-            v = st.session_state.get(f'champion_{s}', {})
-            fit = v.get('fit', -float('inf'))
-            if fit != -float('inf'):
-                net_val = v.get('net', 0)
-                leaderboard_data.append({"Estrategia": s, "Neto_Num": net_val, "Rentabilidad Neta": f"${net_val:,.2f} ({net_val/capital_inicial*100:.2f}%)", "WinRate": f"{v.get('winrate', 0):.1f}%", "Puntaje IA (Riesgo)": f"{fit:,.0f}"})
-        if leaderboard_data:
-            leaderboard_data.sort(key=lambda x: x['Neto_Num'], reverse=True)
-            for item in leaderboard_data: del item['Neto_Num']
-            st.table(pd.DataFrame(leaderboard_data))
-        else: st.write("La bóveda está vacía. Inicie una Forja individual o Global.")
-
-tabs = st.tabs(list(tab_id_map.keys()))
-
-for idx, tab_name in enumerate(list(tab_id_map.keys())):
-    with tabs[idx]:
+for tab_obj, tab_name in zip(ui_tabs, tab_names):
+    with tab_obj:
         if df_global.empty: continue
         s_id = tab_id_map[tab_name]
         is_opt = st.session_state.get(f'opt_status_{s_id}', False)
