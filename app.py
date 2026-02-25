@@ -23,12 +23,13 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Forge", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
+# 🔥 AUTO-PURGA DE CACHÉ SUCIA 🔥
 if st.session_state.get('app_version') != 'V151':
     st.session_state.clear()
     st.session_state['app_version'] = 'V151'
 
 # ==========================================
-# 🧠 1. FUNCIONES MATEMÁTICAS C++
+# 🧠 1. FUNCIONES MATEMÁTICAS 
 # ==========================================
 def npshift(arr, num, fill_value=np.nan):
     result = np.empty_like(arr)
@@ -143,12 +144,11 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct):
                 else: cap_act += profit
                 registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'TP', 'Precio': tp_p, 'Ganancia_$': profit}); en_pos, cierra = False, True
             elif sell_arr[i]:
-                exit_price = o_arr[i+1] if i+1 < n else c_arr[i]
-                ret = (exit_price - p_ent) / p_ent; gross = pos_size * (1 + ret); comm_out = gross * com_pct; total_comms += comm_out; net = gross - comm_out; profit = net - invest_amt
+                ret = (c_arr[i] - p_ent) / p_ent; gross = pos_size * (1 + ret); comm_out = gross * com_pct; total_comms += comm_out; net = gross - comm_out; profit = net - invest_amt
                 if profit > 0: reinv_amt = profit * (reinvest/100); divs += (profit - reinv_amt); cap_act += reinv_amt
                 else: cap_act += profit
                 if cap_act <= 0: cap_act = 0
-                registro_trades.append({'Fecha': f_arr[i+1] if i+1 < n else f_arr[i], 'Tipo': 'DYN_WIN' if profit>0 else 'DYN_LOSS', 'Precio': exit_price, 'Ganancia_$': profit}); en_pos, cierra = False, True
+                registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'DYN_WIN' if profit>0 else 'DYN_LOSS', 'Precio': c_arr[i], 'Ganancia_$': profit}); en_pos, cierra = False, True
         if not en_pos and not cierra and buy_arr[i] and i+1 < n and cap_act > 0:
             invest_amt = cap_act if reinvest == 100 else cap_ini
             if invest_amt > cap_act: invest_amt = cap_act
@@ -179,6 +179,9 @@ todas_las_armas_s = list(set(base_s + quadrix_s + rocket_s))
 
 pine_map = {'Ping_Buy': 'ping_b', 'Ping_Sell': 'ping_s', 'Squeeze_Buy': 'squeeze_b', 'Squeeze_Sell': 'squeeze_s', 'Thermal_Buy': 'therm_b', 'Thermal_Sell': 'therm_s', 'Climax_Buy': 'climax_b', 'Climax_Sell': 'climax_s', 'Lock_Buy': 'lock_b', 'Lock_Sell': 'lock_s', 'Defcon_Buy': 'defcon_b', 'Defcon_Sell': 'defcon_s', 'Jugg_Buy': 'jugg_b', 'Jugg_Sell': 'jugg_s', 'Trinity_Buy': 'trinity_b', 'Trinity_Sell': 'trinity_s', 'Lev_Buy': 'lev_b', 'Lev_Sell': 'lev_s', 'Commander_Buy': 'commander_b', 'Commander_Sell': 'commander_s', 'Q_Pink_Whale_Buy': 'r_Pink_Whale_Buy', 'Q_Lock_Bounce': 'r_Lock_Bounce', 'Q_Lock_Break': 'r_Lock_Break', 'Q_Neon_Up': 'r_Neon_Up', 'Q_Defcon_Buy': 'r_Defcon_Buy', 'Q_Therm_Bounce': 'r_Therm_Bounce', 'Q_Therm_Vacuum': 'r_Therm_Vacuum', 'Q_Nuclear_Buy': 'r_Nuclear_Buy', 'Q_Early_Buy': 'r_Early_Buy', 'Q_Rebound_Buy': 'r_Rebound_Buy', 'Q_Lock_Reject': 'r_Lock_Reject', 'Q_Lock_Breakd': 'r_Lock_Breakd', 'Q_Neon_Dn': 'r_Neon_Dn', 'Q_Defcon_Sell': 'r_Defcon_Sell', 'Q_Therm_Wall_Sell': 'r_Therm_Wall_Sell', 'Q_Therm_Panic_Sell': 'r_Therm_Panic_Sell', 'Q_Nuclear_Sell': 'r_Nuclear_Sell', 'Q_Early_Sell': 'r_Early_Sell'}
 
+# ==========================================
+# 🧬 3. THE DNA VAULT
+# ==========================================
 for s_id in estrategias:
     if f'opt_status_{s_id}' not in st.session_state: st.session_state[f'opt_status_{s_id}'] = False
     if f'champion_{s_id}' not in st.session_state:
@@ -506,8 +509,11 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
     is_dynamic = s_id in ["ALL_FORCES", "GENESIS", "ROCKET", "QUADRIX"] or s_id.startswith("AI_MUTANT")
     is_multi = s_id in ["GENESIS", "ROCKET", "QUADRIX"]
 
+    update_mod = int(max(1, chunks // 3))
+
     for c in range(chunks):
-        if st.session_state.get('abort_opt', False): break
+        if st.session_state.get('abort_opt', False): 
+            st.warning("🛑 OPTIMIZACIÓN ABORTADA."); break
 
         r_hitbox = random.choice([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]); r_therm = random.choice([3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
         r_adx = random.choice([15.0, 20.0, 25.0, 30.0, 35.0]); r_whale = random.choice([1.5, 2.0, 2.5, 3.0, 3.5, 4.0])
@@ -579,6 +585,25 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 
         del s_dict; del regime_arr
         
+        if c == 0 or c == (chunks - 1) or c % update_mod == 0:
+            elapsed = time.time() - start_time
+            pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size; eta = (elapsed / (c + 1)) * (chunks - c - 1)
+            ph_holograma.markdown(f"""
+            <style>
+            .loader-container {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; text-align: center; background: rgba(0,0,0,0.95); padding: 35px; border-radius: 20px; border: 2px solid #FF00FF; box-shadow: 0 0 50px #FF00FF;}}
+            .rocket {{ font-size: 8rem; animation: spin 1s linear infinite; filter: drop-shadow(0 0 20px #FF00FF); }}
+            @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+            </style>
+            <div class="loader-container">
+                <div class="rocket">🚀</div>
+                <div style="color: #FF00FF; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">OMNI-FORGE V151: {s_id}</div>
+                <div style="color: white; font-size: 1.3rem;">Progreso: {pct_done}% | Combos: {combos:,}</div>
+                <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Hallazgo: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x</div>
+                <div style="color: yellow; margin-top: 15px;">ETA: {eta:.1f} segs</div>
+            </div>
+            """, unsafe_allow_html=True)
+            time.sleep(0.05) 
+            
     return bp if bp else None
 
 def run_backtest_eval(s_id, cap_ini, com_pct):
