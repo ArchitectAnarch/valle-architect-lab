@@ -1079,4 +1079,240 @@ RC_Sell_Q4 = cond_defcon_sell
                 b_cond = " or ".join([pine_map.get(x, "false") for x in vault.get(f'r{r}_b', [])]) if vault.get(f'r{r}_b') else "false"
                 s_cond = " or ".join([pine_map.get(x, "false") for x in vault.get(f'r{r}_s', [])]) if vault.get(f'r{r}_s') else "false"
                 t_val = vault.get(f'r{r}_tp', 0.0); s_val = vault.get(f'r{r}_sl', 0.0)
-            ps_logic += f"\nif regime == {r}\n    signal_buy := {b_cond}\n    signal_sell := {s_cond}\n    base_
+            ps_logic += f"\nif regime == {r}\n    signal_buy := {b_cond}\n    signal_sell := {s_cond}\n    base_active_tp := {t_val} / 100.0\n    base_active_sl := {s_val} / 100.0\n"
+    elif s_id.startswith("AI_"):
+        if vault.get('macro') == "Bull Only": m_cond = "macro_bull"
+        elif vault.get('macro') == "Bear Only": m_cond = "not macro_bull"
+        elif vault.get('macro') == "Organic_Vol": m_cond = "high_vol"
+        elif vault.get('macro') == "Organic_Squeeze": m_cond = "squeeze_on"
+        elif vault.get('macro') == "Organic_Safe": m_cond = "trinity_safe"
+        else: m_cond = "true"
+
+        if vault.get('vol') == "Trend": v_cond = "(adx >= adx_trend)"
+        elif vault.get('vol') == "Range": v_cond = "(adx < adx_trend)"
+        elif vault.get('vol') == "Organic_Pump": v_cond = "pump_memory"
+        elif vault.get('vol') == "Organic_Dump": v_cond = "dump_memory"
+        else: v_cond = "true"
+
+        b_cond = " or ".join([pine_map.get(x, "false") for x in vault.get('b_team', [])]) if vault.get('b_team') else "false"
+        s_cond = " or ".join([pine_map.get(x, "false") for x in vault.get('s_team', [])]) if vault.get('s_team') else "false"
+        
+        # 🔥 GENÉTICA Y CAMALEÓN EN PINE SCRIPT 🔥
+        ps_logic += f"""
+float w_rsi = {vault.get('w_rsi',0.0):.4f}
+float w_z = {vault.get('w_z',0.0):.4f}
+float w_adx = {vault.get('w_adx',0.0):.4f}
+float math_score = (rsi_v * w_rsi) + (z_score * w_z) + (adx * w_adx)
+
+bool signal_buy = (({b_cond}) and {m_cond} and {v_cond}) or (math_score > {vault.get('th_buy',999):.2f})
+bool signal_sell = ({s_cond}) or (math_score < {vault.get('th_sell',-999):.2f})
+
+float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
+float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
+"""
+    else:
+        ps_logic += f"\nfloat base_active_tp = {v_tp} / 100.0\nfloat base_active_sl = {v_sl} / 100.0\n"
+        b_k = f"{s_id.split('_')[0].capitalize()}_Buy" if s_id not in ["TARGET_LOCK", "NEON_SQUEEZE", "PINK_CLIMAX", "PING_PONG"] else "Lock_Buy" if s_id == "TARGET_LOCK" else "Squeeze_Buy" if s_id == "NEON_SQUEEZE" else "Climax_Buy" if s_id == "PINK_CLIMAX" else "Ping_Buy"
+        s_k = f"{s_id.split('_')[0].capitalize()}_Sell" if s_id not in ["TARGET_LOCK", "NEON_SQUEEZE", "PINK_CLIMAX", "PING_PONG"] else "Lock_Sell" if s_id == "TARGET_LOCK" else "Squeeze_Sell" if s_id == "NEON_SQUEEZE" else "Climax_Sell" if s_id == "PINK_CLIMAX" else "Ping_Sell"
+        ps_logic += f"\nbool signal_buy = {pine_map.get(b_k, 'false')}\nbool signal_sell = {pine_map.get(s_k, 'false')}\n"
+
+    if s_id.startswith("AI_"):
+        ps_exec = """
+var float trade_tp_dist = 0.0
+var float trade_sl_dist = 0.0
+var float exec_price = 0.0
+
+if signal_buy and strategy.position_size == 0 and window
+    strategy.entry("In", strategy.long, alert_message=wt_enter_long)
+    trade_tp_dist := atr * atr_tp_mult
+    trade_sl_dist := atr * atr_sl_mult
+
+if strategy.position_size > 0
+    exec_price := strategy.opentrades.entry_price(0)
+    strategy.exit("TP/SL", "In", limit=exec_price + trade_tp_dist, stop=exec_price - trade_sl_dist, alert_message=wt_exit_long)
+
+if signal_sell and strategy.position_size > 0
+    strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
+
+plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.belowbar, color=color.aqua, size=size.tiny)
+plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
+"""
+    else:
+        ps_exec = """
+var float trade_tp = 0.0
+var float trade_sl = 0.0
+var float exec_price = 0.0
+
+if signal_buy and strategy.position_size == 0 and window
+    strategy.entry("In", strategy.long, alert_message=wt_enter_long)
+    trade_tp := base_active_tp
+    trade_sl := base_active_sl
+
+if strategy.position_size > 0
+    exec_price := strategy.opentrades.entry_price(0)
+    float target_price = exec_price * (1 + trade_tp)
+    float stop_price = exec_price * (1 - trade_sl)
+    strategy.exit("TP/SL", "In", limit=target_price, stop=stop_price, alert_message=wt_exit_long)
+
+if signal_sell and strategy.position_size > 0
+    strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
+
+plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.belowbar, color=color.aqua, size=size.tiny)
+plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
+"""
+    return ps_base + ps_indicators + ps_logic + ps_exec
+
+# ==========================================
+# 🛑 7. EJECUCIÓN GLOBAL (COLA ASÍNCRONA)
+# ==========================================
+if 'global_queue' not in st.session_state:
+    st.session_state['global_queue'] = []
+
+if st.session_state.get('run_global', False):
+    time.sleep(0.1) 
+    if len(st.session_state['global_queue']) > 0:
+        s_id = st.session_state['global_queue'].pop(0)
+        ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid cyan; border-radius: 10px;'><h2 style='color:cyan;'>⚙️ Forjando Bucle Global: {s_id}...</h2><h4 style='color:lime;'>Quedan {len(st.session_state['global_queue'])} algoritmos en cola.</h4></div>", unsafe_allow_html=True)
+        time.sleep(0.1)
+        
+        v = st.session_state.get(f'champion_{s_id}', {})
+        buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
+        buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
+        
+        bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv',0.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=global_epochs, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))))
+        
+        if bp: save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True
+        
+        st.rerun()
+    else:
+        st.session_state['run_global'] = False
+        ph_holograma.empty()
+        st.sidebar.success("✅ ¡Forja Evolutiva Global Completada!")
+        time.sleep(2); st.rerun()
+
+# ==========================================
+# 🌌 8. EJECUCIÓN PROFUNDA (DEEP FORGE STANDBY)
+# ==========================================
+deep_state = st.session_state.get('deep_opt_state', {})
+if deep_state and not deep_state.get('paused', False) and deep_state.get('current_epoch', 0) < deep_state.get('target_epochs', 0):
+    time.sleep(0.1) 
+    
+    chunk = 1000 
+    if deep_state['target_epochs'] - deep_state['current_epoch'] < chunk:
+        chunk = deep_state['target_epochs'] - deep_state['current_epoch']
+        
+    s_id = deep_state['s_id']
+    v = st.session_state.get(f'champion_{s_id}', {})
+    buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
+    buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
+    
+    deep_info = {'current': deep_state['current_epoch'], 'total': deep_state['target_epochs']}
+    
+    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv',0.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=chunk, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=deep_info)
+    
+    if bp: save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True
+    
+    st.session_state['deep_opt_state']['current_epoch'] += chunk
+    
+    if st.session_state['deep_opt_state']['current_epoch'] >= deep_state['target_epochs']:
+        st.session_state['deep_opt_state']['paused'] = True
+        ph_holograma.empty()
+        st.sidebar.success(f"🌌 ¡FORJA PROFUNDA COMPLETADA PARA {s_id}!")
+        time.sleep(2)
+        
+    st.rerun()
+
+st.title("🛡️ The Omni-Brain Lab")
+
+with st.expander("🏆 SALÓN DE LA FAMA (Ordenado por Rentabilidad Neta)", expanded=False):
+    leaderboard_data = []
+    for s in estrategias:
+        v = st.session_state.get(f'champion_{s}', {})
+        fit = v.get('fit', -float('inf'))
+        opt_str = "✅" if fit != -float('inf') else "➖ No Opt"
+        net_val = v.get('net', 0)
+        leaderboard_data.append({"Estrategia": s, "Neto_Num": net_val, "Rentabilidad": f"${net_val:,.2f}", "WinRate": f"{v.get('winrate', 0):.1f}%", "Estado": opt_str})
+    
+    leaderboard_data.sort(key=lambda x: x['Neto_Num'], reverse=True)
+    for item in leaderboard_data: del item['Neto_Num']
+    st.table(pd.DataFrame(leaderboard_data))
+
+st.markdown("<h3 style='text-align: center; color: #00FF00;'>🎡 CARRUSEL DE ESTRATEGIAS (SELECCIONA PARA INSPECCIONAR)</h3>", unsafe_allow_html=True)
+tab_names = list(tab_id_map.keys())
+selected_tab_name = st.selectbox("Buscar o seleccionar estrategia:", tab_names, index=len(tab_names)-1)
+
+s_id = tab_id_map[selected_tab_name]
+is_opt = st.session_state.get(f'opt_status_{s_id}', False)
+opt_badge = "<span style='color: lime;'>✅ IA OPTIMIZADA</span>" if is_opt else "<span style='color: gray;'>➖ NO OPTIMIZADA</span>"
+vault = st.session_state.get(f'champion_{s_id}', {})
+
+st.markdown(f"### {selected_tab_name} {opt_badge}", unsafe_allow_html=True)
+
+c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
+st.session_state[f'champion_{s_id}']['ado'] = c_ia1.slider("🎯 Target ADO (IA Override)", 0.0, 100.0, value=float(vault.get('ado', 4.0)), key=f"ui_{s_id}_ado_w", step=0.5)
+st.session_state[f'champion_{s_id}']['reinv'] = c_ia2.slider("💵 Reinversión % (IA Override)", 0.0, 100.0, value=float(vault.get('reinv', 0.0)), key=f"ui_{s_id}_reinv_w", step=5.0)
+
+c_ps1, c_ps2 = st.columns(2)
+ps_buy_pct = c_ps1.number_input("🟢 % Inversión Compra (Pine Script)", min_value=1, max_value=100, value=20, step=1, key=f"ui_{s_id}_ps_buy")
+ps_sell_pct = c_ps2.number_input("🔴 % Desinversión Venta (Pine Script)", min_value=1, max_value=100, value=20, step=1, key=f"ui_{s_id}_ps_sell")
+
+c_btn1, c_btn2 = c_ia3.columns(2)
+if c_btn1.button(f"🚀 FORJAR RÁPIDO ({global_epochs*3}k)", type="primary", key=f"btn_opt_{s_id}"):
+    ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid #FF00FF; border-radius: 10px;'><h2 style='color:#FF00FF;'>🚀 Procesando {s_id}...</h2></div>", unsafe_allow_html=True)
+    time.sleep(0.1)
+    buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
+    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(vault.get('reinv', 0.0)), float(vault.get('ado', 4.0)), dias_reales, capital_inicial * (buy_hold_ret / 100.0), epochs=global_epochs, cur_net=float(vault.get('net', -float('inf'))), cur_fit=float(vault.get('fit', -float('inf'))))
+    if bp: save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True; st.success("👑 ¡Bot Forjado!")
+    time.sleep(1); ph_holograma.empty(); st.rerun()
+
+if c_btn2.button(f"🌌 ACTIVAR FORJA PROFUNDA", type="secondary", key=f"btn_deep_{s_id}"):
+    st.session_state['deep_opt_state'] = {'s_id': s_id, 'target_epochs': deep_epochs_target, 'current_epoch': 0, 'paused': False}
+    st.rerun()
+
+df_strat, eq_curve, t_log, total_comms = run_backtest_eval(s_id, capital_inicial, comision_pct)
+df_strat['Total_Portfolio'] = eq_curve
+ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
+buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
+alpha_pct = ret_pct - buy_hold_ret
+
+dftr = pd.DataFrame(t_log)
+tt, wr, pf_val = 0, 0.0, 0.0
+if not dftr.empty:
+    exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
+    tt = len(exs)
+    if tt > 0:
+        ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
+        wr = (ws / tt) * 100
+        gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum(); gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
+        pf_val = gpp / gll if gll > 0 else float('inf')
+
+vault['net'] = eq_curve[-1] - capital_inicial; vault['winrate'] = wr
+mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
+ado_val = tt / dias_reales if dias_reales > 0 else 0.0
+
+c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+c1.metric("Net Profit", f"${eq_curve[-1]-capital_inicial:,.2f}", f"{ret_pct:.2f}%")
+c2.metric("ALPHA", f"{alpha_pct:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
+c3.metric("Trades", f"{tt}", f"ADO: {ado_val:.2f}")
+c4.metric("Win Rate", f"{wr:.1f}%")
+c5.metric("Profit Factor", f"{pf_val:.2f}x")
+c6.metric("Drawdown", f"{mdd:.2f}%", delta_color="inverse")
+c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
+
+with st.expander("📝 PINE SCRIPT GENERATOR", expanded=False):
+    st.info("Traducción Matemática Idéntica a TradingView. Bug 'use_lowest' arreglado y Motor Camaleón activado.")
+    st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct), language="pine")
+
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
+if not dftr.empty:
+    ents = dftr[dftr['Tipo'] == 'ENTRY']
+    fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+    wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
+    fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+    loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
+    fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+
+fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
+fig.update_yaxes(side="right"); fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False)
+st.plotly_chart(fig, use_container_width=True, key=f"chart_{s_id}")
