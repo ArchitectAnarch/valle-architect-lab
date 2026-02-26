@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Forge", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V157':
+if st.session_state.get('app_version') != 'V158':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V157'
+    st.session_state['app_version'] = 'V158'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -292,7 +292,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V157.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V158.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -369,7 +369,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
         st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V157.0**\n\n"
+    res_str = f"📋 **REPORTE OMNI-FORGE V158.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -387,7 +387,7 @@ st.sidebar.download_button(label="🐙 Exportar a GitHub (JSON)", data=json.dump
 # ==========================================
 # 🛑 5. EXTRACCIÓN DE VELAS Y ARRAYS MATEMÁTICOS 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal (V157)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal (V158)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     def _get_tv_pivot(series, left, right, is_high=True):
         window = left + right + 1
@@ -664,8 +664,9 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             if is_dynamic:
                 if s_id.startswith("AI_"):
                     f_buy.fill(False); f_sell.fill(False)
-                    dna_b_team = random.sample(todas_las_armas_b, random.randint(1, len(todas_las_armas_b)))
-                    dna_s_team = random.sample(todas_las_armas_s, random.randint(1, len(todas_las_armas_s)))
+                    # 🔥 V158: LÍMITE DE VELOCIDAD DE ARRAY (MÁX 5 ARMAS PARA MATAR EL RUIDO) 🔥
+                    dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 5))
+                    dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 5))
                     
                     dna_macro = random.choice(["All-Weather", "Bull Only", "Bear Only", "Ignore", "Organic_Vol", "Organic_Squeeze", "Organic_Safe"])
                     dna_vol = random.choice(["All-Weather", "Trend", "Range", "Ignore", "Organic_Pump", "Organic_Dump"])
@@ -687,18 +688,19 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                     f_buy &= (m_mask & v_mask)
                     for r in dna_s_team: f_sell |= s_dict.get(r, default_f)
                     
-                    # 🔥 GENÉTICA PERCEPTRON Y CAMALEÓN (ATR EXIT) 🔥
+                    # 🔥 RANGO DE PERCEPTRÓN AMPLIADO (MENOS OPERACIONES AL AZAR, MÁS PRECISIÓN) 🔥
                     r_w_rsi = random.uniform(-1.0, 1.0)
                     r_w_z = random.uniform(-5.0, 5.0)
                     r_w_adx = random.uniform(-1.0, 1.0)
-                    r_th_b = random.uniform(-20.0, 50.0)
-                    r_th_s = random.uniform(-50.0, 20.0)
+                    r_th_b = random.uniform(-100.0, 100.0)
+                    r_th_s = random.uniform(-100.0, 100.0)
                     
                     r_atr_tp = round(random.uniform(1.0, 20.0), 2)
                     r_atr_sl = round(random.uniform(0.5, 5.0), 2)
                     r_reinv = float(random.choice([0.0, 20.0, 50.0, 100.0]))
                     r_ado = float(round(random.uniform(1.0, 15.0), 1))
                     
+                    # 🔥 SLIPPAGE CRUEL DEL 0.05% INYECTADO 🔥
                     net, pf, nt, mdd = simular_crecimiento_exponencial_ia_core(
                         a_h, a_l, a_c, a_o, a_atr, a_rsi, a_zscore, a_adx,
                         f_buy, f_sell, r_w_rsi, r_w_z, r_w_adx, r_th_b, r_th_s,
@@ -749,7 +751,9 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             if nt >= 1: 
                 safe_pf = min(pf, 3.0) 
                 ado_actual = nt / max(1, dias_reales)
-                fit_score = net * (1.0 + ado_actual * 0.5) * safe_pf
+                
+                # 🔥 V158: EL GEN DEPREDADOR (PENALIZACIÓN LETAL POR DRAWDOWN) 🔥
+                fit_score = (net * safe_pf * (1.0 + ado_actual)) / max(1.0, mdd)
 
                 if fit_score > best_fit_live and net > 0:
                     best_fit_live = fit_score; best_net_live = net; best_pf_live = pf; best_nt_live = nt
@@ -774,7 +778,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"OMNI-FORGE V157: {s_id}"
+                title = f"OMNI-FORGE V158: {s_id}"
                 subtitle = f"Progreso: {pct_done}% | Combos: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#FF00FF"
 
@@ -920,7 +924,6 @@ trinity_safe = macro_bull and not is_falling_knife
 pp_slope = (2*close + nz(close[1]) - nz(close[3]) - 2*nz(close[4])) / 10.0
 pp_slope_s1 = (2*nz(close[1]) + nz(close[2]) - nz(close[4]) - 2*nz(close[5])) / 10.0
 """
-    # 🔥 ARREGLO DE ERROR PIVOT (REALISMO PURO 1 A 1 CON PYTHON) 🔥
     if use_lowest:
         ps_indicators += """
 a_tsup = math.max(ta.lowest(low[1], 30), ta.lowest(low[1], 100), ta.lowest(low[1], 300))
@@ -1013,7 +1016,7 @@ ping_b = (adx < adx_trend) and (close < bbl) and vela_verde
 ping_s = (close > bbu) or (rsi_v > 70)
 squeeze_b = neon_up
 squeeze_s = (close < ema50)
-therm_b = false, therm_s = false // Simplificado por espacio TV
+therm_b = false, therm_s = false
 climax_b = cond_pink_whale_buy
 climax_s = (rsi_v > 80)
 lock_b = cond_lock_buy_bounce
@@ -1097,7 +1100,6 @@ RC_Sell_Q4 = cond_defcon_sell
         b_cond = " or ".join([pine_map.get(x, "false") for x in vault.get('b_team', [])]) if vault.get('b_team') else "false"
         s_cond = " or ".join([pine_map.get(x, "false") for x in vault.get('s_team', [])]) if vault.get('s_team') else "false"
         
-        # 🔥 GENÉTICA Y CAMALEÓN EN PINE SCRIPT 🔥
         ps_logic += f"""
 float w_rsi = {vault.get('w_rsi',0.0):.4f}
 float w_z = {vault.get('w_z',0.0):.4f}
