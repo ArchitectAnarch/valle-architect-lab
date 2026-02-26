@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V162':
+if st.session_state.get('app_version') != 'V163':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V162'
+    st.session_state['app_version'] = 'V163'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -212,7 +212,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V162</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V163</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -300,7 +300,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
         st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V162.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V163.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -318,7 +318,7 @@ st.sidebar.download_button(label="🐙 Exportar ADN a GitHub (JSON)", data=json.
 # ==========================================
 # 🛑 5. EXTRACCIÓN DE VELAS Y ARRAYS MATEMÁTICOS 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Datos del Mercado (V162)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Datos del Mercado (V163)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     def _get_tv_pivot(series, left, right, is_high=True):
         window = left + right + 1
@@ -409,9 +409,7 @@ df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date
 if df_global.empty: st.error(status_api); st.stop()
 
 dias_reales = max((df_global.index[-1] - df_global.index[0]).days, 1)
-
-# 🔥 UI DE DATOS REPARADA 🔥
-st.sidebar.info(f"📊 Matrix Data: **{len(df_global)} velas** ({dias_reales} días de Mercado)")
+st.sidebar.info(f"📊 Matrix Data: **{len(df_global):,} velas** ({dias_reales} días de Mercado)")
 
 a_c = df_global['Close'].values; a_o = df_global['Open'].values; a_h = df_global['High'].values; a_l = df_global['Low'].values
 a_rsi = df_global['RSI'].values; a_rsi_ma = df_global['RSI_MA'].values; a_adx = df_global['ADX'].values
@@ -491,7 +489,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     wt_cross_up = (a_wt1 > a_wt2) & (a_wt1_s1 <= a_wt2_s1); wt_cross_dn = (a_wt1 < a_wt2) & (a_wt1_s1 >= a_wt2_s1)
     wt_oversold = a_wt1 < -60; wt_overbought = a_wt1 > 60
 
-    # POOL GENÉTICO
     s_dict['Ping_Buy'] = (a_adx < adx_th) & (a_c < a_bbl) & a_vv; s_dict['Ping_Sell'] = (a_c > a_bbu) | (a_rsi > 70)
     s_dict['Squeeze_Buy'] = neon_up; s_dict['Squeeze_Sell'] = (a_c < a_ema50)
     s_dict['Thermal_Buy'] = cond_therm_buy_bounce; s_dict['Thermal_Sell'] = cond_therm_sell_wall
@@ -530,8 +527,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
     f_buy = np.empty(n_len, dtype=bool); f_sell = np.empty(n_len, dtype=bool)
     default_f = np.zeros(n_len, dtype=bool)
     update_mod = int(max(1, chunks // 4))
-
-    # 🔥 OPTIMIZACIÓN V162: MEMORIA DE MÁSCARAS PRE-COMPUTADAS (Ultra Velocidad) 🔥
     ones_mask = np.ones(n_len, dtype=bool)
 
     for c in range(chunks):
@@ -604,7 +599,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"GENESIS LAB V162: {s_id}"
+                title = f"GENESIS LAB V163: {s_id}"
                 subtitle = f"Progreso: {pct_done}% | ADN Probado: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#00FFFF"
 
@@ -972,7 +967,6 @@ vault = st.session_state.get(f'champion_{s_id}', {})
 
 st.markdown(f"### {selected_tab_name} {opt_badge}", unsafe_allow_html=True)
 
-# 🔥 NUEVO PANEL: ADN DEL MUTANTE 🔥
 with st.expander("🧬 VER ADN DEL MUTANTE Y ARMAS TÁCTICAS", expanded=True):
     st.markdown(f"**🟢 Escuadrón de Compra:** {', '.join(vault.get('b_team', []))}")
     st.markdown(f"**🔴 Escuadrón de Venta:** {', '.join(vault.get('s_team', []))}")
@@ -1036,7 +1030,7 @@ with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expan
     st.info("Copia y pega este código en TradingView. Este Mutante es un Camaleón con ATR dinámico.")
     st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct), language="pine")
 
-# 🔥 FORZAR RENDERIZADO EXPLÍCITO DE VELAS PARA EVITAR BUG DE PLOTLY 🔥
+# 🔥 MOTORES GRÁFICOS RESTAURADOS PARA ZOOM DINÁMICO Y PAN 🔥
 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
 fig.add_trace(go.Candlestick(
     x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], 
@@ -1057,6 +1051,25 @@ if not dftr.empty:
     fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white'))), row=1, col=1)
 
 fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
-fig.update_yaxes(autorange=True)
-fig.update_yaxes(side="right"); fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False)
-st.plotly_chart(fig, use_container_width=True, key=f"chart_{s_id}")
+
+fig.update_xaxes(fixedrange=False)
+fig.update_yaxes(fixedrange=False, side="right")
+fig.update_layout(
+    template='plotly_dark', 
+    height=800, 
+    xaxis_rangeslider_visible=False,
+    dragmode='pan',
+    hovermode='x unified',
+    margin=dict(l=10, r=50, t=30, b=10)
+)
+
+st.plotly_chart(
+    fig, 
+    use_container_width=True, 
+    key=f"chart_{s_id}", 
+    config={
+        'scrollZoom': True,
+        'displayModeBar': True,
+        'modeBarButtonsToRemove': ['lasso2d']
+    }
+)
