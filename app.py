@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Forge", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V158':
+if st.session_state.get('app_version') != 'V159':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V158'
+    st.session_state['app_version'] = 'V159'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -128,7 +128,7 @@ def simular_crecimiento_exponencial_multi(h_arr, l_arr, c_arr, o_arr, b_c, s_c, 
     pf = g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0)
     return (cap_act + divs) - cap_ini, pf, num_trades, max_dd
 
-# 🔥 NÚCLEO CAMALEÓN IA (MÁXIMO REALISMO SUCIO + MATEMÁTICA GENÉTICA) 🔥
+# 🔥 NÚCLEO CAMALEÓN IA 🔥
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
     b_c, s_c, w_rsi, w_z, w_adx, th_buy, th_sell, 
@@ -292,7 +292,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V158.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V159.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -369,7 +369,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
         st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V158.0**\n\n"
+    res_str = f"📋 **REPORTE OMNI-FORGE V159.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -387,7 +387,7 @@ st.sidebar.download_button(label="🐙 Exportar a GitHub (JSON)", data=json.dump
 # ==========================================
 # 🛑 5. EXTRACCIÓN DE VELAS Y ARRAYS MATEMÁTICOS 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal (V158)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal (V159)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     def _get_tv_pivot(series, left, right, is_high=True):
         window = left + right + 1
@@ -547,7 +547,7 @@ def calcular_señales_numpy(s_id, hitbox, therm_w, adx_th, whale_f):
     pre_pump = ((a_h > a_bbu) | (rsi_vel > 5)) & flash_vol & a_vv; pump_memory = pre_pump | npshift_bool(pre_pump, 1) | npshift_bool(pre_pump, 2)
     pre_dump = ((a_l < a_bbl) | (rsi_vel < -5)) & flash_vol & a_vr; dump_memory = pre_dump | npshift_bool(pre_dump, 1) | npshift_bool(pre_dump, 2)
 
-    retro_peak = (a_rsi < 30) & (a_c < a_bbl); retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
+    retro_peak = (rsi_v < 30) & (a_c < a_bbl); retro_peak_sell = (rsi_v > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
     support_buy = is_grav_sup & a_rcu; support_sell = is_grav_res & a_rcd
     div_bull = (a_l_s1 < a_l_s5) & (a_rsi_s1 > a_rsi_s5) & (a_rsi < 35); div_bear = (npshift(a_h, 1, 0) > npshift(a_h, 5, 0)) & (a_rsi_s1 < a_rsi_s5) & (a_rsi > 65)
@@ -664,7 +664,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             if is_dynamic:
                 if s_id.startswith("AI_"):
                     f_buy.fill(False); f_sell.fill(False)
-                    # 🔥 V158: LÍMITE DE VELOCIDAD DE ARRAY (MÁX 5 ARMAS PARA MATAR EL RUIDO) 🔥
                     dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 5))
                     dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 5))
                     
@@ -688,19 +687,18 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                     f_buy &= (m_mask & v_mask)
                     for r in dna_s_team: f_sell |= s_dict.get(r, default_f)
                     
-                    # 🔥 RANGO DE PERCEPTRÓN AMPLIADO (MENOS OPERACIONES AL AZAR, MÁS PRECISIÓN) 🔥
-                    r_w_rsi = random.uniform(-1.0, 1.0)
-                    r_w_z = random.uniform(-5.0, 5.0)
-                    r_w_adx = random.uniform(-1.0, 1.0)
-                    r_th_b = random.uniform(-100.0, 100.0)
-                    r_th_s = random.uniform(-100.0, 100.0)
+                    # 🔥 PERCEPTRÓN HIPERSENSIBLE Y GATILLO FÁCIL 🔥
+                    r_w_rsi = random.uniform(-2.0, 2.0)
+                    r_w_z = random.uniform(-10.0, 10.0)
+                    r_w_adx = random.uniform(-2.0, 2.0)
+                    r_th_b = random.uniform(-40.0, 40.0) 
+                    r_th_s = random.uniform(-40.0, 40.0)
                     
-                    r_atr_tp = round(random.uniform(1.0, 20.0), 2)
-                    r_atr_sl = round(random.uniform(0.5, 5.0), 2)
-                    r_reinv = float(random.choice([0.0, 20.0, 50.0, 100.0]))
+                    r_atr_tp = round(random.uniform(0.5, 15.0), 2)
+                    r_atr_sl = round(random.uniform(1.0, 20.0), 2)
+                    r_reinv = float(random.choice([20.0, 50.0, 100.0, 100.0])) 
                     r_ado = float(round(random.uniform(1.0, 15.0), 1))
                     
-                    # 🔥 SLIPPAGE CRUEL DEL 0.05% INYECTADO 🔥
                     net, pf, nt, mdd = simular_crecimiento_exponencial_ia_core(
                         a_h, a_l, a_c, a_o, a_atr, a_rsi, a_zscore, a_adx,
                         f_buy, f_sell, r_w_rsi, r_w_z, r_w_adx, r_th_b, r_th_s,
@@ -749,11 +747,16 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 net, pf, nt, mdd = simular_crecimiento_exponencial_scalar(a_h, a_l, a_c, a_o, f_buy, f_sell, float(rtp), float(rsl), float(cap_ini), float(com_pct), float(reinv_q))
 
             if nt >= 1: 
-                safe_pf = min(pf, 3.0) 
                 ado_actual = nt / max(1, dias_reales)
                 
-                # 🔥 V158: EL GEN DEPREDADOR (PENALIZACIÓN LETAL POR DRAWDOWN) 🔥
-                fit_score = (net * safe_pf * (1.0 + ado_actual)) / max(1.0, mdd)
+                # 🔥 V159: EL GEN DE LA AVARICIA (GREED OVERRIDE) 🔥
+                if net > 0:
+                    safe_pf = min(pf, 4.0)
+                    ado_factor = (ado_actual ** 1.5) if ado_actual >= 1.0 else (ado_actual * 0.5)
+                    dd_factor = 1.0 + (mdd / 50.0) 
+                    fit_score = (net * ado_factor * safe_pf) / dd_factor
+                else:
+                    fit_score = net
 
                 if fit_score > best_fit_live and net > 0:
                     best_fit_live = fit_score; best_net_live = net; best_pf_live = pf; best_nt_live = nt
@@ -778,7 +781,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"OMNI-FORGE V158: {s_id}"
+                title = f"OMNI-FORGE V159: {s_id}"
                 subtitle = f"Progreso: {pct_done}% | Combos: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#FF00FF"
 
@@ -1302,7 +1305,7 @@ c6.metric("Drawdown", f"{mdd:.2f}%", delta_color="inverse")
 c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
 
 with st.expander("📝 PINE SCRIPT GENERATOR", expanded=False):
-    st.info("Traducción Matemática Idéntica a TradingView. Bug 'use_lowest' arreglado y Motor Camaleón activado.")
+    st.info("Traducción Matemática Idéntica a TradingView. IA con Gatillo Sensible y Cero Miedo al Drawdown.")
     st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct), language="pine")
 
 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
