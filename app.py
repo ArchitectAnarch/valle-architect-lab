@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Forge", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V152':
+if st.session_state.get('app_version') != 'V153':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V152'
+    st.session_state['app_version'] = 'V153'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++ (SINCRONIZADAS CON TRADINGVIEW)
@@ -216,7 +216,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V152.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V153.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -265,7 +265,7 @@ if st.sidebar.button("🤖 CREAR ALGORITMO IA", type="secondary", use_container_
     st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V152.0**\n\n"
+    res_str = f"📋 **REPORTE OMNI-FORGE V153.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -283,7 +283,7 @@ st.sidebar.download_button(label="🐙 Exportar a GitHub (JSON)", data=json.dump
 # ==========================================
 # 🛑 5. EXTRACCIÓN DE VELAS Y ARRAYS MATEMÁTICOS 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal (V152)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal (V153)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     def _get_tv_pivot(series, left, right, is_high=True):
         window = left + right + 1
@@ -506,7 +506,10 @@ def calcular_señales_numpy(s_id, hitbox, therm_w, adx_th, whale_f):
 
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf')):
     best_net_live = cur_net; best_pf_live = 0.0; best_nt_live = 0; bp = None
-    tp_min, tp_max = 0.5, 40.0 
+    # 🔥 SUPERPODERES IA: RANGOS EXPANDIDOS 🔥
+    tp_min, tp_max = 0.1, 100.0 
+    sl_min, sl_max = 0.1, 50.0
+
     iters = 3000 * epochs
     chunks = min(iters, 50) 
     chunk_size = max(1, iters // chunks)
@@ -547,7 +550,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 s_k = f"{s_id.split('_')[0].capitalize()}_Sell" if s_id not in ["TARGET_LOCK", "NEON_SQUEEZE", "PINK_CLIMAX", "PING_PONG"] else "Lock_Sell" if s_id == "TARGET_LOCK" else "Squeeze_Sell" if s_id == "NEON_SQUEEZE" else "Climax_Sell" if s_id == "PINK_CLIMAX" else "Ping_Sell"
                 f_buy[:] = s_dict.get(b_k, default_f); f_sell[:] = s_dict.get(s_k, default_f)
 
-        # Pre-calculamos máscaras para Genesis para no destruir la RAM
         if is_multi:
             m1 = regime_arr == 1; m2 = regime_arr == 2; m3 = regime_arr == 3; m4 = regime_arr == 4
 
@@ -555,23 +557,27 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             if is_dynamic:
                 if s_id == "ALL_FORCES" or s_id.startswith("AI_MUTANT"):
                     f_buy.fill(False); f_sell.fill(False)
-                    dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 3)) if s_id.startswith("AI_") else random.sample(base_b, random.randint(1, len(base_b)))
-                    dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 3)) if s_id.startswith("AI_") else random.sample(base_s, random.randint(1, len(base_s)))
-                    dna_macro = random.choice(["All-Weather", "Bull Only", "Bear Only"]); dna_vol = random.choice(["All-Weather", "Trend", "Range"])
+                    # 🔥 LA IA AHORA PUEDE COMBINAR HASTA 5 ARMAS Y SALTARSE REGLAS MACRO 🔥
+                    dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 5)) if s_id.startswith("AI_") else random.sample(base_b, random.randint(1, len(base_b)))
+                    dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 5)) if s_id.startswith("AI_") else random.sample(base_s, random.randint(1, len(base_s)))
+                    dna_macro = random.choice(["All-Weather", "Bull Only", "Bear Only", "Ignore"])
+                    dna_vol = random.choice(["All-Weather", "Trend", "Range", "Ignore"])
+                    
                     m_mask = a_mb if dna_macro == "Bull Only" else (~a_mb if dna_macro == "Bear Only" else np.ones(n_len, dtype=bool))
                     v_mask = (a_adx >= r_adx) if dna_vol == "Trend" else ((a_adx < r_adx) if dna_vol == "Range" else np.ones(n_len, dtype=bool))
+                    
                     for r in dna_b_team: f_buy |= s_dict.get(r, default_f)
                     f_buy &= (m_mask & v_mask)
                     for r in dna_s_team: f_sell |= s_dict.get(r, default_f)
-                    rtp = round(random.uniform(tp_min, tp_max), 1); rsl = round(random.uniform(0.5, 20.0), 1)
+                    
+                    rtp = round(random.uniform(tp_min, tp_max), 2); rsl = round(random.uniform(sl_min, sl_max), 2)
                     net, pf, nt, mdd = simular_crecimiento_exponencial_scalar(a_h, a_l, a_c, a_o, f_buy, f_sell, float(rtp), float(rsl), float(cap_ini), float(com_pct), float(reinv_q))
                 elif is_multi:
                     opts_b = quadrix_b if s_id == "QUADRIX" else rocket_b if s_id == "ROCKET" else base_b
                     opts_s = quadrix_s if s_id == "QUADRIX" else rocket_s if s_id == "ROCKET" else base_s
                     dna_b = [random.sample(opts_b, 1) for _ in range(4)]; dna_s = [random.sample(opts_s, 1) for _ in range(4)]
-                    dna_tp = [random.uniform(tp_min, tp_max) for _ in range(4)]; dna_sl = [random.uniform(0.5, 20.0) for _ in range(4)]
+                    dna_tp = [random.uniform(tp_min, tp_max) for _ in range(4)]; dna_sl = [random.uniform(sl_min, sl_max) for _ in range(4)]
                     
-                    # 🔥 CERO RAM: Bitwise operators directos 🔥
                     b1 = s_dict.get(dna_b[0][0], default_f); s1 = s_dict.get(dna_s[0][0], default_f)
                     b2 = s_dict.get(dna_b[1][0], default_f); s2 = s_dict.get(dna_s[1][0], default_f)
                     b3 = s_dict.get(dna_b[2][0], default_f); s3 = s_dict.get(dna_s[2][0], default_f)
@@ -581,11 +587,11 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                     
                     net, pf, nt, mdd = simular_crecimiento_exponencial_multi(a_h, a_l, a_c, a_o, f_buy, f_sell, regime_arr, dna_tp[0], dna_sl[0], dna_tp[1], dna_sl[1], dna_tp[2], dna_sl[2], dna_tp[3], dna_sl[3], float(cap_ini), float(com_pct), float(reinv_q))
             else:
-                rtp = round(random.uniform(tp_min, tp_max), 1); rsl = round(random.uniform(0.5, 20.0), 1)
+                rtp = round(random.uniform(tp_min, tp_max), 2); rsl = round(random.uniform(sl_min, sl_max), 2)
                 net, pf, nt, mdd = simular_crecimiento_exponencial_scalar(a_h, a_l, a_c, a_o, f_buy, f_sell, float(rtp), float(rsl), float(cap_ini), float(com_pct), float(reinv_q))
 
             if nt >= 1: 
-                # 🔥 LEY DE HIERRO ABSOLUTA: Solo nos importa el Dinero Neto 🔥
+                # 🔥 LEY DE HIERRO ABSOLUTA 🔥
                 if net > best_net_live and net > 0:
                     best_net_live = net; best_pf_live = pf; best_nt_live = nt
                     if s_id == "ALL_FORCES" or s_id.startswith("AI_MUTANT"):
@@ -608,7 +614,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             </style>
             <div class="loader-container">
                 <div class="rocket">🚀</div>
-                <div style="color: #FF00FF; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">OMNI-FORGE V152: {s_id}</div>
+                <div style="color: #FF00FF; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">OMNI-FORGE V153: {s_id}</div>
                 <div style="color: white; font-size: 1.3rem;">Progreso: {pct_done}% | Combos: {combos:,}</div>
                 <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Mejor Neta: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x</div>
                 <div style="color: yellow; margin-top: 15px;">ETA: {eta:.1f} segs</div>
@@ -874,7 +880,6 @@ RC_Buy_Q4 = ping_buy_cmdr or cond_defcon_buy or cond_lock_buy_bounce
 RC_Sell_Q4 = cond_defcon_sell or cond_therm_sell_panic
 """
     ps_logic = ""
-    # 🔥 ARREGLO: DECLARACIÓN PREVIA UNICA Y AISLADA 🔥
     if s_id not in ["GENESIS", "ROCKET", "QUADRIX", "ROCKET_ULTRA", "ROCKET_COMMANDER"]:
         ps_logic += f"\nfloat base_active_tp = {v_tp} / 100.0\nfloat base_active_sl = {v_sl} / 100.0\n"
     else:
@@ -911,25 +916,25 @@ RC_Sell_Q4 = cond_defcon_sell or cond_therm_sell_panic
         s_k = f"{s_id.split('_')[0].capitalize()}_Sell" if s_id not in ["TARGET_LOCK", "NEON_SQUEEZE", "PINK_CLIMAX", "PING_PONG"] else "Lock_Sell" if s_id == "TARGET_LOCK" else "Squeeze_Sell" if s_id == "NEON_SQUEEZE" else "Climax_Sell" if s_id == "PINK_CLIMAX" else "Ping_Sell"
         ps_logic += f"\nbool signal_buy = {pine_map.get(b_k, 'false')}\nbool signal_sell = {pine_map.get(s_k, 'false')}\n"
 
-    # 🔥 EJECUCIÓN CON CANDADO DE RIESGO SINCRONIZADO AL PYTHON LAB 🔥
+    # 🔥 NUEVO CÓDIGO DE EJECUCIÓN (CORRECCIÓN DE LA LATENCIA DE VELA) 🔥
     ps_exec = """
 var float trade_tp = 0.0
 var float trade_sl = 0.0
+var float exec_price = 0.0
 
 if signal_buy and strategy.position_size == 0 and window
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
     trade_tp := base_active_tp
     trade_sl := base_active_sl
 
-if signal_sell and strategy.position_size > 0
-    strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
-
-// ELIMINACIÓN DE LA BRECHA DE ESPECULACIÓN: Ejecución inmediata del Exit Limit
-if strategy.position_size > 0 or (signal_buy and window)
-    float exec_price = strategy.position_size > 0 ? strategy.opentrades.entry_price(0) : close
+if strategy.position_size > 0
+    exec_price := strategy.opentrades.entry_price(0)
     float target_price = exec_price * (1 + trade_tp)
     float stop_price = exec_price * (1 - trade_sl)
     strategy.exit("TP/SL", "In", limit=target_price, stop=stop_price, alert_message=wt_exit_long)
+
+if signal_sell and strategy.position_size > 0
+    strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
 
 // ICONOS PEQUEÑOS Y DISCRETOS
 plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.belowbar, color=color.aqua, size=size.tiny)
@@ -944,7 +949,6 @@ if 'global_queue' not in st.session_state:
     st.session_state['global_queue'] = []
 
 if st.session_state.get('run_global', False):
-    # 🔥 MICRO-PAUSA DE INTERFAZ ANTES DE CORRER EL BUCLE 🔥
     time.sleep(0.1) 
     if len(st.session_state['global_queue']) > 0:
         s_id = st.session_state['global_queue'].pop(0)
@@ -981,74 +985,75 @@ with st.expander("🏆 SALÓN DE LA FAMA (Ordenado por Rentabilidad Neta)", expa
     for item in leaderboard_data: del item['Neto_Num']
     st.table(pd.DataFrame(leaderboard_data))
 
+# 🔥 NUEVO CARRUSEL DESPLEGABLE (Reemplaza a los Tabs) 🔥
+st.markdown("<h3 style='text-align: center; color: #00FF00;'>🎡 CARRUSEL DE ESTRATEGIAS (SELECCIONA PARA INSPECCIONAR)</h3>", unsafe_allow_html=True)
 tab_names = list(tab_id_map.keys())
-ui_tabs = st.tabs(tab_names)
+selected_tab_name = st.selectbox("Buscar o seleccionar estrategia:", tab_names, index=len(tab_names)-1)
 
-for tab_obj, tab_name in zip(ui_tabs, tab_names):
-    with tab_obj:
-        s_id = tab_id_map[tab_name]
-        is_opt = st.session_state.get(f'opt_status_{s_id}', False)
-        opt_badge = "<span style='color: lime;'>✅ IA OPTIMIZADA</span>" if is_opt else "<span style='color: gray;'>➖ NO OPTIMIZADA</span>"
-        vault = st.session_state.get(f'champion_{s_id}', {})
+# Lógica principal (sin identar dentro de un 'with st.tab')
+s_id = tab_id_map[selected_tab_name]
+is_opt = st.session_state.get(f'opt_status_{s_id}', False)
+opt_badge = "<span style='color: lime;'>✅ IA OPTIMIZADA</span>" if is_opt else "<span style='color: gray;'>➖ NO OPTIMIZADA</span>"
+vault = st.session_state.get(f'champion_{s_id}', {})
 
-        st.markdown(f"### {tab_name} {opt_badge}", unsafe_allow_html=True)
-        
-        c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
-        st.session_state[f'champion_{s_id}']['ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(vault.get('ado', 4.0)), key=f"ui_{s_id}_ado_w", step=0.5)
-        st.session_state[f'champion_{s_id}']['reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(vault.get('reinv', 0.0)), key=f"ui_{s_id}_reinv_w", step=5.0)
-        
-        if c_ia3.button(f"🚀 FORJAR BOT INDIVIDUAL ({global_epochs*3}k)", type="primary", key=f"btn_opt_{s_id}"):
-            ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid #FF00FF; border-radius: 10px;'><h2 style='color:#FF00FF;'>🚀 Procesando {s_id}...</h2></div>", unsafe_allow_html=True)
-            time.sleep(0.1)
-            buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
-            bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(vault.get('reinv', 0.0)), float(vault.get('ado', 4.0)), dias_reales, capital_inicial * (buy_hold_ret / 100.0), epochs=global_epochs, cur_net=float(vault.get('net', -float('inf'))))
-            if bp: save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True; st.success("👑 ¡Bot Forjado!")
-            time.sleep(1); ph_holograma.empty(); st.rerun()
+st.markdown(f"### {selected_tab_name} {opt_badge}", unsafe_allow_html=True)
 
-        df_strat, eq_curve, t_log, total_comms = run_backtest_eval(s_id, capital_inicial, comision_pct)
-        df_strat['Total_Portfolio'] = eq_curve
-        ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
-        buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
-        alpha_pct = ret_pct - buy_hold_ret
+c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
+st.session_state[f'champion_{s_id}']['ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(vault.get('ado', 4.0)), key=f"ui_{s_id}_ado_w", step=0.5)
+st.session_state[f'champion_{s_id}']['reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(vault.get('reinv', 0.0)), key=f"ui_{s_id}_reinv_w", step=5.0)
 
-        dftr = pd.DataFrame(t_log)
-        tt, wr, pf_val = 0, 0.0, 0.0
-        if not dftr.empty:
-            exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
-            tt = len(exs)
-            if tt > 0:
-                ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
-                wr = (ws / tt) * 100
-                gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum(); gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
-                pf_val = gpp / gll if gll > 0 else float('inf')
-        
-        vault['net'] = eq_curve[-1] - capital_inicial; vault['winrate'] = wr
-        mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
-        ado_val = tt / dias_reales if dias_reales > 0 else 0.0
+if c_ia3.button(f"🚀 FORJAR BOT INDIVIDUAL ({global_epochs*3}k)", type="primary", key=f"btn_opt_{s_id}"):
+    ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid #FF00FF; border-radius: 10px;'><h2 style='color:#FF00FF;'>🚀 Procesando {s_id}...</h2></div>", unsafe_allow_html=True)
+    time.sleep(0.1)
+    buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
+    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(vault.get('reinv', 0.0)), float(vault.get('ado', 4.0)), dias_reales, capital_inicial * (buy_hold_ret / 100.0), epochs=global_epochs, cur_net=float(vault.get('net', -float('inf'))))
+    if bp: save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True; st.success("👑 ¡Bot Forjado!")
+    time.sleep(1); ph_holograma.empty(); st.rerun()
 
-        c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-        c1.metric("Net Profit", f"${eq_curve[-1]-capital_inicial:,.2f}", f"{ret_pct:.2f}%")
-        c2.metric("ALPHA", f"{alpha_pct:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
-        c3.metric("Trades", f"{tt}", f"ADO: {ado_val:.2f}")
-        c4.metric("Win Rate", f"{wr:.1f}%")
-        c5.metric("Profit Factor", f"{pf_val:.2f}x")
-        c6.metric("Drawdown", f"{mdd:.2f}%", delta_color="inverse")
-        c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
+df_strat, eq_curve, t_log, total_comms = run_backtest_eval(s_id, capital_inicial, comision_pct)
+df_strat['Total_Portfolio'] = eq_curve
+ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
+buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
+alpha_pct = ret_pct - buy_hold_ret
 
-        with st.expander("📝 PINE SCRIPT GENERATOR", expanded=False):
-            st.info("Traducción Matemática Idéntica a TradingView. Copie este script, está 100% depurado.")
-            st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download), language="pine")
+dftr = pd.DataFrame(t_log)
+tt, wr, pf_val = 0, 0.0, 0.0
+if not dftr.empty:
+    exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
+    tt = len(exs)
+    if tt > 0:
+        ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
+        wr = (ws / tt) * 100
+        gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum(); gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
+        pf_val = gpp / gll if gll > 0 else float('inf')
 
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
-        fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
-        if not dftr.empty:
-            ents = dftr[dftr['Tipo'] == 'ENTRY']
-            fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white'))), row=1, col=1)
-            wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
-            fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white'))), row=1, col=1)
-            loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
-            fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+vault['net'] = eq_curve[-1] - capital_inicial; vault['winrate'] = wr
+mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
+ado_val = tt / dias_reales if dias_reales > 0 else 0.0
 
-        fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
-        fig.update_yaxes(side="right"); fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig, use_container_width=True, key=f"chart_{s_id}")
+c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+c1.metric("Net Profit", f"${eq_curve[-1]-capital_inicial:,.2f}", f"{ret_pct:.2f}%")
+c2.metric("ALPHA", f"{alpha_pct:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
+c3.metric("Trades", f"{tt}", f"ADO: {ado_val:.2f}")
+c4.metric("Win Rate", f"{wr:.1f}%")
+c5.metric("Profit Factor", f"{pf_val:.2f}x")
+c6.metric("Drawdown", f"{mdd:.2f}%", delta_color="inverse")
+c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
+
+with st.expander("📝 PINE SCRIPT GENERATOR", expanded=False):
+    st.info("Traducción Matemática Idéntica a TradingView. Copie este script, está 100% depurado para eliminar desfases de latencia de vela.")
+    st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download), language="pine")
+
+fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio"), row=1, col=1)
+if not dftr.empty:
+    ents = dftr[dftr['Tipo'] == 'ENTRY']
+    fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+    wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
+    fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+    loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
+    fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+
+fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
+fig.update_yaxes(side="right"); fig.update_layout(template='plotly_dark', height=750, xaxis_rangeslider_visible=False)
+st.plotly_chart(fig, use_container_width=True, key=f"chart_{s_id}")
