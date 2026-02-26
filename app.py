@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Forge", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V153':
+if st.session_state.get('app_version') != 'V154':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V153'
+    st.session_state['app_version'] = 'V154'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++ (SINCRONIZADAS CON TRADINGVIEW)
@@ -83,7 +83,6 @@ def simular_crecimiento_exponencial_scalar(h_arr, l_arr, c_arr, o_arr, b_c, s_c,
     pf = g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0)
     return (cap_act + divs) - cap_ini, pf, num_trades, max_dd
 
-# 🔥 NUEVO MOTOR C++ PARA ESTRATEGIAS MÚLTIPLES (EXTREMA VELOCIDAD) 🔥
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_multi(h_arr, l_arr, c_arr, o_arr, b_c, s_c, regime_arr, tp1, sl1, tp2, sl2, tp3, sl3, tp4, sl4, cap_ini, com_pct, reinvest_pct):
     cap_act = cap_ini; divs = 0.0; en_pos = False; p_ent = 0.0; tp_act = 0.0; sl_act = 0.0
@@ -208,15 +207,15 @@ for s_id in estrategias:
 def save_champion(s_id, bp):
     if not bp: return
     vault = st.session_state.setdefault(f'champion_{s_id}', {})
-    # 🔥 LEY DE HIERRO: SOLO SE GUARDA SI GANA MÁS DINERO NETO 🔥
-    if bp.get('net', -float('inf')) <= vault.get('net', -float('inf')):
+    # 🔥 LEY DE HIERRO ACTUALIZADA: Basada en el 'fit score' para premiar alta frecuencia y rentabilidad 🔥
+    if bp.get('fit', -float('inf')) <= vault.get('fit', -float('inf')):
         return
     for k in bp.keys(): vault[k] = bp[k]
 
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V153.0</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🚀 OMNI-FORGE V154.0</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -265,7 +264,7 @@ if st.sidebar.button("🤖 CREAR ALGORITMO IA", type="secondary", use_container_
     st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE OMNI-FORGE V153.0**\n\n"
+    res_str = f"📋 **REPORTE OMNI-FORGE V154.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -283,7 +282,7 @@ st.sidebar.download_button(label="🐙 Exportar a GitHub (JSON)", data=json.dump
 # ==========================================
 # 🛑 5. EXTRACCIÓN DE VELAS Y ARRAYS MATEMÁTICOS 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal (V153)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Construyendo Geometría Fractal (V154)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     def _get_tv_pivot(series, left, right, is_high=True):
         window = left + right + 1
@@ -504,9 +503,8 @@ def calcular_señales_numpy(s_id, hitbox, therm_w, adx_th, whale_f):
     regime = np.where(a_mb & (a_adx >= adx_th), 1, np.where(a_mb & (a_adx < adx_th), 2, np.where(~a_mb & (a_adx >= adx_th), 3, 4)))
     return s_dict, regime
 
-def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf')):
-    best_net_live = cur_net; best_pf_live = 0.0; best_nt_live = 0; bp = None
-    # 🔥 SUPERPODERES IA: RANGOS EXPANDIDOS 🔥
+def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf')):
+    best_fit_live = cur_fit; best_net_live = -float('inf'); best_pf_live = 0.0; best_nt_live = 0; bp = None
     tp_min, tp_max = 0.1, 100.0 
     sl_min, sl_max = 0.1, 50.0
 
@@ -515,7 +513,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
     chunk_size = max(1, iters // chunks)
     start_time = time.time()
     n_len = len(a_c)
-    target_nt = max(1.0, target_ado * dias_reales)
 
     f_buy = np.empty(n_len, dtype=bool); f_sell = np.empty(n_len, dtype=bool)
     default_f = np.zeros(n_len, dtype=bool)
@@ -557,7 +554,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             if is_dynamic:
                 if s_id == "ALL_FORCES" or s_id.startswith("AI_MUTANT"):
                     f_buy.fill(False); f_sell.fill(False)
-                    # 🔥 LA IA AHORA PUEDE COMBINAR HASTA 5 ARMAS Y SALTARSE REGLAS MACRO 🔥
                     dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 5)) if s_id.startswith("AI_") else random.sample(base_b, random.randint(1, len(base_b)))
                     dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 5)) if s_id.startswith("AI_") else random.sample(base_s, random.randint(1, len(base_s)))
                     dna_macro = random.choice(["All-Weather", "Bull Only", "Bear Only", "Ignore"])
@@ -571,7 +567,12 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                     for r in dna_s_team: f_sell |= s_dict.get(r, default_f)
                     
                     rtp = round(random.uniform(tp_min, tp_max), 2); rsl = round(random.uniform(sl_min, sl_max), 2)
-                    net, pf, nt, mdd = simular_crecimiento_exponencial_scalar(a_h, a_l, a_c, a_o, f_buy, f_sell, float(rtp), float(rsl), float(cap_ini), float(com_pct), float(reinv_q))
+                    
+                    # 🔥 LA IA DECIDE SU PROPIA REINVERSIÓN Y ADO 🔥
+                    r_reinv = float(random.choice([0.0, 20.0, 50.0, 100.0])) if s_id.startswith("AI_") else reinv_q
+                    r_ado = float(round(random.uniform(1.0, 15.0), 1)) if s_id.startswith("AI_") else target_ado
+                    
+                    net, pf, nt, mdd = simular_crecimiento_exponencial_scalar(a_h, a_l, a_c, a_o, f_buy, f_sell, float(rtp), float(rsl), float(cap_ini), float(com_pct), float(r_reinv))
                 elif is_multi:
                     opts_b = quadrix_b if s_id == "QUADRIX" else rocket_b if s_id == "ROCKET" else base_b
                     opts_s = quadrix_s if s_id == "QUADRIX" else rocket_s if s_id == "ROCKET" else base_s
@@ -591,15 +592,19 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 net, pf, nt, mdd = simular_crecimiento_exponencial_scalar(a_h, a_l, a_c, a_o, f_buy, f_sell, float(rtp), float(rsl), float(cap_ini), float(com_pct), float(reinv_q))
 
             if nt >= 1: 
-                # 🔥 LEY DE HIERRO ABSOLUTA 🔥
-                if net > best_net_live and net > 0:
-                    best_net_live = net; best_pf_live = pf; best_nt_live = nt
+                # 🔥 SISTEMA DE RECOMPENSA (FITNESS SCORE): Dinero + Bono por ADO y Profit Factor 🔥
+                safe_pf = min(pf, 3.0) 
+                ado_actual = nt / max(1, dias_reales)
+                fit_score = net * (1.0 + ado_actual * 0.5) * safe_pf
+
+                if fit_score > best_fit_live and net > 0:
+                    best_fit_live = fit_score; best_net_live = net; best_pf_live = pf; best_nt_live = nt
                     if s_id == "ALL_FORCES" or s_id.startswith("AI_MUTANT"):
-                        bp = {'b_team': dna_b_team, 's_team': dna_s_team, 'macro': dna_macro, 'vol': dna_vol, 'tp': rtp, 'sl': rsl, 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': net, 'net': net, 'winrate': 0.0}
+                        bp = {'b_team': dna_b_team, 's_team': dna_s_team, 'macro': dna_macro, 'vol': dna_vol, 'tp': rtp, 'sl': rsl, 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 'net': net, 'winrate': 0.0, 'reinv': r_reinv, 'ado': r_ado}
                     elif is_multi:
-                        bp = {'r1_b': dna_b[0], 'r1_s': dna_s[0], 'r1_tp': dna_tp[0], 'r1_sl': dna_sl[0], 'r2_b': dna_b[1], 'r2_s': dna_s[1], 'r2_tp': dna_tp[1], 'r2_sl': dna_sl[1], 'r3_b': dna_b[2], 'r3_s': dna_s[2], 'r3_tp': dna_tp[2], 'r3_sl': dna_sl[2], 'r4_b': dna_b[3], 'r4_s': dna_s[3], 'r4_tp': dna_tp[3], 'r4_sl': dna_sl[3], 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': net, 'net': net, 'winrate': 0.0}
+                        bp = {'r1_b': dna_b[0], 'r1_s': dna_s[0], 'r1_tp': dna_tp[0], 'r1_sl': dna_sl[0], 'r2_b': dna_b[1], 'r2_s': dna_s[1], 'r2_tp': dna_tp[1], 'r2_sl': dna_sl[1], 'r3_b': dna_b[2], 'r3_s': dna_s[2], 'r3_tp': dna_tp[2], 'r3_sl': dna_sl[2], 'r4_b': dna_b[3], 'r4_s': dna_s[3], 'r4_tp': dna_tp[3], 'r4_sl': dna_sl[3], 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 'net': net, 'winrate': 0.0}
                     else:
-                        bp = {'tp': rtp, 'sl': rsl, 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': net, 'net': net, 'winrate': 0.0}
+                        bp = {'tp': rtp, 'sl': rsl, 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 'net': net, 'winrate': 0.0}
                 
         del s_dict; del regime_arr
         
@@ -614,7 +619,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             </style>
             <div class="loader-container">
                 <div class="rocket">🚀</div>
-                <div style="color: #FF00FF; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">OMNI-FORGE V153: {s_id}</div>
+                <div style="color: #FF00FF; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">OMNI-FORGE V154: {s_id}</div>
                 <div style="color: white; font-size: 1.3rem;">Progreso: {pct_done}% | Combos: {combos:,}</div>
                 <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Mejor Neta: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x</div>
                 <div style="color: yellow; margin-top: 15px;">ETA: {eta:.1f} segs</div>
@@ -668,7 +673,7 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 0.0)), com_pct)
     return df_strat, eq_curve, t_log, total_comms
 
-# 🔥 PINE SCRIPT RESTAURADO: SINCRONIZACIÓN PERFECTA CON LATENCIA CERO 🔥
+# 🔥 PINE SCRIPT RESTAURADO Y MAPEO CORREGIDO 🔥
 def generar_pine_script(s_id, vault, sym, tf):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0)
     v_adx = vault.get('adx_th', 25.0); v_wf = vault.get('whale_f', 2.5)
@@ -858,6 +863,26 @@ lev_s = (close < ema200)
 commander_b = cond_pink_whale_buy or cond_therm_buy_bounce or cond_lock_buy_bounce
 commander_s = cond_therm_sell_wall or (close < ema50)
 
+// 🔥 ARREGLO DE IDENTIFICADORES PARA LA IA (MAPEO DIRECTO A QUADRIX) 🔥
+r_Pink_Whale_Buy = cond_pink_whale_buy
+r_Lock_Bounce = cond_lock_buy_bounce
+r_Lock_Break = cond_lock_buy_break
+r_Neon_Up = neon_up
+r_Defcon_Buy = cond_defcon_buy
+r_Therm_Bounce = cond_therm_buy_bounce
+r_Therm_Vacuum = cond_therm_buy_vacuum
+r_Nuclear_Buy = is_magenta and (wt_oversold or wt_cross_up)
+r_Early_Buy = is_magenta
+r_Rebound_Buy = rsi_cross_up and not is_magenta
+r_Lock_Reject = cond_lock_sell_reject
+r_Lock_Breakd = cond_lock_sell_breakd
+r_Neon_Dn = neon_dn
+r_Defcon_Sell = cond_defcon_sell
+r_Therm_Wall_Sell = cond_therm_sell_wall
+r_Therm_Panic_Sell = cond_therm_sell_panic
+r_Nuclear_Sell = (rsi_v > 70) and (wt_overbought or wt_cross_dn)
+r_Early_Sell = (rsi_v > 70) and vela_roja
+
 matrix_active = is_grav_sup or (floor_w >= 3)
 final_wick_req = matrix_active ? 0.15 : (adx < 40 ? 0.4 : 0.5)
 final_vol_req = matrix_active ? 1.2 : (adx < 40 ? 1.5 : 1.8)
@@ -875,7 +900,7 @@ RC_Sell_Q1 = ping_sell_cmdr or cond_defcon_sell
 RC_Buy_Q2 = cond_therm_buy_bounce or climax_buy_cmdr or ping_buy_cmdr
 RC_Sell_Q2 = cond_defcon_sell or cond_lock_sell_reject
 RC_Buy_Q3 = cond_pink_whale_buy or cond_defcon_buy
-RC_Sell_Q3 = climax_sell_cmdr or ping_sell_cmdr
+RC_Sell_Q3 = climax_sell_cmdr or ping_sell_cmdr 
 RC_Buy_Q4 = ping_buy_cmdr or cond_defcon_buy or cond_lock_buy_bounce
 RC_Sell_Q4 = cond_defcon_sell or cond_therm_sell_panic
 """
@@ -916,7 +941,6 @@ RC_Sell_Q4 = cond_defcon_sell or cond_therm_sell_panic
         s_k = f"{s_id.split('_')[0].capitalize()}_Sell" if s_id not in ["TARGET_LOCK", "NEON_SQUEEZE", "PINK_CLIMAX", "PING_PONG"] else "Lock_Sell" if s_id == "TARGET_LOCK" else "Squeeze_Sell" if s_id == "NEON_SQUEEZE" else "Climax_Sell" if s_id == "PINK_CLIMAX" else "Ping_Sell"
         ps_logic += f"\nbool signal_buy = {pine_map.get(b_k, 'false')}\nbool signal_sell = {pine_map.get(s_k, 'false')}\n"
 
-    # 🔥 NUEVO CÓDIGO DE EJECUCIÓN (CORRECCIÓN DE LA LATENCIA DE VELA) 🔥
     ps_exec = """
 var float trade_tp = 0.0
 var float trade_sl = 0.0
@@ -959,7 +983,7 @@ if st.session_state.get('run_global', False):
         buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
         buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
         
-        bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv',0.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=global_epochs, cur_net=float(v.get('net',-float('inf'))))
+        bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv',0.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=global_epochs, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))))
         
         if bp: save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True
         
@@ -985,12 +1009,10 @@ with st.expander("🏆 SALÓN DE LA FAMA (Ordenado por Rentabilidad Neta)", expa
     for item in leaderboard_data: del item['Neto_Num']
     st.table(pd.DataFrame(leaderboard_data))
 
-# 🔥 NUEVO CARRUSEL DESPLEGABLE (Reemplaza a los Tabs) 🔥
 st.markdown("<h3 style='text-align: center; color: #00FF00;'>🎡 CARRUSEL DE ESTRATEGIAS (SELECCIONA PARA INSPECCIONAR)</h3>", unsafe_allow_html=True)
 tab_names = list(tab_id_map.keys())
 selected_tab_name = st.selectbox("Buscar o seleccionar estrategia:", tab_names, index=len(tab_names)-1)
 
-# Lógica principal (sin identar dentro de un 'with st.tab')
 s_id = tab_id_map[selected_tab_name]
 is_opt = st.session_state.get(f'opt_status_{s_id}', False)
 opt_badge = "<span style='color: lime;'>✅ IA OPTIMIZADA</span>" if is_opt else "<span style='color: gray;'>➖ NO OPTIMIZADA</span>"
@@ -999,14 +1021,14 @@ vault = st.session_state.get(f'champion_{s_id}', {})
 st.markdown(f"### {selected_tab_name} {opt_badge}", unsafe_allow_html=True)
 
 c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
-st.session_state[f'champion_{s_id}']['ado'] = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=float(vault.get('ado', 4.0)), key=f"ui_{s_id}_ado_w", step=0.5)
-st.session_state[f'champion_{s_id}']['reinv'] = c_ia2.slider("💵 Reinversión (%)", 0.0, 100.0, value=float(vault.get('reinv', 0.0)), key=f"ui_{s_id}_reinv_w", step=5.0)
+st.session_state[f'champion_{s_id}']['ado'] = c_ia1.slider("🎯 Target ADO (IA Override)", 0.0, 100.0, value=float(vault.get('ado', 4.0)), key=f"ui_{s_id}_ado_w", step=0.5)
+st.session_state[f'champion_{s_id}']['reinv'] = c_ia2.slider("💵 Reinversión % (IA Override)", 0.0, 100.0, value=float(vault.get('reinv', 0.0)), key=f"ui_{s_id}_reinv_w", step=5.0)
 
 if c_ia3.button(f"🚀 FORJAR BOT INDIVIDUAL ({global_epochs*3}k)", type="primary", key=f"btn_opt_{s_id}"):
     ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid #FF00FF; border-radius: 10px;'><h2 style='color:#FF00FF;'>🚀 Procesando {s_id}...</h2></div>", unsafe_allow_html=True)
     time.sleep(0.1)
     buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
-    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(vault.get('reinv', 0.0)), float(vault.get('ado', 4.0)), dias_reales, capital_inicial * (buy_hold_ret / 100.0), epochs=global_epochs, cur_net=float(vault.get('net', -float('inf'))))
+    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(vault.get('reinv', 0.0)), float(vault.get('ado', 4.0)), dias_reales, capital_inicial * (buy_hold_ret / 100.0), epochs=global_epochs, cur_net=float(vault.get('net', -float('inf'))), cur_fit=float(vault.get('fit', -float('inf'))))
     if bp: save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True; st.success("👑 ¡Bot Forjado!")
     time.sleep(1); ph_holograma.empty(); st.rerun()
 
@@ -1041,7 +1063,7 @@ c6.metric("Drawdown", f"{mdd:.2f}%", delta_color="inverse")
 c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
 
 with st.expander("📝 PINE SCRIPT GENERATOR", expanded=False):
-    st.info("Traducción Matemática Idéntica a TradingView. Copie este script, está 100% depurado para eliminar desfases de latencia de vela.")
+    st.info("Traducción Matemática Idéntica a TradingView. Copie este script, está 100% depurado para eliminar desfases de latencia de vela y Errores de Identificador.")
     st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download), language="pine")
 
 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
