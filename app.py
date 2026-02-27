@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V163':
+if st.session_state.get('app_version') != 'V164':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V163'
+    st.session_state['app_version'] = 'V164'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -44,7 +44,6 @@ def npshift_bool(arr, num, fill_value=False):
     else: result[:] = arr
     return result
 
-# 🔥 NÚCLEO CAMALEÓN IA (MÁXIMO REALISMO SUCIO + MATEMÁTICA GENÉTICA) 🔥
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
     b_c, s_c, w_rsi, w_z, w_adx, th_buy, th_sell, 
@@ -171,7 +170,6 @@ todas_las_armas_b = [
     'Commander_Buy', 'Lev_Buy', 'Q_Pink_Whale_Buy', 'Q_Lock_Bounce', 'Q_Lock_Break', 'Q_Neon_Up', 'Q_Defcon_Buy', 
     'Q_Therm_Bounce', 'Q_Therm_Vacuum', 'Q_Nuclear_Buy', 'Q_Early_Buy', 'Q_Rebound_Buy'
 ]
-
 todas_las_armas_s = [
     'Ping_Sell', 'Climax_Sell', 'Thermal_Sell', 'Lock_Sell', 'Squeeze_Sell', 'Defcon_Sell', 'Jugg_Sell', 'Trinity_Sell', 
     'Commander_Sell', 'Lev_Sell', 'Q_Lock_Reject', 'Q_Lock_Breakd', 'Q_Neon_Dn', 'Q_Defcon_Sell', 'Q_Therm_Wall_Sell', 
@@ -212,7 +210,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V163</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V164</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -300,7 +298,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
         st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V163.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V164.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -312,20 +310,11 @@ st.sidebar.markdown("---")
 if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_univ_report"):
     st.sidebar.text_area("Block Note Universal:", value=generar_reporte_universal(capital_inicial, comision_pct), height=200)
 
-vault_export = {s: st.session_state.get(f'champion_{s}', {}) for s in estrategias}
-st.sidebar.download_button(label="🐙 Exportar ADN a GitHub (JSON)", data=json.dumps(vault_export, indent=4), file_name=f"MUTANT_VAULT_{ticker.replace('/','_')}.json", mime="application/json", use_container_width=True)
-
 # ==========================================
 # 🛑 5. EXTRACCIÓN DE VELAS Y ARRAYS MATEMÁTICOS 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Datos del Mercado (V163)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Datos del Mercado (V164)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
-    def _get_tv_pivot(series, left, right, is_high=True):
-        window = left + right + 1
-        roll = series.rolling(window).max() if is_high else series.rolling(window).min()
-        is_pivot = series.shift(right) == roll
-        return series.shift(right).where(is_pivot, np.nan).ffill()
-        
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
         start_ts = int(datetime.combine(start, datetime.min.time()).timestamp() * 1000)
@@ -409,7 +398,9 @@ df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date
 if df_global.empty: st.error(status_api); st.stop()
 
 dias_reales = max((df_global.index[-1] - df_global.index[0]).days, 1)
-st.sidebar.info(f"📊 Matrix Data: **{len(df_global):,} velas** ({dias_reales} días de Mercado)")
+
+# 🔥 MEDIDOR DE VELAS RESTAURADO EN EL UI 🔥
+st.sidebar.info(f"📊 Matrix Data: **{len(df_global):,} velas** ({dias_reales} días)")
 
 a_c = df_global['Close'].values; a_o = df_global['Open'].values; a_h = df_global['High'].values; a_l = df_global['Low'].values
 a_rsi = df_global['RSI'].values; a_rsi_ma = df_global['RSI_MA'].values; a_adx = df_global['ADX'].values
@@ -437,9 +428,7 @@ a_pp_slope_s1 = npshift(a_pp_slope, 1, 0.0)
 
 def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     n_len = len(a_c); s_dict = {}
-    
     a_tsup = np.maximum(a_pl30_l, np.maximum(a_pl100_l, a_pl300_l)); a_tres = np.minimum(a_ph30_l, np.minimum(a_ph100_l, a_ph300_l))
-
     a_dsup = np.abs(a_c - a_tsup) / a_c * 100; a_dres = np.abs(a_c - a_tres) / a_c * 100
     sr_val = a_atr * 2.0
     ceil_w = np.where((a_ph30_l > a_c) & (a_ph30_l <= a_c + sr_val), 1, 0) + np.where((a_pl30_l > a_c) & (a_pl30_l <= a_c + sr_val), 1, 0) + np.where((a_ph100_l > a_c) & (a_ph100_l <= a_c + sr_val), 3, 0) + np.where((a_pl100_l > a_c) & (a_pl100_l <= a_c + sr_val), 3, 0) + np.where((a_ph300_l > a_c) & (a_ph300_l <= a_c + sr_val), 5, 0) + np.where((a_pl300_l > a_c) & (a_pl300_l <= a_c + sr_val), 5, 0)
@@ -599,7 +588,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"GENESIS LAB V163: {s_id}"
+                title = f"GENESIS LAB V164: {s_id}"
                 subtitle = f"Progreso: {pct_done}% | ADN Probado: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#00FFFF"
 
@@ -1030,8 +1019,13 @@ with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expan
     st.info("Copia y pega este código en TradingView. Este Mutante es un Camaleón con ATR dinámico.")
     st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct), language="pine")
 
-# 🔥 MOTORES GRÁFICOS RESTAURADOS PARA ZOOM DINÁMICO Y PAN 🔥
+st.markdown("---")
+# 🔥 BOTÓN Y EXPLICACIÓN DE AUTO-AJUSTE 🔥
+st.info("🖱️ **TIP GRÁFICO:** Si las velas se ven aplanadas, haz **Doble Clic** dentro del gráfico o usa el botón **'Autoscale'** (Casita) en el menú de la esquina superior derecha.")
+
+# 🔥 RANGO FORZADO Y ZOOM DESBLOQUEADO (V164) 🔥
 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+
 fig.add_trace(go.Candlestick(
     x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], 
     name="Precio", increasing_line_color='cyan', decreasing_line_color='magenta'
@@ -1052,8 +1046,12 @@ if not dftr.empty:
 
 fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
 
+y_min_force = df_strat['Low'].min() * 0.98
+y_max_force = df_strat['High'].max() * 1.02
+
 fig.update_xaxes(fixedrange=False)
-fig.update_yaxes(fixedrange=False, side="right")
+fig.update_yaxes(fixedrange=False, side="right", range=[y_min_force, y_max_force], row=1, col=1)
+
 fig.update_layout(
     template='plotly_dark', 
     height=800, 
@@ -1070,6 +1068,6 @@ st.plotly_chart(
     config={
         'scrollZoom': True,
         'displayModeBar': True,
-        'modeBarButtonsToRemove': ['lasso2d']
+        'modeBarButtonsToRemove': ['lasso2d', 'select2d']
     }
 )
