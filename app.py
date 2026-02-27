@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V166':
+if st.session_state.get('app_version') != 'V167':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V166'
+    st.session_state['app_version'] = 'V167'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -178,6 +178,25 @@ todas_las_armas_s = [
     'Wyc_Upthrust_Sell', 'VSA_Dist_Sell', 'Fibo_618_Sell', 'MACD_Exhaust_Sell', 'Stoch_OB_Sell'
 ]
 
+pine_map = {
+    'Ping_Buy': 'ping_b', 'Ping_Sell': 'ping_s', 'Squeeze_Buy': 'squeeze_b', 'Squeeze_Sell': 'squeeze_s', 
+    'Thermal_Buy': 'therm_b', 'Thermal_Sell': 'therm_s', 'Climax_Buy': 'climax_b', 'Climax_Sell': 'climax_s', 
+    'Lock_Buy': 'lock_b', 'Lock_Sell': 'lock_s', 'Defcon_Buy': 'defcon_b', 'Defcon_Sell': 'defcon_s', 
+    'Jugg_Buy': 'jugg_b', 'Jugg_Sell': 'jugg_s', 'Trinity_Buy': 'trinity_b', 'Trinity_Sell': 'trinity_s', 
+    'Lev_Buy': 'lev_b', 'Lev_Sell': 'lev_s', 'Commander_Buy': 'commander_b', 'Commander_Sell': 'commander_s', 
+    'Q_Pink_Whale_Buy': 'r_Pink_Whale_Buy', 'Q_Lock_Bounce': 'r_Lock_Bounce', 'Q_Lock_Break': 'r_Lock_Break', 
+    'Q_Neon_Up': 'r_Neon_Up', 'Q_Defcon_Buy': 'r_Defcon_Buy', 'Q_Therm_Bounce': 'r_Therm_Bounce', 
+    'Q_Therm_Vacuum': 'r_Therm_Vacuum', 'Q_Nuclear_Buy': 'r_Nuclear_Buy', 'Q_Early_Buy': 'r_Early_Buy', 
+    'Q_Rebound_Buy': 'r_Rebound_Buy', 'Q_Lock_Reject': 'r_Lock_Reject', 'Q_Lock_Breakd': 'r_Lock_Breakd', 
+    'Q_Neon_Dn': 'r_Neon_Dn', 'Q_Defcon_Sell': 'r_Defcon_Sell', 'Q_Therm_Wall_Sell': 'r_Therm_Wall_Sell', 
+    'Q_Therm_Panic_Sell': 'r_Therm_Panic_Sell', 'Q_Nuclear_Sell': 'r_Nuclear_Sell', 'Q_Early_Sell': 'r_Early_Sell',
+    'Wyc_Spring_Buy': 'wyc_spring_buy', 'Wyc_Upthrust_Sell': 'wyc_upthrust_sell',
+    'VSA_Accum_Buy': 'vsa_accum_buy', 'VSA_Dist_Sell': 'vsa_dist_sell',
+    'Fibo_618_Buy': 'fibo_618_buy', 'Fibo_618_Sell': 'fibo_618_sell',
+    'MACD_Impulse_Buy': 'macd_impulse_buy', 'MACD_Exhaust_Sell': 'macd_exhaust_sell',
+    'Stoch_OS_Buy': 'stoch_os_buy', 'Stoch_OB_Sell': 'stoch_ob_sell'
+}
+
 for s_id in estrategias:
     if f'opt_status_{s_id}' not in st.session_state: st.session_state[f'opt_status_{s_id}'] = False
     if f'champion_{s_id}' not in st.session_state:
@@ -198,7 +217,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V166</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V167</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -285,10 +304,23 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
         st.session_state['deep_opt_state'] = {}
         st.rerun()
 
+def generar_reporte_universal(cap_ini, com_pct):
+    res_str = f"📋 **REPORTE GENESIS LAB V167.0**\n\n"
+    res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
+    for s_id in estrategias:
+        v = st.session_state.get(f'champion_{s_id}', {})
+        opt_icon = "✅" if st.session_state.get(f'opt_status_{s_id}', False) else "➖"
+        res_str += f"🧬 **{s_id}** [{opt_icon}]\nNet Profit: ${v.get('net',0):,.2f} \nWin Rate: {v.get('winrate',0):.1f}%\n---\n"
+    return res_str
+
+st.sidebar.markdown("---")
+if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_univ_report"):
+    st.sidebar.text_area("Block Note Universal:", value=generar_reporte_universal(capital_inicial, comision_pct), height=200)
+
 # ==========================================
 # 🛑 5. EXTRACCIÓN DE VELAS Y ARRAYS MATEMÁTICOS 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Biblioteca Matemática Institucional (V166)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Biblioteca Matemática Institucional (V167)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -417,12 +449,24 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     a_dsup = np.abs(a_c - a_tsup) / a_c * 100; a_dres = np.abs(a_c - a_tres) / a_c * 100
     sr_val = a_atr * 2.0
 
+    # 🔥 RESTAURACIÓN DE LAS ARMAS TÉRMICAS (V167) 🔥
+    ceil_w = np.where((a_ph30_l > a_c) & (a_ph30_l <= a_c + sr_val), 1, 0) + np.where((a_pl30_l > a_c) & (a_pl30_l <= a_c + sr_val), 1, 0) + np.where((a_ph100_l > a_c) & (a_ph100_l <= a_c + sr_val), 3, 0) + np.where((a_pl100_l > a_c) & (a_pl100_l <= a_c + sr_val), 3, 0) + np.where((a_ph300_l > a_c) & (a_ph300_l <= a_c + sr_val), 5, 0) + np.where((a_pl300_l > a_c) & (a_pl300_l <= a_c + sr_val), 5, 0)
+    floor_w = np.where((a_ph30_l < a_c) & (a_ph30_l >= a_c - sr_val), 1, 0) + np.where((a_pl30_l < a_c) & (a_pl30_l >= a_c - sr_val), 1, 0) + np.where((a_ph100_l < a_c) & (a_ph100_l >= a_c - sr_val), 3, 0) + np.where((a_pl100_l < a_c) & (a_pl100_l >= a_c - sr_val), 3, 0) + np.where((a_ph300_l < a_c) & (a_ph300_l >= a_c - sr_val), 5, 0) + np.where((a_pl300_l < a_c) & (a_pl300_l >= a_c - sr_val), 5, 0)
+
+    is_abyss = floor_w == 0
+    is_hard_wall = ceil_w >= therm_w
+
     trinity_safe = a_mb & ~a_fk
     neon_up = a_sqz_on & (a_c >= a_bbu * 0.999) & a_vv; neon_dn = a_sqz_on & (a_c <= a_bbl * 1.001) & a_vr
     defcon_level = np.full(n_len, 5); m4 = neon_up | neon_dn; defcon_level[m4] = 4; m3 = m4 & (a_bb_delta > 0); defcon_level[m3] = 3; m2 = m3 & (a_bb_delta > a_bb_delta_avg) & (a_adx > adx_th); defcon_level[m2] = 2; m1 = m2 & (a_bb_delta > a_bb_delta_avg * 1.5) & (a_adx > adx_th + 5) & (a_rvol > 1.2); defcon_level[m1] = 1
 
     cond_defcon_buy = (defcon_level <= 2) & neon_up; cond_defcon_sell = (defcon_level <= 2) & neon_dn
     
+    cond_therm_buy_bounce = (floor_w >= therm_w) & a_rcu & ~is_hard_wall
+    cond_therm_buy_vacuum = (ceil_w <= 3) & neon_up & ~is_abyss
+    cond_therm_sell_wall = (ceil_w >= therm_w) & a_rcd
+    cond_therm_sell_panic = is_abyss & a_vr
+
     tol = a_atr * 0.5; is_grav_sup = a_dsup < hitbox; is_grav_res = a_dres < hitbox
     cross_up_res = (a_c > a_tres) & (a_c_s1 <= npshift(a_tres, 1, 0)); cross_dn_sup = (a_c < a_tsup) & (a_c_s1 >= npshift(a_tsup, 1, 0))
     cond_lock_buy_bounce = is_grav_sup & (a_l <= a_tsup + tol) & (a_c > a_tsup) & a_vv
@@ -460,7 +504,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     s_dict['Ping_Buy'] = (a_adx < adx_th) & (a_c < a_bbl) & a_vv; s_dict['Ping_Sell'] = (a_c > a_bbu) | (a_rsi > 70)
     s_dict['Squeeze_Buy'] = neon_up; s_dict['Squeeze_Sell'] = (a_c < a_ema50)
-    s_dict['Thermal_Buy'] = is_grav_sup & a_rcu; s_dict['Thermal_Sell'] = is_grav_res & a_rcd
+    s_dict['Thermal_Buy'] = cond_therm_buy_bounce; s_dict['Thermal_Sell'] = cond_therm_sell_wall
     s_dict['Climax_Buy'] = cond_pink_whale_buy; s_dict['Climax_Sell'] = (a_rsi > 80)
     s_dict['Lock_Buy'] = cond_lock_buy_bounce; s_dict['Lock_Sell'] = cond_lock_sell_reject
     s_dict['Defcon_Buy'] = cond_defcon_buy; s_dict['Defcon_Sell'] = cond_defcon_sell
@@ -584,7 +628,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"GENESIS LAB V166: {s_id}"
+                title = f"GENESIS LAB V167: {s_id}"
                 subtitle = f"Progreso: {pct_done}% | ADN Probado: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#00FFFF"
 
@@ -697,9 +741,7 @@ kc_u = ta.sma(close, 20) + (atr * 1.5)
 kc_l = ta.sma(close, 20) - (atr * 1.5)
 squeeze_on = (bbu < kc_u) and (bbl > kc_l)
 
-// 🔥 BUG Z-SCORE CORREGIDO (DIVIDIR POR STDEV, NO POR DEV) 🔥
 z_score = stdev20 == 0 ? 0 : (close - basis) / stdev20
-
 rsi_bb_basis = ta.sma(rsi_v, 14), rsi_bb_dev = ta.stdev(rsi_v, 14) * 2.0
 
 vela_verde = close > open, vela_roja = close < open
@@ -725,6 +767,24 @@ a_tres = math.min(ta.highest(high[1], 30), ta.highest(high[1], 100), ta.highest(
 a_dsup = math.abs(close - a_tsup) / close * 100, a_dres = math.abs(close - a_tres) / close * 100
 sr_val = atr * 2.0
 
+ceil_w = 0, floor_w = 0
+ceil_w += (ta.highest(high[1], 30) > close and ta.highest(high[1], 30) <= close + sr_val) ? 1 : 0
+ceil_w += (ta.lowest(low[1], 30) > close and ta.lowest(low[1], 30) <= close + sr_val) ? 1 : 0
+ceil_w += (ta.highest(high[1], 100) > close and ta.highest(high[1], 100) <= close + sr_val) ? 3 : 0
+ceil_w += (ta.lowest(low[1], 100) > close and ta.lowest(low[1], 100) <= close + sr_val) ? 3 : 0
+ceil_w += (ta.highest(high[1], 300) > close and ta.highest(high[1], 300) <= close + sr_val) ? 5 : 0
+ceil_w += (ta.lowest(low[1], 300) > close and ta.lowest(low[1], 300) <= close + sr_val) ? 5 : 0
+
+floor_w += (ta.highest(high[1], 30) < close and ta.highest(high[1], 30) >= close - sr_val) ? 1 : 0
+floor_w += (ta.lowest(low[1], 30) < close and ta.lowest(low[1], 30) >= close - sr_val) ? 1 : 0
+floor_w += (ta.highest(high[1], 100) < close and ta.highest(high[1], 100) >= close - sr_val) ? 3 : 0
+floor_w += (ta.lowest(low[1], 100) < close and ta.lowest(low[1], 100) >= close - sr_val) ? 3 : 0
+floor_w += (ta.highest(high[1], 300) < close and ta.highest(high[1], 300) >= close - sr_val) ? 5 : 0
+floor_w += (ta.lowest(low[1], 300) < close and ta.lowest(low[1], 300) >= close - sr_val) ? 5 : 0
+
+is_abyss = floor_w == 0
+is_hard_wall = ceil_w >= therm_wall
+
 neon_up = squeeze_on and (close >= bbu * 0.999) and vela_verde
 neon_dn = squeeze_on and (close <= bbl * 1.001) and vela_roja
 defcon_level = 5
@@ -739,6 +799,11 @@ if neon_up or neon_dn
 
 cond_defcon_buy = defcon_level <= 2 and neon_up
 cond_defcon_sell = defcon_level <= 2 and neon_dn
+
+cond_therm_buy_bounce = (floor_w >= therm_wall) and rsi_cross_up and not is_hard_wall
+cond_therm_buy_vacuum = (ceil_w <= 3) and neon_up and not is_abyss
+cond_therm_sell_wall = (ceil_w >= therm_wall) and rsi_cross_dn
+cond_therm_sell_panic = is_abyss and vela_roja
 
 tol = atr * 0.5, is_grav_sup = a_dsup < hitbox_pct, is_grav_res = a_dres < hitbox_pct
 cross_up_res = (close > a_tres) and (nz(close[1]) <= nz(a_tres[1]))
@@ -797,9 +862,7 @@ wt_cross_dn = (wt1 < wt2) and (nz(wt1[1]) >= nz(wt2[1]))
 wt_oversold = wt1 < -60
 wt_overbought = wt1 > 60
 
-cond_therm_buy_bounce = is_grav_sup and rsi_cross_up
-cond_therm_sell_wall = is_grav_res and rsi_cross_dn
-
+// 🔥 POOL DE ARMAS 🔥
 ping_b = (adx < adx_trend) and (close < bbl) and vela_verde
 ping_s = (close > bbu) or (rsi_v > 70)
 squeeze_b = neon_up
@@ -827,7 +890,7 @@ r_Lock_Break = cond_lock_buy_break
 r_Neon_Up = neon_up
 r_Defcon_Buy = cond_defcon_buy
 r_Therm_Bounce = cond_therm_buy_bounce
-r_Therm_Vacuum = false
+r_Therm_Vacuum = cond_therm_buy_vacuum
 r_Nuclear_Buy = is_magenta and (wt_oversold or wt_cross_up)
 r_Early_Buy = is_magenta
 r_Rebound_Buy = rsi_cross_up and not is_magenta
@@ -836,10 +899,11 @@ r_Lock_Breakd = cond_lock_sell_breakd
 r_Neon_Dn = neon_dn
 r_Defcon_Sell = cond_defcon_sell
 r_Therm_Wall_Sell = cond_therm_sell_wall
-r_Therm_Panic_Sell = false
+r_Therm_Panic_Sell = cond_therm_sell_panic
 r_Nuclear_Sell = (rsi_v > 70) and (wt_overbought or wt_cross_dn)
 r_Early_Sell = (rsi_v > 70) and vela_roja
 
+// 🔥 NUEVAS ARMAS GENÉTICAS (WYCKOFF, VSA, FIBO, ELLIOTT, MURPHY) 🔥
 wyc_spring_buy = (low < a_tsup) and (close > a_tsup) and high_vol
 wyc_upthrust_sell = (high > a_tres) and (close < a_tres) and high_vol
 vsa_accum_buy = (body_size < atr * 0.5) and (lower_wick > body_size * 1.5) and high_vol and vela_roja
@@ -886,7 +950,6 @@ var float trade_sl_ticks = 0.0
 
 if signal_buy and strategy.position_size == 0 and window
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
-    // 🔥 V166: INTRABAR EXIT (Mismo Tick) 🔥
     trade_tp_ticks := (atr * atr_tp_mult) / syminfo.mintick
     trade_sl_ticks := (atr * atr_sl_mult) / syminfo.mintick
     strategy.exit("TP/SL", "In", profit=trade_tp_ticks, loss=trade_sl_ticks, alert_message=wt_exit_long)
