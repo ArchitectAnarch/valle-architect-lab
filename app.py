@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V165':
+if st.session_state.get('app_version') != 'V166':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V165'
+    st.session_state['app_version'] = 'V166'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -165,7 +165,6 @@ if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0:
 estrategias = st.session_state['ai_algos']
 tab_id_map = {f"🤖 {ai_id}": ai_id for ai_id in estrategias}
 
-# 🔥 NUEVAS ARMAS GENÉTICAS (WYCKOFF, VSA, FIBO, ELLIOTT, MURPHY) 🔥
 todas_las_armas_b = [
     'Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Jugg_Buy', 'Trinity_Buy', 
     'Commander_Buy', 'Lev_Buy', 'Q_Pink_Whale_Buy', 'Q_Lock_Bounce', 'Q_Lock_Break', 'Q_Neon_Up', 'Q_Defcon_Buy', 
@@ -178,25 +177,6 @@ todas_las_armas_s = [
     'Q_Therm_Panic_Sell', 'Q_Nuclear_Sell', 'Q_Early_Sell',
     'Wyc_Upthrust_Sell', 'VSA_Dist_Sell', 'Fibo_618_Sell', 'MACD_Exhaust_Sell', 'Stoch_OB_Sell'
 ]
-
-pine_map = {
-    'Ping_Buy': 'ping_b', 'Ping_Sell': 'ping_s', 'Squeeze_Buy': 'squeeze_b', 'Squeeze_Sell': 'squeeze_s', 
-    'Thermal_Buy': 'therm_b', 'Thermal_Sell': 'therm_s', 'Climax_Buy': 'climax_b', 'Climax_Sell': 'climax_s', 
-    'Lock_Buy': 'lock_b', 'Lock_Sell': 'lock_s', 'Defcon_Buy': 'defcon_b', 'Defcon_Sell': 'defcon_s', 
-    'Jugg_Buy': 'jugg_b', 'Jugg_Sell': 'jugg_s', 'Trinity_Buy': 'trinity_b', 'Trinity_Sell': 'trinity_s', 
-    'Lev_Buy': 'lev_b', 'Lev_Sell': 'lev_s', 'Commander_Buy': 'commander_b', 'Commander_Sell': 'commander_s', 
-    'Q_Pink_Whale_Buy': 'r_Pink_Whale_Buy', 'Q_Lock_Bounce': 'r_Lock_Bounce', 'Q_Lock_Break': 'r_Lock_Break', 
-    'Q_Neon_Up': 'r_Neon_Up', 'Q_Defcon_Buy': 'r_Defcon_Buy', 'Q_Therm_Bounce': 'r_Therm_Bounce', 
-    'Q_Therm_Vacuum': 'r_Therm_Vacuum', 'Q_Nuclear_Buy': 'r_Nuclear_Buy', 'Q_Early_Buy': 'r_Early_Buy', 
-    'Q_Rebound_Buy': 'r_Rebound_Buy', 'Q_Lock_Reject': 'r_Lock_Reject', 'Q_Lock_Breakd': 'r_Lock_Breakd', 
-    'Q_Neon_Dn': 'r_Neon_Dn', 'Q_Defcon_Sell': 'r_Defcon_Sell', 'Q_Therm_Wall_Sell': 'r_Therm_Wall_Sell', 
-    'Q_Therm_Panic_Sell': 'r_Therm_Panic_Sell', 'Q_Nuclear_Sell': 'r_Nuclear_Sell', 'Q_Early_Sell': 'r_Early_Sell',
-    'Wyc_Spring_Buy': 'wyc_spring_buy', 'Wyc_Upthrust_Sell': 'wyc_upthrust_sell',
-    'VSA_Accum_Buy': 'vsa_accum_buy', 'VSA_Dist_Sell': 'vsa_dist_sell',
-    'Fibo_618_Buy': 'fibo_618_buy', 'Fibo_618_Sell': 'fibo_618_sell',
-    'MACD_Impulse_Buy': 'macd_impulse_buy', 'MACD_Exhaust_Sell': 'macd_exhaust_sell',
-    'Stoch_OS_Buy': 'stoch_os_buy', 'Stoch_OB_Sell': 'stoch_ob_sell'
-}
 
 for s_id in estrategias:
     if f'opt_status_{s_id}' not in st.session_state: st.session_state[f'opt_status_{s_id}'] = False
@@ -218,7 +198,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V165</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V166</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -305,23 +285,10 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
         st.session_state['deep_opt_state'] = {}
         st.rerun()
 
-def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V165.0**\n\n"
-    res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
-    for s_id in estrategias:
-        v = st.session_state.get(f'champion_{s_id}', {})
-        opt_icon = "✅" if st.session_state.get(f'opt_status_{s_id}', False) else "➖"
-        res_str += f"🧬 **{s_id}** [{opt_icon}]\nNet Profit: ${v.get('net',0):,.2f} \nWin Rate: {v.get('winrate',0):.1f}%\n---\n"
-    return res_str
-
-st.sidebar.markdown("---")
-if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_univ_report"):
-    st.sidebar.text_area("Block Note Universal:", value=generar_reporte_universal(capital_inicial, comision_pct), height=200)
-
 # ==========================================
 # 🛑 5. EXTRACCIÓN DE VELAS Y ARRAYS MATEMÁTICOS 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Biblioteca Matemática Institucional (V165)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Biblioteca Matemática Institucional (V166)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -362,7 +329,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['RSI_MA'] = df['RSI'].rolling(14, min_periods=1).mean()
         df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
         
-        # 🔥 NUEVAS LIBRERÍAS (MACD + STOCH) 🔥
         macd_df = ta.macd(df['Close'], fast=12, slow=26, signal=9)
         df['MACD'] = macd_df.iloc[:, 0].fillna(0)
         df['MACD_Sig'] = macd_df.iloc[:, 2].fillna(0)
@@ -504,16 +470,14 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Commander_Buy'] = cond_pink_whale_buy | cond_lock_buy_bounce; s_dict['Commander_Sell'] = (a_c < a_ema50)
 
     s_dict['Q_Pink_Whale_Buy'] = cond_pink_whale_buy; s_dict['Q_Lock_Bounce'] = cond_lock_buy_bounce; s_dict['Q_Lock_Break'] = cond_lock_buy_break
-    s_dict['Q_Neon_Up'] = neon_up; s_dict['Q_Defcon_Buy'] = cond_defcon_buy; s_dict['Q_Therm_Bounce'] = False; s_dict['Q_Therm_Vacuum'] = False
+    s_dict['Q_Neon_Up'] = neon_up; s_dict['Q_Defcon_Buy'] = cond_defcon_buy; s_dict['Q_Therm_Bounce'] = cond_therm_buy_bounce; s_dict['Q_Therm_Vacuum'] = cond_therm_buy_vacuum
     s_dict['Q_Nuclear_Buy'] = is_magenta & (wt_oversold | wt_cross_up); s_dict['Q_Early_Buy'] = is_magenta; s_dict['Q_Rebound_Buy'] = a_rcu & ~is_magenta
     s_dict['Q_Lock_Reject'] = cond_lock_sell_reject; s_dict['Q_Lock_Breakd'] = cond_lock_sell_breakd; s_dict['Q_Neon_Dn'] = neon_dn
-    s_dict['Q_Defcon_Sell'] = cond_defcon_sell; s_dict['Q_Therm_Wall_Sell'] = False; s_dict['Q_Therm_Panic_Sell'] = False
+    s_dict['Q_Defcon_Sell'] = cond_defcon_sell; s_dict['Q_Therm_Wall_Sell'] = cond_therm_sell_wall; s_dict['Q_Therm_Panic_Sell'] = cond_therm_sell_panic
     s_dict['Q_Nuclear_Sell'] = (a_rsi > 70) & (wt_overbought | wt_cross_dn); s_dict['Q_Early_Sell'] = (a_rsi > 70) & a_vr
 
-    # 🔥 NUEVAS ARMAS DE LA LIBRERÍA INSTITUCIONAL 🔥
     s_dict['Wyc_Spring_Buy'] = (a_l < a_tsup) & (a_c > a_tsup) & a_hvol
     s_dict['Wyc_Upthrust_Sell'] = (a_h > a_tres) & (a_c < a_tres) & a_hvol
-    
     s_dict['VSA_Accum_Buy'] = (a_bs < a_atr * 0.5) & (a_lw > a_bs * 1.5) & a_hvol & a_vr
     s_dict['VSA_Dist_Sell'] = (a_bs < a_atr * 0.5) & (a_uw > a_bs * 1.5) & a_hvol & a_vv
     
@@ -525,7 +489,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     
     s_dict['MACD_Impulse_Buy'] = (a_macd > a_macd_sig) & (a_macd > 0) & (a_macd > a_macd_s1)
     s_dict['MACD_Exhaust_Sell'] = (a_macd < a_macd_sig) & (a_macd > 0) & (a_macd < a_macd_s1)
-    
     s_dict['Stoch_OS_Buy'] = (a_stoch_k < 20) & (a_stoch_k > a_stoch_d)
     s_dict['Stoch_OB_Sell'] = (a_stoch_k > 80) & (a_stoch_k < a_stoch_d)
 
@@ -621,7 +584,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"GENESIS LAB V165: {s_id}"
+                title = f"GENESIS LAB V166: {s_id}"
                 subtitle = f"Progreso: {pct_done}% | ADN Probado: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#00FFFF"
 
@@ -720,22 +683,32 @@ high_vol = volume > vol_ma_20
 ap = hlc3, esa = ta.ema(ap, 10), d_wt = ta.ema(math.abs(ap - esa), 10)
 wt1 = ta.ema((ap - esa) / (0.015 * (d_wt == 0 ? 1 : d_wt)), 21), wt2 = ta.sma(wt1, 4)
 
-basis = ta.sma(close, 20), dev = 2.0 * ta.stdev(close, 20), bbu = basis + dev, bbl = basis - dev
-bb_width = (bbu - bbl) / basis, bb_width_avg = ta.sma(bb_width, 20)
-bb_delta = bb_width - nz(bb_width[1], 0), bb_delta_avg = ta.sma(bb_delta, 10)
-kc_u = ta.sma(close, 20) + (atr * 1.5), kc_l = ta.sma(close, 20) - (atr * 1.5)
+basis = ta.sma(close, 20)
+stdev20 = ta.stdev(close, 20)
+dev = 2.0 * stdev20
+bbu = basis + dev
+bbl = basis - dev
+bb_width = (bbu - bbl) / basis
+bb_width_avg = ta.sma(bb_width, 20)
+bb_delta = bb_width - nz(bb_width[1], 0)
+bb_delta_avg = ta.sma(bb_delta, 10)
+
+kc_u = ta.sma(close, 20) + (atr * 1.5)
+kc_l = ta.sma(close, 20) - (atr * 1.5)
 squeeze_on = (bbu < kc_u) and (bbl > kc_l)
-z_score = dev == 0 ? 0 : (close - basis) / dev
+
+// 🔥 BUG Z-SCORE CORREGIDO (DIVIDIR POR STDEV, NO POR DEV) 🔥
+z_score = stdev20 == 0 ? 0 : (close - basis) / stdev20
+
 rsi_bb_basis = ta.sma(rsi_v, 14), rsi_bb_dev = ta.stdev(rsi_v, 14) * 2.0
 
 vela_verde = close > open, vela_roja = close < open
 rsi_ma = ta.sma(rsi_v, 14)
-rsi_cross_up = rsi_v > rsi_ma and nz(rsi_v[1]) <= nz(rsi_ma[1])
-rsi_cross_dn = rsi_v < rsi_ma and nz(rsi_v[1]) >= nz(rsi_ma[1])
+rsi_cross_up = (rsi_v > rsi_ma) and (nz(rsi_v[1]) <= nz(rsi_ma[1]))
+rsi_cross_dn = (rsi_v < rsi_ma) and (nz(rsi_v[1]) >= nz(rsi_ma[1]))
 macro_bull = close >= ema200
 trinity_safe = macro_bull and not is_falling_knife
 
-// 🔥 LIBRERÍA INSTITUCIONAL INYECTADA 🔥
 [macdLine, signalLine, _] = ta.macd(close, 12, 26, 9)
 stoch_k = ta.sma(ta.stoch(close, high, low, 14), 3)
 stoch_d = ta.sma(stoch_k, 3)
@@ -768,8 +741,8 @@ cond_defcon_buy = defcon_level <= 2 and neon_up
 cond_defcon_sell = defcon_level <= 2 and neon_dn
 
 tol = atr * 0.5, is_grav_sup = a_dsup < hitbox_pct, is_grav_res = a_dres < hitbox_pct
-cross_up_res = (close > a_tres) and nz(close[1] <= a_tres[1])
-cross_dn_sup = (close < a_tsup) and nz(close[1] >= a_tsup[1])
+cross_up_res = (close > a_tres) and (nz(close[1]) <= nz(a_tres[1]))
+cross_dn_sup = (close < a_tsup) and (nz(close[1]) >= nz(a_tsup[1]))
 cond_lock_buy_bounce = is_grav_sup and (low <= a_tsup + tol) and (close > a_tsup) and vela_verde
 cond_lock_buy_break = is_grav_res and cross_up_res and high_vol and vela_verde
 cond_lock_sell_reject = is_grav_res and (high >= a_tres - tol) and (close < a_tres) and vela_roja
@@ -787,7 +760,7 @@ dump_memory = pre_dump or nz(pre_dump[1]) or nz(pre_dump[2])
 
 retro_peak = (rsi_v < 30) and (close < bbl)
 retro_peak_sell = (rsi_v > 70) and (close > bbu)
-k_break_up = (rsi_v > (rsi_bb_basis + rsi_bb_dev)) and nz(rsi_v[1] <= (rsi_bb_basis[1] + rsi_bb_dev[1]))
+k_break_up = (rsi_v > (rsi_bb_basis + rsi_bb_dev)) and (nz(rsi_v[1]) <= (nz(rsi_bb_basis[1]) + nz(rsi_bb_dev[1])))
 support_buy = is_grav_sup and rsi_cross_up
 support_sell = is_grav_res and rsi_cross_dn
 div_bull = nz(low[1]) < nz(low[5]) and nz(rsi_v[1]) > nz(rsi_v[5]) and (rsi_v < 35)
@@ -819,23 +792,27 @@ is_magenta = (buy_score >= 70) or retro_peak
 is_magenta_sell = (sell_score >= 70) or retro_peak_sell
 cond_pink_whale_buy = is_magenta and is_whale_icon
 
-wt_cross_up = (wt1 > wt2) and nz(wt1[1] <= wt2[1])
-wt_cross_dn = (wt1 < wt2) and nz(wt1[1] >= wt2[1])
-wt_oversold = wt1 < -60, wt_overbought = wt1 > 60
+wt_cross_up = (wt1 > wt2) and (nz(wt1[1]) <= nz(wt2[1]))
+wt_cross_dn = (wt1 < wt2) and (nz(wt1[1]) >= nz(wt2[1]))
+wt_oversold = wt1 < -60
+wt_overbought = wt1 > 60
 
-// 🔥 POOL DE ARMAS 🔥
+cond_therm_buy_bounce = is_grav_sup and rsi_cross_up
+cond_therm_sell_wall = is_grav_res and rsi_cross_dn
+
 ping_b = (adx < adx_trend) and (close < bbl) and vela_verde
 ping_s = (close > bbu) or (rsi_v > 70)
 squeeze_b = neon_up
 squeeze_s = (close < ema50)
-therm_b = false, therm_s = false
+therm_b = cond_therm_buy_bounce
+therm_s = cond_therm_sell_wall
 climax_b = cond_pink_whale_buy
 climax_s = (rsi_v > 80)
 lock_b = cond_lock_buy_bounce
 lock_s = cond_lock_sell_reject
 defcon_b = cond_defcon_buy
 defcon_s = cond_defcon_sell
-jugg_b = macro_bull and (close > ema50) and nz(close[1] < ema50[1]) and vela_verde and not is_falling_knife
+jugg_b = macro_bull and (close > ema50) and nz(close[1]) < nz(ema50[1]) and vela_verde and not is_falling_knife
 jugg_s = (close < ema50)
 trinity_b = macro_bull and (rsi_v < 35) and vela_verde and not is_falling_knife
 trinity_s = (rsi_v > 75) or (close < ema200)
@@ -849,7 +826,7 @@ r_Lock_Bounce = cond_lock_buy_bounce
 r_Lock_Break = cond_lock_buy_break
 r_Neon_Up = neon_up
 r_Defcon_Buy = cond_defcon_buy
-r_Therm_Bounce = false
+r_Therm_Bounce = cond_therm_buy_bounce
 r_Therm_Vacuum = false
 r_Nuclear_Buy = is_magenta and (wt_oversold or wt_cross_up)
 r_Early_Buy = is_magenta
@@ -858,12 +835,11 @@ r_Lock_Reject = cond_lock_sell_reject
 r_Lock_Breakd = cond_lock_sell_breakd
 r_Neon_Dn = neon_dn
 r_Defcon_Sell = cond_defcon_sell
-r_Therm_Wall_Sell = false
+r_Therm_Wall_Sell = cond_therm_sell_wall
 r_Therm_Panic_Sell = false
 r_Nuclear_Sell = (rsi_v > 70) and (wt_overbought or wt_cross_dn)
 r_Early_Sell = (rsi_v > 70) and vela_roja
 
-// 🔥 NUEVAS ARMAS GENÉTICAS (WYCKOFF, VSA, FIBO, ELLIOTT, MURPHY) 🔥
 wyc_spring_buy = (low < a_tsup) and (close > a_tsup) and high_vol
 wyc_upthrust_sell = (high > a_tres) and (close < a_tres) and high_vol
 vsa_accum_buy = (body_size < atr * 0.5) and (lower_wick > body_size * 1.5) and high_vol and vela_roja
@@ -905,18 +881,15 @@ float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
 float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
     ps_exec = """
-var float trade_tp_dist = 0.0
-var float trade_sl_dist = 0.0
-var float exec_price = 0.0
+var float trade_tp_ticks = 0.0
+var float trade_sl_ticks = 0.0
 
 if signal_buy and strategy.position_size == 0 and window
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
-    trade_tp_dist := atr * atr_tp_mult
-    trade_sl_dist := atr * atr_sl_mult
-
-if strategy.position_size > 0
-    exec_price := strategy.opentrades.entry_price(0)
-    strategy.exit("TP/SL", "In", limit=exec_price + trade_tp_dist, stop=exec_price - trade_sl_dist, alert_message=wt_exit_long)
+    // 🔥 V166: INTRABAR EXIT (Mismo Tick) 🔥
+    trade_tp_ticks := (atr * atr_tp_mult) / syminfo.mintick
+    trade_sl_ticks := (atr * atr_sl_mult) / syminfo.mintick
+    strategy.exit("TP/SL", "In", profit=trade_tp_ticks, loss=trade_sl_ticks, alert_message=wt_exit_long)
 
 if signal_sell and strategy.position_size > 0
     strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
@@ -1072,7 +1045,7 @@ c6.metric("Drawdown", f"{mdd:.2f}%", delta_color="inverse")
 c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
 
 with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expanded=False):
-    st.info("Copia y pega este código en TradingView. Este Mutante es un Camaleón con ATR dinámico.")
+    st.info("Traducción Matemática Idéntica a TradingView. Bug 'use_lowest' arreglado y Motor Camaleón activado.")
     st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct), language="pine")
 
 st.markdown("---")
