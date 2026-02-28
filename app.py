@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V167':
+if st.session_state.get('app_version') != 'V168':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V167'
+    st.session_state['app_version'] = 'V168'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -204,7 +204,7 @@ for s_id in estrategias:
             'b_team': [random.choice(todas_las_armas_b)], 's_team': [random.choice(todas_las_armas_s)], 
             'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 
             'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 
-            'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 999.0, 'th_sell': -999.0, 'atr_tp': 2.0, 'atr_sl': 1.0
+            'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0
         }
 
 def save_champion(s_id, bp):
@@ -217,7 +217,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V167</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V168</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -265,7 +265,7 @@ if st.sidebar.button("🤖 CREAR NUEVO MUTANTE IA", type="secondary", use_contai
         'b_team': [random.choice(todas_las_armas_b)], 's_team': [random.choice(todas_las_armas_s)], 
         'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 
         'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 
-        'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 999.0, 'th_sell': -999.0, 'atr_tp': 2.0, 'atr_sl': 1.0
+        'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0
     }
     st.session_state['global_queue'] = [new_id]
     st.session_state['run_global'] = True
@@ -283,7 +283,7 @@ if st.sidebar.button("🌌 CREAR MUTANTE PROFUNDO", type="secondary", use_contai
         'b_team': [random.choice(todas_las_armas_b)], 's_team': [random.choice(todas_las_armas_s)], 
         'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 
         'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 
-        'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 999.0, 'th_sell': -999.0, 'atr_tp': 2.0, 'atr_sl': 1.0
+        'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0
     }
     st.session_state['deep_opt_state'] = {'s_id': new_id, 'target_epochs': deep_epochs_target, 'current_epoch': 0, 'paused': False}
     st.rerun()
@@ -304,28 +304,20 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
         st.session_state['deep_opt_state'] = {}
         st.rerun()
 
-def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V167.0**\n\n"
-    res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
-    for s_id in estrategias:
-        v = st.session_state.get(f'champion_{s_id}', {})
-        opt_icon = "✅" if st.session_state.get(f'opt_status_{s_id}', False) else "➖"
-        res_str += f"🧬 **{s_id}** [{opt_icon}]\nNet Profit: ${v.get('net',0):,.2f} \nWin Rate: {v.get('winrate',0):.1f}%\n---\n"
-    return res_str
-
-st.sidebar.markdown("---")
-if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_univ_report"):
-    st.sidebar.text_area("Block Note Universal:", value=generar_reporte_universal(capital_inicial, comision_pct), height=200)
-
 # ==========================================
-# 🛑 5. EXTRACCIÓN DE VELAS Y ARRAYS MATEMÁTICOS 🛑
+# 🛑 5. EXTRACCIÓN DE VELAS Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sintetizando Biblioteca Matemática Institucional (V167)...")
-def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal Institucional (V168)...")
+def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
-        start_ts = int(datetime.combine(start, datetime.min.time()).timestamp() * 1000)
+        
+        # 🔥 WARM-UP FANTASMA: 30 DÍAS DE DATOS INVISIBLES PARA CALENTAR ATR Y EMA 🔥
+        warmup_days = 30 if is_micro else 150
+        warmup_start = start - timedelta(days=warmup_days)
+        start_ts = int(datetime.combine(warmup_start, datetime.min.time()).timestamp() * 1000)
         end_ts = int((datetime.combine(end, datetime.min.time()) + timedelta(days=1)).timestamp() * 1000)
+        
         all_ohlcv, current_ts, error_count = [], start_ts, 0
         while current_ts < end_ts:
             try: ohlcv = ex_class.fetch_ohlcv(sym, iv_down, since=current_ts, limit=1000); error_count = 0 
@@ -349,6 +341,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df = df[~df.index.duplicated(keep='first')]
         if len(df) < 50: return pd.DataFrame(), f"❌ Solo {len(df)} velas."
             
+        # CÁLCULO DE INDICADORES (CON LOS DATOS FANTASMA INCLUIDOS)
         df['EMA_200'] = df['Close'].ewm(span=200, min_periods=1, adjust=False).mean()
         df['EMA_50'] = df['Close'].ewm(span=50, min_periods=1, adjust=False).mean()
         df['Vol_MA_20'] = df['Volume'].rolling(window=20, min_periods=1).mean()
@@ -405,11 +398,15 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset):
         df['Macro_Bull'] = df['Close'] >= df['EMA_200']
         df['PP_Slope'] = (2*df['Close'] + df['Close'].shift(1) - df['Close'].shift(3) - 2*df['Close'].shift(4)) / 10.0
         
+        # 🔥 WARM-UP TERMINADO: CORTAR DATOS FANTASMA 🔥
+        target_start = pd.to_datetime(datetime.combine(start, datetime.min.time())) + timedelta(hours=offset)
+        df = df[df.index >= target_start]
+
         gc.collect()
         return df, "OK"
     except Exception as e: return pd.DataFrame(), f"❌ ERROR FATAL GENERAL: {str(e)}"
 
-df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, utc_offset)
+df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, utc_offset, is_micro)
 if df_global.empty: st.error(status_api); st.stop()
 
 dias_reales = max((df_global.index[-1] - df_global.index[0]).days, 1)
@@ -449,7 +446,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     a_dsup = np.abs(a_c - a_tsup) / a_c * 100; a_dres = np.abs(a_c - a_tres) / a_c * 100
     sr_val = a_atr * 2.0
 
-    # 🔥 RESTAURACIÓN DE LAS ARMAS TÉRMICAS (V167) 🔥
     ceil_w = np.where((a_ph30_l > a_c) & (a_ph30_l <= a_c + sr_val), 1, 0) + np.where((a_pl30_l > a_c) & (a_pl30_l <= a_c + sr_val), 1, 0) + np.where((a_ph100_l > a_c) & (a_ph100_l <= a_c + sr_val), 3, 0) + np.where((a_pl100_l > a_c) & (a_pl100_l <= a_c + sr_val), 3, 0) + np.where((a_ph300_l > a_c) & (a_ph300_l <= a_c + sr_val), 5, 0) + np.where((a_pl300_l > a_c) & (a_pl300_l <= a_c + sr_val), 5, 0)
     floor_w = np.where((a_ph30_l < a_c) & (a_ph30_l >= a_c - sr_val), 1, 0) + np.where((a_pl30_l < a_c) & (a_pl30_l >= a_c - sr_val), 1, 0) + np.where((a_ph100_l < a_c) & (a_ph100_l >= a_c - sr_val), 3, 0) + np.where((a_pl100_l < a_c) & (a_pl100_l >= a_c - sr_val), 3, 0) + np.where((a_ph300_l < a_c) & (a_ph300_l >= a_c - sr_val), 5, 0) + np.where((a_pl300_l < a_c) & (a_pl300_l >= a_c - sr_val), 5, 0)
 
@@ -578,8 +574,10 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
 
         for _ in range(chunk_size): 
             f_buy.fill(False); f_sell.fill(False)
-            dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 5))
-            dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 5))
+            
+            # 🔥 LA IA DEBE USAR MÚLTIPLES MECANISMOS SIMULTÁNEOS 🔥
+            dna_b_team = random.sample(todas_las_armas_b, random.randint(5, 12))
+            dna_s_team = random.sample(todas_las_armas_s, random.randint(5, 12))
             
             dna_macro = random.choice(["All-Weather", "Bull Only", "Bear Only", "Ignore", "Organic_Vol", "Organic_Squeeze", "Organic_Safe"])
             dna_vol = random.choice(["All-Weather", "Trend", "Range", "Ignore", "Organic_Pump", "Organic_Dump"])
@@ -592,7 +590,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             for r in dna_s_team: f_sell |= s_dict.get(r, default_f)
             
             r_w_rsi = random.uniform(-2.0, 2.0); r_w_z = random.uniform(-10.0, 10.0); r_w_adx = random.uniform(-2.0, 2.0)
-            r_th_b = random.uniform(-40.0, 40.0); r_th_s = random.uniform(-40.0, 40.0)
+            r_th_b = random.uniform(0.0, 100.0); r_th_s = random.uniform(-100.0, 0.0)
             
             r_atr_tp = round(random.uniform(0.5, 15.0), 2); r_atr_sl = round(random.uniform(1.0, 20.0), 2)
             r_reinv = float(random.choice([20.0, 50.0, 100.0, 100.0])) 
@@ -604,19 +602,17 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(r_reinv), 0.05
             )
 
-            if nt >= 1: 
+            # 🔥 CONDICIÓN ESTRICTA: Mínimo 5 Trades, ADO >= 1.0, Sin miedo al Drawdown 🔥
+            if nt >= 5: 
                 ado_actual = nt / max(1, dias_reales)
-                if net > 0:
-                    safe_pf = min(pf, 4.0)
-                    ado_factor = (ado_actual ** 1.5) if ado_actual >= 1.0 else (ado_actual * 0.5)
-                    dd_factor = 1.0 + (mdd / 50.0) 
-                    fit_score = (net * ado_factor * safe_pf) / dd_factor
-                else:
-                    fit_score = net
+                if ado_actual >= 1.0 and net > 0:
+                    safe_pf = min(pf, 10.0)
+                    ado_factor = ado_actual ** 2.0 
+                    fit_score = net * safe_pf * ado_factor
 
-                if fit_score > best_fit_live and net > 0:
-                    best_fit_live = fit_score; best_net_live = net; best_pf_live = pf; best_nt_live = nt
-                    bp = {'b_team': dna_b_team, 's_team': dna_s_team, 'macro': dna_macro, 'vol': dna_vol, 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 'net': net, 'winrate': 0.0, 'reinv': r_reinv, 'ado': r_ado, 'w_rsi': r_w_rsi, 'w_z': r_w_z, 'w_adx': r_w_adx, 'th_buy': r_th_b, 'th_sell': r_th_s, 'atr_tp': r_atr_tp, 'atr_sl': r_atr_sl}
+                    if fit_score > best_fit_live:
+                        best_fit_live = fit_score; best_net_live = net; best_pf_live = pf; best_nt_live = nt
+                        bp = {'b_team': dna_b_team, 's_team': dna_s_team, 'macro': dna_macro, 'vol': dna_vol, 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 'net': net, 'winrate': 0.0, 'reinv': r_reinv, 'ado': r_ado, 'w_rsi': r_w_rsi, 'w_z': r_w_z, 'w_adx': r_w_adx, 'th_buy': r_th_b, 'th_sell': r_th_s, 'atr_tp': r_atr_tp, 'atr_sl': r_atr_sl}
                 
         if c == 0 or c == (chunks - 1) or c % update_mod == 0:
             elapsed = time.time() - start_time
@@ -628,7 +624,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"GENESIS LAB V167: {s_id}"
+                title = f"GENESIS LAB V168: {s_id}"
                 subtitle = f"Progreso: {pct_done}% | ADN Probado: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#00FFFF"
 
@@ -694,7 +690,7 @@ def generar_pine_script(s_id, vault, sym, tf, buy_pct=20, sell_pct=20):
     json_sell = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {sell_pct}, "limit_price": {{{{close}}}}, "side": "🔴 VENTA"}}'
 
     ps_base = f"""//@version=5
-strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_value=0.25)
+strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_value=0.25, slippage=5)
 wt_enter_long = input.text_area(defval='{json_buy}', title="🟢 WT: Mensaje Enter Long")
 wt_exit_long  = input.text_area(defval='{json_sell}', title="🔴 WT: Mensaje Exit Long")
 
@@ -862,7 +858,6 @@ wt_cross_dn = (wt1 < wt2) and (nz(wt1[1]) >= nz(wt2[1]))
 wt_oversold = wt1 < -60
 wt_overbought = wt1 > 60
 
-// 🔥 POOL DE ARMAS 🔥
 ping_b = (adx < adx_trend) and (close < bbl) and vela_verde
 ping_s = (close > bbu) or (rsi_v > 70)
 squeeze_b = neon_up
@@ -903,7 +898,6 @@ r_Therm_Panic_Sell = cond_therm_sell_panic
 r_Nuclear_Sell = (rsi_v > 70) and (wt_overbought or wt_cross_dn)
 r_Early_Sell = (rsi_v > 70) and vela_roja
 
-// 🔥 NUEVAS ARMAS GENÉTICAS (WYCKOFF, VSA, FIBO, ELLIOTT, MURPHY) 🔥
 wyc_spring_buy = (low < a_tsup) and (close > a_tsup) and high_vol
 wyc_upthrust_sell = (high > a_tres) and (close < a_tres) and high_vol
 vsa_accum_buy = (body_size < atr * 0.5) and (lower_wick > body_size * 1.5) and high_vol and vela_roja
