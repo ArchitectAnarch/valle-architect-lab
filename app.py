@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V177':
+if st.session_state.get('app_version') != 'V178':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V177'
+    st.session_state['app_version'] = 'V178'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -44,10 +44,9 @@ def npshift_bool(arr, num, fill_value=False):
     else: result[:] = arr
     return result
 
-# 🔥 NÚCLEO CAMALEÓN RECONSTRUIDO: MÁSCARAS ESTRICTAS INYECTADAS (V177) 🔥
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
-    b_c, s_c, m_mask, v_mask, w_rsi, w_z, w_adx, th_buy, th_sell, 
+    b_c, s_c, w_rsi, w_z, w_adx, th_buy, th_sell, 
     atr_tp_mult, atr_sl_mult, cap_ini, com_pct, invest_pct, slippage_pct):
     
     cap_act = cap_ini; en_pos = False; p_ent = 0.0
@@ -89,14 +88,8 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
             if cap_act <= 0: break
             
         if not en_pos and i+1 < len(h_arr):
-            can_buy = b_c[i]
-            if not can_buy:
-                score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
-                if score > th_buy:
-                    can_buy = True
-            
-            # 🔥 REGLA INSTITUCIONAL: AUNQUE LA MATEMÁTICA LO PIDA, DEBE RESPETAR EL CLIMA DE MERCADO 🔥
-            if can_buy and m_mask[i] and v_mask[i]:
+            score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
+            if b_c[i] or (score > th_buy):
                 invest_amt = cap_act * (invest_pct / 100.0) 
                 if invest_amt > cap_act: invest_amt = cap_act 
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
@@ -160,7 +153,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     return curva.tolist(), 0.0, cap_act, registro_trades, en_pos, total_comms
 
 # ==========================================
-# 🧬 2. ARSENAL DE INDICADORES (ADN V177)
+# 🧬 2. ARSENAL DE INDICADORES (ADN V178)
 # ==========================================
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
@@ -225,7 +218,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V177</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V178</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -249,8 +242,16 @@ intervalos = {"1 Minuto": "1m", "5 Minutos": "5m", "15 Minutos": "15m", "30 Minu
 intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=2) 
 iv_download = intervalos[intervalo_sel]
 hoy = datetime.today().date()
+
+# 🔥 Ajuste: Permitir hasta 250 días en micro para igualar la profundidad de TradingView
 is_micro = iv_download in ["1m", "5m", "15m", "30m"]
-start_date, end_date = st.sidebar.slider("📅 Scope Histórico", min_value=hoy - timedelta(days=45 if is_micro else 1500), max_value=hoy, value=(hoy - timedelta(days=45 if is_micro else 1500), hoy), format="YYYY-MM-DD")
+start_date, end_date = st.sidebar.slider(
+    "📅 Scope Histórico", 
+    min_value=hoy - timedelta(days=250 if is_micro else 1500), 
+    max_value=hoy, 
+    value=(hoy - timedelta(days=200 if is_micro else 1500), hoy), 
+    format="YYYY-MM-DD"
+)
 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
@@ -311,7 +312,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V177.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V178.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -326,7 +327,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V177)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V178)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -463,7 +464,7 @@ a_pa_3sol_b = df_global['PA_3_Soldiers'].values; a_pa_3cro_s = df_global['PA_3_C
 
 a_pl30_l = df_global['PL30_L'].fillna(0).values; a_ph30_l = df_global['PH30_L'].fillna(99999).values
 a_pl100_l = df_global['PL100_L'].fillna(0).values; a_ph100_l = df_global['PH100_L'].fillna(99999).values
-a_pl300_l = df_global['PL300_L'].fillna(0).values; a_ph300_l = df_global['PH300_L'].fillna(99999).values
+a_pl300_l = df_global['PL300_L'].fillna(0).values; a_ph30_l = df_global['PH300_L'].fillna(99999).values
 
 a_c_s1 = npshift(a_c, 1, 0.0); a_o_s1 = npshift(a_o, 1, 0.0); a_l_s1 = npshift(a_l, 1, 0.0); a_l_s5 = npshift(a_l, 5, 0.0)
 a_h_s1 = npshift(a_h, 1, 0.0); a_h_s5 = npshift(a_h, 5, 0.0)
@@ -669,7 +670,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"GENESIS LAB V177 (70% TRAIN): {s_id}"
+                title = f"GENESIS LAB V178 (70% TRAIN): {s_id}"
                 subtitle = f"Progreso: {pct_done}% | ADN Probado: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#00FFFF"
 
@@ -725,25 +726,28 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     df_strat['Signal_Buy'], df_strat['Signal_Sell'] = f_buy, f_sell
     df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
     
-    eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.05)
+    # 🔥 Ajuste: Slippage a 0.0 para paridad exacta con TradingView en la prueba visual
+    eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.0)
     return df_strat, eq_curve, t_log, total_comms
 
-def generar_pine_script(s_id, vault, sym, tf, buy_pct=20, sell_pct=20):
+# 🔥 Ajuste: Se inyectan com_pct y la fecha de inicio (start_date_obj) real 🔥
+def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0)
     v_adx = vault.get('adx_th', 25.0); v_wf = vault.get('whale_f', 2.5)
     
     json_buy = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {buy_pct}, "limit_price": {{{{close}}}}, "side": "🟢 COMPRA"}}'
     json_sell = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {sell_pct}, "limit_price": {{{{close}}}}, "side": "🔴 VENTA"}}'
 
+    # 🔥 Ajuste: Comisión conectada a la UI y Slippage en 0 🔥
     ps_base = f"""//@version=5
-strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value={buy_pct}, commission_value=0.25, slippage=0)
+strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value={buy_pct}, commission_value={com_pct*100}, slippage=0)
 wt_enter_long = input.text_area(defval='{json_buy}', title="🟢 WT: Mensaje Enter Long")
 wt_exit_long  = input.text_area(defval='{json_sell}', title="🔴 WT: Mensaje Exit Long")
 
 grp_time = "📅 FILTRO DE FECHA"
-start_year = input.int(2020, "Año de Inicio", group=grp_time)
-start_month = input.int(1, "Mes de Inicio", group=grp_time)
-start_day = input.int(1, "Día de Inicio", group=grp_time)
+start_year = input.int({start_date_obj.year}, "Año de Inicio", group=grp_time)
+start_month = input.int({start_date_obj.month}, "Mes de Inicio", group=grp_time)
+start_day = input.int({start_date_obj.day}, "Día de Inicio", group=grp_time)
 window = time >= timestamp(syminfo.timezone, start_year, start_month, start_day, 0, 0)
 
 hitbox_pct   = {v_hb}
@@ -1174,7 +1178,8 @@ c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
 
 with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expanded=False):
     st.info("Traducción Matemática Idéntica. TV usa Ticks Reales para evitar Fake Trades en Gaps.")
-    st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct), language="pine")
+    # 🔥 Ajuste: Pasar comision_pct real y la primera fecha (df_strat.index[0])
+    st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct, comision_pct, df_strat.index[0]), language="pine")
 
 st.markdown("---")
 st.info("🖱️ **TIP GRÁFICO:** Si las velas se ven aplanadas, haz **Doble Clic** dentro del gráfico o usa el botón **'Autoscale'** (Casita) en el menú de la esquina superior derecha.")
