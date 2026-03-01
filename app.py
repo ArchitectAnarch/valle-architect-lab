@@ -1182,4 +1182,61 @@ st.info("🖱️ **TIP GRÁFICO:** Si las velas se ven aplanadas, haz **Doble Cl
 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
 
 fig.add_trace(go.Candlestick(
-    x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close
+    x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], 
+    name="Precio", increasing_line_color='cyan', decreasing_line_color='magenta'
+), row=1, col=1)
+
+fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='Río Center (EMA 50)', line=dict(color='yellow', width=1, dash='dot')), row=1, col=1)
+fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='Macro Trend (EMA 200)', line=dict(color='purple', width=2)), row=1, col=1)
+fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['BBU'], mode='lines', name='Squeeze Top (BBU)', line=dict(color='rgba(128,128,128,0.5)', width=1)), row=1, col=1)
+fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['BBL'], mode='lines', name='Squeeze Bot (BBL)', line=dict(color='rgba(128,128,128,0.5)', width=1)), row=1, col=1)
+
+if not dftr.empty:
+    ents = dftr[dftr['Tipo'] == 'ENTRY']
+    fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+    wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
+    fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+    loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
+    fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+
+fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
+
+y_min_force = df_strat['Low'].min() * 0.98
+y_max_force = df_strat['High'].max() * 1.02
+
+# 🔥 DIVISIÓN VISUAL IN-SAMPLE / OUT-OF-SAMPLE (PARCHE V176) 🔥
+if len(df_strat) > 0:
+    split_idx = int(len(df_strat) * 0.70)
+    if split_idx < len(df_strat):
+        split_date_str = df_strat.index[split_idx].strftime('%Y-%m-%d %H:%M:%S')
+        fig.add_vline(x=split_date_str, line_width=2, line_dash="dash", line_color="yellow")
+        fig.add_annotation(
+            x=split_date_str, y=0.95, yref="paper", 
+            text="OUT-OF-SAMPLE (30%) ➡️", 
+            showarrow=False, xanchor="left", yanchor="top", 
+            font=dict(color="yellow", size=10),
+            bgcolor="rgba(0,0,0,0.5)"
+        )
+
+fig.update_xaxes(fixedrange=False)
+fig.update_yaxes(fixedrange=False, side="right", range=[y_min_force, y_max_force], row=1, col=1)
+
+fig.update_layout(
+    template='plotly_dark', 
+    height=800, 
+    xaxis_rangeslider_visible=False,
+    dragmode='pan',
+    hovermode='x unified',
+    margin=dict(l=10, r=50, t=30, b=10)
+)
+
+st.plotly_chart(
+    fig, 
+    use_container_width=True, 
+    key=f"chart_{s_id}", 
+    config={
+        'scrollZoom': True,
+        'displayModeBar': True,
+        'modeBarButtonsToRemove': ['lasso2d', 'select2d']
+    }
+)
