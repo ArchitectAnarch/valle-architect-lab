@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V176':
+if st.session_state.get('app_version') != 'V177':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V176'
+    st.session_state['app_version'] = 'V177'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -44,9 +44,10 @@ def npshift_bool(arr, num, fill_value=False):
     else: result[:] = arr
     return result
 
+# 🔥 NÚCLEO CAMALEÓN RECONSTRUIDO: MÁSCARAS ESTRICTAS INYECTADAS (V177) 🔥
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
-    b_c, s_c, w_rsi, w_z, w_adx, th_buy, th_sell, 
+    b_c, s_c, m_mask, v_mask, w_rsi, w_z, w_adx, th_buy, th_sell, 
     atr_tp_mult, atr_sl_mult, cap_ini, com_pct, invest_pct, slippage_pct):
     
     cap_act = cap_ini; en_pos = False; p_ent = 0.0
@@ -88,8 +89,14 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
             if cap_act <= 0: break
             
         if not en_pos and i+1 < len(h_arr):
-            score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
-            if b_c[i] or (score > th_buy):
+            can_buy = b_c[i]
+            if not can_buy:
+                score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
+                if score > th_buy:
+                    can_buy = True
+            
+            # 🔥 REGLA INSTITUCIONAL: AUNQUE LA MATEMÁTICA LO PIDA, DEBE RESPETAR EL CLIMA DE MERCADO 🔥
+            if can_buy and m_mask[i] and v_mask[i]:
                 invest_amt = cap_act * (invest_pct / 100.0) 
                 if invest_amt > cap_act: invest_amt = cap_act 
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
@@ -153,7 +160,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     return curva.tolist(), 0.0, cap_act, registro_trades, en_pos, total_comms
 
 # ==========================================
-# 🧬 2. ARSENAL DE INDICADORES (ADN V176)
+# 🧬 2. ARSENAL DE INDICADORES (ADN V177)
 # ==========================================
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
@@ -218,7 +225,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V176</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V177</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -304,7 +311,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V176.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V177.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -319,7 +326,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V176)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V177)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -623,6 +630,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             
             r_atr_tp = round(random.uniform(0.5, 15.0), 2); r_atr_sl = round(random.uniform(1.0, 20.0), 2)
             
+            # 🔥 EJECUCIÓN C++ EXCLUSIVA EN ZONA IN-SAMPLE 🔥
             net, pf, nt, mdd, wr = simular_crecimiento_exponencial_ia_core(
                 a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx], a_atr[:split_idx], 
                 a_rsi[:split_idx], a_zscore[:split_idx], a_adx[:split_idx],
@@ -661,7 +669,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"GENESIS LAB V176 (70% TRAIN): {s_id}"
+                title = f"GENESIS LAB V177 (70% TRAIN): {s_id}"
                 subtitle = f"Progreso: {pct_done}% | ADN Probado: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#00FFFF"
 
@@ -1174,65 +1182,4 @@ st.info("🖱️ **TIP GRÁFICO:** Si las velas se ven aplanadas, haz **Doble Cl
 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
 
 fig.add_trace(go.Candlestick(
-    x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], 
-    name="Precio", increasing_line_color='cyan', decreasing_line_color='magenta'
-), row=1, col=1)
-
-fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='Río Center (EMA 50)', line=dict(color='yellow', width=1, dash='dot')), row=1, col=1)
-fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='Macro Trend (EMA 200)', line=dict(color='purple', width=2)), row=1, col=1)
-fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['BBU'], mode='lines', name='Squeeze Top (BBU)', line=dict(color='rgba(128,128,128,0.5)', width=1)), row=1, col=1)
-fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['BBL'], mode='lines', name='Squeeze Bot (BBL)', line=dict(color='rgba(128,128,128,0.5)', width=1)), row=1, col=1)
-
-if not dftr.empty:
-    ents = dftr[dftr['Tipo'] == 'ENTRY']
-    fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white'))), row=1, col=1)
-    wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
-    fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white'))), row=1, col=1)
-    loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
-    fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white'))), row=1, col=1)
-
-fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
-
-y_min_force = df_strat['Low'].min() * 0.98
-y_max_force = df_strat['High'].max() * 1.02
-
-# 🔥 DIVISIÓN VISUAL IN-SAMPLE / OUT-OF-SAMPLE (PARCHE PLOTLY V176) 🔥
-if len(df_strat) > 0:
-    split_idx = int(len(df_strat) * 0.70)
-    if split_idx < len(df_strat):
-        split_date = df_strat.index[split_idx]
-        
-        # 1. Dibujamos la línea pura sin texto para evitar el bug matemático de fechas en Plotly
-        fig.add_vline(x=split_date, line_width=2, line_dash="dash", line_color="yellow")
-        
-        # 2. Añadimos el texto como una anotación flotante referenciada al "papel" de la gráfica
-        fig.add_annotation(
-            x=split_date, y=0.95, yref="paper", 
-            text="OUT-OF-SAMPLE (30%) ➡️", 
-            showarrow=False, xanchor="left", yanchor="top", 
-            font=dict(color="yellow", size=10),
-            bgcolor="rgba(0,0,0,0.5)"
-        )
-
-fig.update_xaxes(fixedrange=False)
-fig.update_yaxes(fixedrange=False, side="right", range=[y_min_force, y_max_force], row=1, col=1)
-
-fig.update_layout(
-    template='plotly_dark', 
-    height=800, 
-    xaxis_rangeslider_visible=False,
-    dragmode='pan',
-    hovermode='x unified',
-    margin=dict(l=10, r=50, t=30, b=10)
-)
-
-st.plotly_chart(
-    fig, 
-    use_container_width=True, 
-    key=f"chart_{s_id}", 
-    config={
-        'scrollZoom': True,
-        'displayModeBar': True,
-        'modeBarButtonsToRemove': ['lasso2d', 'select2d']
-    }
-)
+    x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close
