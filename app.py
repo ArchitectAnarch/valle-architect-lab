@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V174':
+if st.session_state.get('app_version') != 'V175':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V174'
+    st.session_state['app_version'] = 'V175'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -153,7 +153,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     return curva.tolist(), 0.0, cap_act, registro_trades, en_pos, total_comms
 
 # ==========================================
-# 🧬 2. ARSENAL DE INDICADORES (ADN V174)
+# 🧬 2. ARSENAL DE INDICADORES (ADN V175)
 # ==========================================
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
@@ -218,7 +218,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V174</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V175</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -304,7 +304,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V174.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V175.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -319,7 +319,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V174.1)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V175)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -418,7 +418,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         target_start = pd.to_datetime(datetime.combine(start, datetime.min.time())) + timedelta(hours=offset)
         df = df[df.index >= target_start]
 
-        # 🔥 PROTOCOLO OUT-OF-SAMPLE (V174) 🔥
         split_idx = int(len(df) * 0.70)
         df['Is_Train'] = False
         if len(df) > 0:
@@ -578,7 +577,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
     start_time = time.time()
     n_len = len(a_c)
 
-    # 🔥 OUT OF SAMPLE (70/30 SPLIT) 🔥
     split_idx = int(n_len * 0.70)
     dias_entrenamiento = max(1, dias_reales * 0.70)
 
@@ -625,7 +623,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             
             r_atr_tp = round(random.uniform(0.5, 15.0), 2); r_atr_sl = round(random.uniform(1.0, 20.0), 2)
             
-            # 🔥 IN-SAMPLE RUN (70%) 🔥
             net, pf, nt, mdd, wr = simular_crecimiento_exponencial_ia_core(
                 a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx], a_atr[:split_idx], 
                 a_rsi[:split_idx], a_zscore[:split_idx], a_adx[:split_idx],
@@ -634,7 +631,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.05
             )
 
-            # 🔥 ADO Y ACUMULACIÓN AJUSTADOS 🔥
             if nt >= 5 and net > 0: 
                 ado_actual = nt / max(1, dias_entrenamiento)
                 ado_target_safe = max(0.1, target_ado)
@@ -665,7 +661,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"GENESIS LAB V174 (70% TRAIN): {s_id}"
+                title = f"GENESIS LAB V175 (70% TRAIN): {s_id}"
                 subtitle = f"Progreso: {pct_done}% | ADN Probado: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#00FFFF"
 
@@ -985,8 +981,6 @@ float w_adx = {vault.get('w_adx',0.0):.4f}
 float math_score = (rsi_v * w_rsi) + (z_score * w_z) + (adx * w_adx)
 
 bool raw_buy = ({b_cond}) or (math_score > {vault.get('th_buy',999):.2f})
-
-// 🔥 V174: MÁSCARA DE CLIMA DE MERCADO 🔥
 bool signal_buy = raw_buy and {m_cond} and {v_cond}
 
 bool signal_sell = ({s_cond}) or (math_score < {vault.get('th_sell',-999):.2f})
@@ -1001,7 +995,6 @@ if signal_buy and strategy.position_size == 0 and window
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
     locked_atr := atr
 
-// 🔥 V174: CERO REPAINTING. TICK BASED EXIT Y ATR BLOQUEADO 🔥
 if strategy.position_size > 0
     float tp_ticks = (locked_atr * atr_tp_mult) / syminfo.mintick
     float sl_ticks = (locked_atr * atr_sl_mult) / syminfo.mintick
@@ -1205,8 +1198,12 @@ y_max_force = df_strat['High'].max() * 1.02
 
 # 🔥 DIVISIÓN VISUAL IN-SAMPLE / OUT-OF-SAMPLE 🔥
 if len(df_strat) > 0:
-    split_date = df_strat.index[int(len(df_strat) * 0.70)]
-    fig.add_vline(x=split_date, line_width=2, line_dash="dash", line_color="yellow", annotation_text="OUT-OF-SAMPLE (30%) ➡️", annotation_position="top right")
+    split_idx = int(len(df_strat) * 0.70)
+    if split_idx < len(df_strat):
+        # Conversión a string para evitar bug de Plotly con Timestamps
+        split_date_str = df_strat.index[split_idx].strftime('%Y-%m-%d %H:%M:%S')
+        fig.add_vline(x=split_date_str, line_width=2, line_dash="dash", line_color="yellow", annotation_text="OUT-OF-SAMPLE (30%) ➡️", annotation_position="top right")
+
 
 fig.update_xaxes(fixedrange=False)
 fig.update_yaxes(fixedrange=False, side="right", range=[y_min_force, y_max_force], row=1, col=1)
