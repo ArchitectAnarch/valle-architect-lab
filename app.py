@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V168':
+if st.session_state.get('app_version') != 'V169':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V168'
+    st.session_state['app_version'] = 'V169'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -44,16 +44,18 @@ def npshift_bool(arr, num, fill_value=False):
     else: result[:] = arr
     return result
 
+# 🔥 NÚCLEO CAMALEÓN RECONSTRUIDO: COMPOUNDING EXACTO DE TRADINGVIEW 🔥
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
     b_c, s_c, w_rsi, w_z, w_adx, th_buy, th_sell, 
-    atr_tp_mult, atr_sl_mult, cap_ini, com_pct, reinvest_pct, slippage_pct):
+    atr_tp_mult, atr_sl_mult, cap_ini, com_pct, invest_pct, slippage_pct):
     
-    cap_act = cap_ini; divs = 0.0; en_pos = False; p_ent = 0.0
+    cap_act = cap_ini; en_pos = False; p_ent = 0.0
     pos_size = 0.0; invest_amt = 0.0; g_profit = 0.0; g_loss = 0.0; num_trades = 0; max_dd = 0.0; peak = cap_ini
     slip_in = 1.0 + (slippage_pct / 100.0)
     slip_out = 1.0 - (slippage_pct / 100.0)
     tp_p = 0.0; sl_p = 0.0
+    wins = 0
     
     for i in range(len(h_arr)):
         if en_pos:
@@ -61,38 +63,35 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 exec_p = sl_p * slip_out
                 ret = (exec_p - p_ent) / p_ent
                 gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
-                if profit > 0: reinv = profit * (reinvest_pct / 100.0); divs += (profit - reinv); cap_act += reinv
-                else: cap_act += profit
+                cap_act += profit
                 g_loss += abs(profit); num_trades += 1; en_pos = False
             elif h_arr[i] >= tp_p:
                 exec_p = tp_p * slip_out
                 ret = (exec_p - p_ent) / p_ent
                 gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
-                if profit > 0: reinv = profit * (reinvest_pct / 100.0); divs += (profit - reinv); cap_act += reinv
-                else: cap_act += profit
-                if profit > 0: g_profit += profit 
-                else: g_loss += abs(profit)
-                num_trades += 1; en_pos = False
+                cap_act += profit
+                g_profit += profit; num_trades += 1; en_pos = False
+                if profit > 0: wins += 1
             else:
                 score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
                 if s_c[i] or (score < th_sell):
                     exit_price = (o_arr[i+1] if i+1 < len(o_arr) else c_arr[i]) * slip_out
                     ret = (exit_price - p_ent) / p_ent; gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
-                    if profit > 0: reinv = profit * (reinvest_pct / 100.0); divs += (profit - reinv); cap_act += reinv
-                    else: cap_act += profit
-                    if profit > 0: g_profit += profit 
-                    else: g_loss += abs(profit)
+                    cap_act += profit
+                    if profit > 0: 
+                        g_profit += profit; wins += 1
+                    else: 
+                        g_loss += abs(profit)
                     num_trades += 1; en_pos = False
             
-            total_equity = cap_act + divs
-            if total_equity > peak: peak = total_equity
-            if peak > 0: dd = (peak - total_equity) / peak * 100.0; max_dd = max(max_dd, dd)
+            if cap_act > peak: peak = cap_act
+            if peak > 0: dd = (peak - cap_act) / peak * 100.0; max_dd = max(max_dd, dd)
             if cap_act <= 0: break
             
         if not en_pos and i+1 < len(h_arr):
             score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
             if b_c[i] or (score > th_buy):
-                invest_amt = cap_act if reinvest_pct == 100.0 else cap_ini
+                invest_amt = cap_act * (invest_pct / 100.0) 
                 if invest_amt > cap_act: invest_amt = cap_act 
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in
@@ -102,16 +101,17 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 en_pos = True
                 
     pf = g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0)
-    return (cap_act + divs) - cap_ini, pf, num_trades, max_dd
+    wr = (wins / num_trades) * 100.0 if num_trades > 0 else 0.0
+    return (cap_act - cap_ini), pf, num_trades, max_dd, wr
 
-def simular_visual(df_sim, cap_ini, reinvest, com_pct, slippage_pct=0.0):
+def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     registro_trades = []; n = len(df_sim); curva = np.full(n, cap_ini, dtype=float)
     h_arr, l_arr, c_arr, o_arr = df_sim['High'].values, df_sim['Low'].values, df_sim['Close'].values, df_sim['Open'].values
     atr_arr = df_sim['ATR'].values
     buy_arr, sell_arr = df_sim['Signal_Buy'].values, df_sim['Signal_Sell'].values
     tp_arr, sl_arr = df_sim['Active_TP'].values, df_sim['Active_SL'].values
     f_arr = df_sim.index
-    en_pos, p_ent, tp_act, sl_act, cap_act, divs, pos_size, invest_amt, total_comms = False, 0.0, 0.0, 0.0, cap_ini, 0.0, 0.0, 0.0, 0.0
+    en_pos, p_ent, tp_act, sl_act, cap_act, pos_size, invest_amt, total_comms = False, 0.0, 0.0, 0.0, cap_ini, 0.0, 0.0, 0.0
     
     slip_in = 1.0 + (slippage_pct/100.0)
     slip_out = 1.0 - (slippage_pct/100.0)
@@ -124,26 +124,23 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct, slippage_pct=0.0):
             if l_arr[i] <= sl_p:
                 exec_p = sl_p * slip_out
                 ret = (exec_p - p_ent) / p_ent; gross = pos_size * (1 + ret); comm_out = gross * com_pct; total_comms += comm_out; net = gross - comm_out; profit = net - invest_amt
-                if profit > 0: reinv_amt = profit * (reinvest/100); divs += (profit - reinv_amt); cap_act += reinv_amt
-                else: cap_act += profit
+                cap_act += profit
                 if cap_act <= 0: cap_act = 0
                 registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'SL', 'Precio': exec_p, 'Ganancia_$': profit}); en_pos, cierra = False, True
             elif h_arr[i] >= tp_p:
                 exec_p = tp_p * slip_out
                 ret = (exec_p - p_ent) / p_ent; gross = pos_size * (1 + ret); comm_out = gross * com_pct; total_comms += comm_out; net = gross - comm_out; profit = net - invest_amt
-                if profit > 0: reinv_amt = profit * (reinvest/100); divs += (profit - reinv_amt); cap_act += reinv_amt
-                else: cap_act += profit
+                cap_act += profit
                 registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'TP', 'Precio': exec_p, 'Ganancia_$': profit}); en_pos, cierra = False, True
             elif sell_arr[i]:
                 exit_price = (o_arr[i+1] if i+1 < n else c_arr[i]) * slip_out
                 ret = (exit_price - p_ent) / p_ent; gross = pos_size * (1 + ret); comm_out = gross * com_pct; total_comms += comm_out; net = gross - comm_out; profit = net - invest_amt
-                if profit > 0: reinv_amt = profit * (reinvest/100); divs += (profit - reinv_amt); cap_act += reinv_amt
-                else: cap_act += profit
+                cap_act += profit
                 if cap_act <= 0: cap_act = 0
                 registro_trades.append({'Fecha': f_arr[i+1] if i+1 < n else f_arr[i], 'Tipo': 'DYN_WIN' if profit>0 else 'DYN_LOSS', 'Precio': exit_price, 'Ganancia_$': profit}); en_pos, cierra = False, True
         
         if not en_pos and not cierra and buy_arr[i] and i+1 < n and cap_act > 0:
-            invest_amt = cap_act if reinvest == 100 else cap_ini
+            invest_amt = cap_act * (invest_pct / 100.0)
             if invest_amt > cap_act: invest_amt = cap_act
             comm_in = invest_amt * com_pct; total_comms += comm_in; pos_size = invest_amt - comm_in
             p_ent = o_arr[i+1] * slip_in
@@ -152,12 +149,12 @@ def simular_visual(df_sim, cap_ini, reinvest, com_pct, slippage_pct=0.0):
             en_pos = True
             registro_trades.append({'Fecha': f_arr[i+1], 'Tipo': 'ENTRY', 'Precio': p_ent, 'Ganancia_$': 0})
         
-        if en_pos and cap_act > 0: curva[i] = cap_act + (pos_size * ((c_arr[i] - p_ent) / p_ent)) + divs
-        else: curva[i] = cap_act + divs
-    return curva.tolist(), divs, cap_act, registro_trades, en_pos, total_comms
+        if en_pos and cap_act > 0: curva[i] = cap_act + (pos_size * ((c_arr[i] - p_ent) / p_ent))
+        else: curva[i] = cap_act
+    return curva.tolist(), 0.0, cap_act, registro_trades, en_pos, total_comms
 
 # ==========================================
-# 🧬 2. ARSENAL DE INDICADORES (ADN)
+# 🧬 2. ARSENAL DE INDICADORES (ADN V169)
 # ==========================================
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
@@ -169,13 +166,15 @@ todas_las_armas_b = [
     'Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Jugg_Buy', 'Trinity_Buy', 
     'Commander_Buy', 'Lev_Buy', 'Q_Pink_Whale_Buy', 'Q_Lock_Bounce', 'Q_Lock_Break', 'Q_Neon_Up', 'Q_Defcon_Buy', 
     'Q_Therm_Bounce', 'Q_Therm_Vacuum', 'Q_Nuclear_Buy', 'Q_Early_Buy', 'Q_Rebound_Buy',
-    'Wyc_Spring_Buy', 'VSA_Accum_Buy', 'Fibo_618_Buy', 'MACD_Impulse_Buy', 'Stoch_OS_Buy'
+    'Wyc_Spring_Buy', 'VSA_Accum_Buy', 'Fibo_618_Buy', 'MACD_Impulse_Buy', 'Stoch_OS_Buy',
+    'PA_Engulfing_Buy', 'PA_Pinbar_Buy' # NUEVAS ARMAS VELAS CRUDAS
 ]
 todas_las_armas_s = [
     'Ping_Sell', 'Climax_Sell', 'Thermal_Sell', 'Lock_Sell', 'Squeeze_Sell', 'Defcon_Sell', 'Jugg_Sell', 'Trinity_Sell', 
     'Commander_Sell', 'Lev_Sell', 'Q_Lock_Reject', 'Q_Lock_Breakd', 'Q_Neon_Dn', 'Q_Defcon_Sell', 'Q_Therm_Wall_Sell', 
     'Q_Therm_Panic_Sell', 'Q_Nuclear_Sell', 'Q_Early_Sell',
-    'Wyc_Upthrust_Sell', 'VSA_Dist_Sell', 'Fibo_618_Sell', 'MACD_Exhaust_Sell', 'Stoch_OB_Sell'
+    'Wyc_Upthrust_Sell', 'VSA_Dist_Sell', 'Fibo_618_Sell', 'MACD_Exhaust_Sell', 'Stoch_OB_Sell',
+    'PA_Engulfing_Sell', 'PA_Pinbar_Sell' # NUEVAS ARMAS VELAS CRUDAS
 ]
 
 pine_map = {
@@ -194,7 +193,9 @@ pine_map = {
     'VSA_Accum_Buy': 'vsa_accum_buy', 'VSA_Dist_Sell': 'vsa_dist_sell',
     'Fibo_618_Buy': 'fibo_618_buy', 'Fibo_618_Sell': 'fibo_618_sell',
     'MACD_Impulse_Buy': 'macd_impulse_buy', 'MACD_Exhaust_Sell': 'macd_exhaust_sell',
-    'Stoch_OS_Buy': 'stoch_os_buy', 'Stoch_OB_Sell': 'stoch_ob_sell'
+    'Stoch_OS_Buy': 'stoch_os_buy', 'Stoch_OB_Sell': 'stoch_ob_sell',
+    'PA_Engulfing_Buy': 'pa_engulfing_buy', 'PA_Engulfing_Sell': 'pa_engulfing_sell',
+    'PA_Pinbar_Buy': 'pa_pinbar_buy', 'PA_Pinbar_Sell': 'pa_pinbar_sell'
 }
 
 for s_id in estrategias:
@@ -203,7 +204,7 @@ for s_id in estrategias:
         st.session_state[f'champion_{s_id}'] = {
             'b_team': [random.choice(todas_las_armas_b)], 's_team': [random.choice(todas_las_armas_s)], 
             'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 
-            'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 
+            'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 
             'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0
         }
 
@@ -217,7 +218,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V168</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V169</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -264,7 +265,7 @@ if st.sidebar.button("🤖 CREAR NUEVO MUTANTE IA", type="secondary", use_contai
     st.session_state[f'champion_{new_id}'] = {
         'b_team': [random.choice(todas_las_armas_b)], 's_team': [random.choice(todas_las_armas_s)], 
         'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 
-        'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 
+        'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 
         'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0
     }
     st.session_state['global_queue'] = [new_id]
@@ -282,7 +283,7 @@ if st.sidebar.button("🌌 CREAR MUTANTE PROFUNDO", type="secondary", use_contai
     st.session_state[f'champion_{new_id}'] = {
         'b_team': [random.choice(todas_las_armas_b)], 's_team': [random.choice(todas_las_armas_s)], 
         'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 
-        'whale_f': 2.5, 'ado': 4.0, 'reinv': 0.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 
+        'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 
         'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0
     }
     st.session_state['deep_opt_state'] = {'s_id': new_id, 'target_epochs': deep_epochs_target, 'current_epoch': 0, 'paused': False}
@@ -305,7 +306,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
         st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V168.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V169.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -318,14 +319,13 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
     st.sidebar.text_area("Block Note Universal:", value=generar_reporte_universal(capital_inicial, comision_pct), height=200)
 
 # ==========================================
-# 🛑 5. EXTRACCIÓN Y WARM-UP (Sincronía con TV) 🛑
+# 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V168)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V169)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
         
-        # 🔥 WARM-UP FANTASMA: Se descargan días extra para pre-calentar EMA y ATR 🔥
         warmup_days = 40 if is_micro else 150
         warmup_start = start - timedelta(days=warmup_days)
         start_ts = int(datetime.combine(warmup_start, datetime.min.time()).timestamp() * 1000)
@@ -401,6 +401,12 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
         df['is_falling_knife'] = (df['Open'].shift(1) - df['Close'].shift(1)) > (df['ATR'].shift(1) * 1.5)
         
+        # 🔥 PRICE ACTION INYECTADO 🔥
+        df['PA_Engulfing_Buy'] = (df['Vela_Verde']) & (df['Vela_Roja'].shift(1)) & (df['Close'] > df['Open'].shift(1)) & (df['Open'] < df['Close'].shift(1))
+        df['PA_Engulfing_Sell'] = (df['Vela_Roja']) & (df['Vela_Verde'].shift(1)) & (df['Close'] < df['Open'].shift(1)) & (df['Open'] > df['Close'].shift(1))
+        df['PA_Pinbar_Buy'] = (df['lower_wick'] > df['body_size'] * 2.5) & (df['upper_wick'] < df['body_size'])
+        df['PA_Pinbar_Sell'] = (df['upper_wick'] > df['body_size'] * 2.5) & (df['lower_wick'] < df['body_size'])
+
         df['PL30_L'] = df['Low'].shift(1).rolling(30, min_periods=1).min(); df['PH30_L'] = df['High'].shift(1).rolling(30, min_periods=1).max()
         df['PL100_L'] = df['Low'].shift(1).rolling(100, min_periods=1).min(); df['PH100_L'] = df['High'].shift(1).rolling(100, min_periods=1).max()
         df['PL300_L'] = df['Low'].shift(1).rolling(300, min_periods=1).min(); df['PH300_L'] = df['High'].shift(1).rolling(300, min_periods=1).max()
@@ -410,7 +416,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         df['Macro_Bull'] = df['Close'] >= df['EMA_200']
         df['PP_Slope'] = (2*df['Close'] + df['Close'].shift(1) - df['Close'].shift(3) - 2*df['Close'].shift(4)) / 10.0
         
-        # 🔥 WARM-UP TERMINADO: CORTAR DATOS FANTASMA PARA SINCRONÍA EXACTA 🔥
         target_start = pd.to_datetime(datetime.combine(start, datetime.min.time())) + timedelta(hours=offset)
         df = df[df.index >= target_start]
 
@@ -440,6 +445,9 @@ a_zscore = df_global['Z_Score'].values; a_rsi_bb_b = df_global['RSI_BB_Basis'].v
 a_lw = df_global['lower_wick'].values; a_uw = df_global['upper_wick'].values; a_bs = df_global['body_size'].values
 a_mb = df_global['Macro_Bull'].values; a_fk = df_global['is_falling_knife'].values
 a_pp_slope = df_global['PP_Slope'].fillna(0).values
+
+a_pa_eng_b = df_global['PA_Engulfing_Buy'].values; a_pa_eng_s = df_global['PA_Engulfing_Sell'].values
+a_pa_pin_b = df_global['PA_Pinbar_Buy'].values; a_pa_pin_s = df_global['PA_Pinbar_Sell'].values
 
 a_pl30_l = df_global['PL30_L'].fillna(0).values; a_ph30_l = df_global['PH30_L'].fillna(99999).values
 a_pl100_l = df_global['PL100_L'].fillna(0).values; a_ph100_l = df_global['PH100_L'].fillna(99999).values
@@ -519,7 +527,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Jugg_Buy'] = a_mb & (a_c > a_ema50) & (a_c_s1 < npshift(a_ema50,1)) & a_vv & ~a_fk; s_dict['Jugg_Sell'] = (a_c < a_ema50)
     s_dict['Trinity_Buy'] = a_mb & (a_rsi < 35) & a_vv & ~a_fk; s_dict['Trinity_Sell'] = (a_rsi > 75) | (a_c < a_ema200)
     s_dict['Lev_Buy'] = a_mb & a_rcu & (a_rsi < 45); s_dict['Lev_Sell'] = (a_c < a_ema200)
-    s_dict['Commander_Buy'] = cond_pink_whale_buy | cond_lock_buy_bounce; s_dict['Commander_Sell'] = (a_c < a_ema50)
 
     s_dict['Q_Pink_Whale_Buy'] = cond_pink_whale_buy; s_dict['Q_Lock_Bounce'] = cond_lock_buy_bounce; s_dict['Q_Lock_Break'] = cond_lock_buy_break
     s_dict['Q_Neon_Up'] = neon_up; s_dict['Q_Defcon_Buy'] = cond_defcon_buy; s_dict['Q_Therm_Bounce'] = cond_therm_buy_bounce; s_dict['Q_Therm_Vacuum'] = cond_therm_buy_vacuum
@@ -544,6 +551,9 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Stoch_OS_Buy'] = (a_stoch_k < 20) & (a_stoch_k > a_stoch_d)
     s_dict['Stoch_OB_Sell'] = (a_stoch_k > 80) & (a_stoch_k < a_stoch_d)
 
+    s_dict['PA_Engulfing_Buy'] = a_pa_eng_b; s_dict['PA_Engulfing_Sell'] = a_pa_eng_s
+    s_dict['PA_Pinbar_Buy'] = a_pa_pin_b; s_dict['PA_Pinbar_Sell'] = a_pa_pin_s
+
     s_dict['Organic_Vol'] = a_hvol
     s_dict['Organic_Squeeze'] = a_sqz_on
     s_dict['Organic_Safe'] = a_mb & ~a_fk
@@ -552,7 +562,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     return s_dict
 
-def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None):
+def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None):
     best_fit_live = cur_fit; best_net_live = cur_net; best_pf_live = 0.0; best_nt_live = 0; bp = None
 
     iters = 3000 * epochs
@@ -587,7 +597,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
         for _ in range(chunk_size): 
             f_buy.fill(False); f_sell.fill(False)
             
-            # 🔥 OBLIGACIÓN GENÉTICA: Combinaciones masivas (5 a 12 armas) 🔥
             dna_b_team = random.sample(todas_las_armas_b, random.randint(5, 12))
             dna_s_team = random.sample(todas_las_armas_s, random.randint(5, 12))
             
@@ -605,26 +614,27 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
             r_th_b = random.uniform(0.0, 100.0); r_th_s = random.uniform(-100.0, 0.0)
             
             r_atr_tp = round(random.uniform(0.5, 15.0), 2); r_atr_sl = round(random.uniform(1.0, 20.0), 2)
-            r_reinv = float(random.choice([20.0, 50.0, 100.0, 100.0])) 
-            r_ado = float(round(random.uniform(1.0, 15.0), 1))
             
-            net, pf, nt, mdd = simular_crecimiento_exponencial_ia_core(
+            net, pf, nt, mdd, wr = simular_crecimiento_exponencial_ia_core(
                 a_h, a_l, a_c, a_o, a_atr, a_rsi, a_zscore, a_adx,
                 f_buy, f_sell, r_w_rsi, r_w_z, r_w_adx, r_th_b, r_th_s,
-                r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(r_reinv), 0.05
+                r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.05
             )
 
-            # 🔥 V168: CASTIGO A LA PEREZA (Calcina bots con < 5 trades o ADO < 1.0) 🔥
+            # 🔥 V169: CERO PEREZA Y ACUMULACIÓN DE TOKENS OBLIGATORIA 🔥
             if nt >= 5: 
                 ado_actual = nt / max(1, dias_reales)
                 if ado_actual >= 1.0 and net > 0:
-                    safe_pf = min(pf, 10.0)
-                    ado_factor = ado_actual ** 2.0 
-                    fit_score = net * safe_pf * ado_factor
+                    safe_pf = min(pf, 5.0)
+                    alpha_factor = 2.0 if (net > buy_hold_money) else 0.5 # Premia si acumula tokens mejor que hacer HOLD
+                    wr_factor = wr / 50.0 # Premia alta tasa de acierto
+                    dd_penalty = 1.0 + (mdd / 25.0) # Penaliza suavemente drawdowns peligrosos
+                    
+                    fit_score = (net * safe_pf * wr_factor * alpha_factor * (ado_actual ** 1.2)) / dd_penalty
 
                     if fit_score > best_fit_live:
                         best_fit_live = fit_score; best_net_live = net; best_pf_live = pf; best_nt_live = nt
-                        bp = {'b_team': dna_b_team, 's_team': dna_s_team, 'macro': dna_macro, 'vol': dna_vol, 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 'net': net, 'winrate': 0.0, 'reinv': r_reinv, 'ado': r_ado, 'w_rsi': r_w_rsi, 'w_z': r_w_z, 'w_adx': r_w_adx, 'th_buy': r_th_b, 'th_sell': r_th_s, 'atr_tp': r_atr_tp, 'atr_sl': r_atr_sl}
+                        bp = {'b_team': dna_b_team, 's_team': dna_s_team, 'macro': dna_macro, 'vol': dna_vol, 'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 'net': net, 'winrate': wr, 'reinv': invest_pct, 'ado': ado_actual, 'w_rsi': r_w_rsi, 'w_z': r_w_z, 'w_adx': r_w_adx, 'th_buy': r_th_b, 'th_sell': r_th_s, 'atr_tp': r_atr_tp, 'atr_sl': r_atr_sl}
                 
         if c == 0 or c == (chunks - 1) or c % update_mod == 0:
             elapsed = time.time() - start_time
@@ -636,7 +646,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"GENESIS LAB V168: {s_id}"
+                title = f"GENESIS LAB V169: {s_id}"
                 subtitle = f"Progreso: {pct_done}% | ADN Probado: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#00FFFF"
 
@@ -650,7 +660,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, reinv_q, target_ado, dias_reale
                 <div class="rocket">🧬</div>
                 <div style="color: {color}; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">{title}</div>
                 <div style="color: white; font-size: 1.3rem;">{subtitle}</div>
-                <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Mejor Neta: ${best_net_live:.2f} | PF: {best_pf_live:.1f}x</div>
+                <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Mejor Neta: ${best_net_live:.2f} | WinRate: {best_pf_live:.1f}x</div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -702,7 +712,7 @@ def generar_pine_script(s_id, vault, sym, tf, buy_pct=20, sell_pct=20):
     json_sell = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {sell_pct}, "limit_price": {{{{close}}}}, "side": "🔴 VENTA"}}'
 
     ps_base = f"""//@version=5
-strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, commission_value=0.25, slippage=0)
+strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value={buy_pct}, commission_value=0.25, slippage=0)
 wt_enter_long = input.text_area(defval='{json_buy}', title="🟢 WT: Mensaje Enter Long")
 wt_exit_long  = input.text_area(defval='{json_sell}', title="🔴 WT: Mensaje Exit Long")
 
@@ -873,7 +883,12 @@ wt_cross_dn = (wt1 < wt2) and (nz(wt1[1]) >= nz(wt2[1]))
 wt_oversold = wt1 < -60
 wt_overbought = wt1 > 60
 
-// 🔥 POOL DE ARMAS 🔥
+// 🔥 PRICE ACTION CRUDO 🔥
+pa_engulfing_buy = vela_verde and nz(vela_roja[1]) and close > nz(open[1]) and open < nz(close[1])
+pa_engulfing_sell = vela_roja and nz(vela_verde[1]) and close < nz(open[1]) and open > nz(close[1])
+pa_pinbar_buy = lower_wick > body_size * 2.5 and upper_wick < body_size
+pa_pinbar_sell = upper_wick > body_size * 2.5 and lower_wick < body_size
+
 ping_b = (adx < adx_trend) and (close < bbl) and vela_verde
 ping_s = (close > bbu) or (rsi_v > 70)
 squeeze_b = neon_up
@@ -955,16 +970,16 @@ float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
 float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
     ps_exec = """
-var float my_atr = na
+var float trade_tp_ticks = 0.0
+var float trade_sl_ticks = 0.0
 
 if signal_buy and strategy.position_size == 0 and window
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
-    my_atr := atr
 
-// 🔥 V168: LÍMITES DINÁMICOS AMARRADOS AL PRECIO REAL DE ENTRADA 🔥
+// 🔥 V169: CERO REPAINTING. Ejecución matemática exacta en la misma vela 🔥
 if strategy.position_size > 0
     float entry_p = strategy.opentrades.entry_price(0)
-    strategy.exit("TP/SL", "In", limit=entry_p + (my_atr * atr_tp_mult), stop=entry_p - (my_atr * atr_sl_mult), alert_message=wt_exit_long)
+    strategy.exit("TP/SL", "In", limit=entry_p + (atr * atr_tp_mult), stop=entry_p - (atr * atr_sl_mult), alert_message=wt_exit_long)
 
 if signal_sell and strategy.position_size > 0
     strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
@@ -991,7 +1006,7 @@ if st.session_state.get('run_global', False):
         buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
         buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
         
-        bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv',0.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=global_epochs, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))))
+        bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=global_epochs, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))))
         
         if bp: save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True
         
@@ -1020,7 +1035,7 @@ if deep_state and not deep_state.get('paused', False) and deep_state.get('curren
     
     deep_info = {'current': deep_state['current_epoch'], 'total': deep_state['target_epochs']}
     
-    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv',0.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=chunk, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=deep_info)
+    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=chunk, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=deep_info)
     
     if bp: save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True
     
@@ -1068,20 +1083,19 @@ with st.expander("🧬 VER ADN DEL MUTANTE Y ARMAS TÁCTICAS", expanded=True):
     st.markdown(f"**📏 Gatillos Sensibles:** Buy > `{vault.get('th_buy',0):.2f}` | Sell < `{vault.get('th_sell',0):.2f}`")
     st.markdown(f"**🎯 Camaleón ATR (Toma de Ganancias):** TP: `{vault.get('atr_tp',0):.2f}x` | SL: `{vault.get('atr_sl',0):.2f}x`")
 
-c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
-st.session_state[f'champion_{s_id}']['ado'] = c_ia1.slider("🎯 Target ADO (IA Override)", 0.0, 100.0, value=float(vault.get('ado', 4.0)), key=f"ui_{s_id}_ado_w", step=0.5)
-st.session_state[f'champion_{s_id}']['reinv'] = c_ia2.slider("💵 Reinversión % (IA Override)", 0.0, 100.0, value=float(vault.get('reinv', 0.0)), key=f"ui_{s_id}_reinv_w", step=5.0)
-
+# 🔥 CONTROL MAESTRO DE RIESGO UNIFICADO 🔥
 c_ps1, c_ps2 = st.columns(2)
-ps_buy_pct = c_ps1.number_input("🟢 % Inversión Compra (Pine Script)", min_value=1, max_value=100, value=20, step=1, key=f"ui_{s_id}_ps_buy")
-ps_sell_pct = c_ps2.number_input("🔴 % Desinversión Venta (Pine Script)", min_value=1, max_value=100, value=20, step=1, key=f"ui_{s_id}_ps_sell")
+ps_buy_pct = c_ps1.number_input("🟢 % Riesgo Capital (Compra)", min_value=1, max_value=100, value=int(vault.get('reinv', 20.0)), step=1, key=f"ui_{s_id}_ps_buy")
+ps_sell_pct = c_ps2.number_input("🔴 % Desinversión Venta", min_value=1, max_value=100, value=100, step=1, key=f"ui_{s_id}_ps_sell", help="TV asume vender toda la posición. Mantén en 100% o tu webhook.")
 
-c_btn1, c_btn2 = c_ia3.columns(2)
+st.session_state[f'champion_{s_id}']['reinv'] = ps_buy_pct 
+
+c_btn1, c_btn2 = st.columns(2)
 if c_btn1.button(f"🚀 FORJAR RÁPIDO ({global_epochs*3}k)", type="primary", key=f"btn_opt_{s_id}"):
     ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid #FF00FF; border-radius: 10px;'><h2 style='color:#FF00FF;'>🚀 Mutando {s_id}...</h2></div>", unsafe_allow_html=True)
     time.sleep(0.1)
     buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
-    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(vault.get('reinv', 0.0)), float(vault.get('ado', 4.0)), dias_reales, capital_inicial * (buy_hold_ret / 100.0), epochs=global_epochs, cur_net=float(vault.get('net', -float('inf'))), cur_fit=float(vault.get('fit', -float('inf'))))
+    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(ps_buy_pct), 4.0, dias_reales, capital_inicial * (buy_hold_ret / 100.0), epochs=global_epochs, cur_net=float(vault.get('net', -float('inf'))), cur_fit=float(vault.get('fit', -float('inf'))))
     if bp: save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True; st.success("👑 ¡Mutante Forjado!")
     time.sleep(1); ph_holograma.empty(); st.rerun()
 
@@ -1120,7 +1134,7 @@ c6.metric("Drawdown", f"{mdd:.2f}%", delta_color="inverse")
 c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
 
 with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expanded=False):
-    st.info("Traducción Matemática Idéntica a TradingView. Warm-Up y TP/SL Intrabarra corregidos.")
+    st.info("Traducción Matemática Idéntica a TradingView. Bug de Pine Script Destruido.")
     st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct), language="pine")
 
 st.markdown("---")
