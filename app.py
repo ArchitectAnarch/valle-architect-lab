@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V175':
+if st.session_state.get('app_version') != 'V176':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V175'
+    st.session_state['app_version'] = 'V176'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -153,7 +153,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     return curva.tolist(), 0.0, cap_act, registro_trades, en_pos, total_comms
 
 # ==========================================
-# 🧬 2. ARSENAL DE INDICADORES (ADN V175)
+# 🧬 2. ARSENAL DE INDICADORES (ADN V176)
 # ==========================================
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
@@ -218,7 +218,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V175</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V176</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -304,7 +304,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V175.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V176.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -319,7 +319,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V175)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V176)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -661,7 +661,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"GENESIS LAB V175 (70% TRAIN): {s_id}"
+                title = f"GENESIS LAB V176 (70% TRAIN): {s_id}"
                 subtitle = f"Progreso: {pct_done}% | ADN Probado: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#00FFFF"
 
@@ -1196,14 +1196,23 @@ fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='
 y_min_force = df_strat['Low'].min() * 0.98
 y_max_force = df_strat['High'].max() * 1.02
 
-# 🔥 DIVISIÓN VISUAL IN-SAMPLE / OUT-OF-SAMPLE 🔥
+# 🔥 DIVISIÓN VISUAL IN-SAMPLE / OUT-OF-SAMPLE (PARCHE PLOTLY V176) 🔥
 if len(df_strat) > 0:
     split_idx = int(len(df_strat) * 0.70)
     if split_idx < len(df_strat):
-        # Conversión a string para evitar bug de Plotly con Timestamps
-        split_date_str = df_strat.index[split_idx].strftime('%Y-%m-%d %H:%M:%S')
-        fig.add_vline(x=split_date_str, line_width=2, line_dash="dash", line_color="yellow", annotation_text="OUT-OF-SAMPLE (30%) ➡️", annotation_position="top right")
-
+        split_date = df_strat.index[split_idx]
+        
+        # 1. Dibujamos la línea pura sin texto para evitar el bug matemático de fechas en Plotly
+        fig.add_vline(x=split_date, line_width=2, line_dash="dash", line_color="yellow")
+        
+        # 2. Añadimos el texto como una anotación flotante referenciada al "papel" de la gráfica
+        fig.add_annotation(
+            x=split_date, y=0.95, yref="paper", 
+            text="OUT-OF-SAMPLE (30%) ➡️", 
+            showarrow=False, xanchor="left", yanchor="top", 
+            font=dict(color="yellow", size=10),
+            bgcolor="rgba(0,0,0,0.5)"
+        )
 
 fig.update_xaxes(fixedrange=False)
 fig.update_yaxes(fixedrange=False, side="right", range=[y_min_force, y_max_force], row=1, col=1)
