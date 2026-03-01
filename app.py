@@ -1253,4 +1253,35 @@ y_max_force = df_strat['High'].max() * 1.02
 if len(df_strat) > 0:
     split_idx = int(len(df_strat) * 0.70)
     if split_idx < len(df_strat):
-        split_date_str = df_strat.index[split_idx].strftime('%Y-%m-%d %H:%M:%
+        split_date_str = df_strat.index[split_idx].strftime('%Y-%m-%d %H:%M:%S')
+        fig.add_vline(x=split_date_str, line_width=2, line_dash="dash", line_color="yellow")
+        fig.add_annotation(
+            x=split_date_str, y=0.95, yref="paper", 
+            text="OUT-OF-SAMPLE (30%) ➡️", 
+            showarrow=False, xanchor="left", yanchor="top", 
+            font=dict(color="yellow", size=10),
+            bgcolor="rgba(0,0,0,0.5)"
+        )
+
+fig.update_xaxes(fixedrange=False)
+fig.update_yaxes(fixedrange=False, side="right", range=[y_min_force, y_max_force], row=1, col=1)
+
+fig.update_layout(
+    template='plotly_dark', 
+    height=800, 
+    xaxis_rangeslider_visible=False,
+    dragmode='pan',
+    hovermode='x unified',
+    margin=dict(l=10, r=50, t=30, b=10)
+)
+
+st.plotly_chart(
+    fig, 
+    use_container_width=True, 
+    key=f"chart_{s_id}", 
+    config={
+        'scrollZoom': True,
+        'displayModeBar': True,
+        'modeBarButtonsToRemove': ['lasso2d', 'select2d']
+    }
+)
