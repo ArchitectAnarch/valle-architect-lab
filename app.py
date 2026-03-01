@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V178':
+if st.session_state.get('app_version') != 'V179':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V178'
+    st.session_state['app_version'] = 'V179'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -153,7 +153,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     return curva.tolist(), 0.0, cap_act, registro_trades, en_pos, total_comms
 
 # ==========================================
-# 🧬 2. ARSENAL DE INDICADORES (ADN V178)
+# 🧬 2. ARSENAL DE INDICADORES (ADN V179)
 # ==========================================
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
@@ -218,7 +218,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V178</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V179</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -242,16 +242,8 @@ intervalos = {"1 Minuto": "1m", "5 Minutos": "5m", "15 Minutos": "15m", "30 Minu
 intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), index=2) 
 iv_download = intervalos[intervalo_sel]
 hoy = datetime.today().date()
-
-# 🔥 Ajuste: Permitir hasta 250 días en micro para igualar la profundidad de TradingView
 is_micro = iv_download in ["1m", "5m", "15m", "30m"]
-start_date, end_date = st.sidebar.slider(
-    "📅 Scope Histórico", 
-    min_value=hoy - timedelta(days=250 if is_micro else 1500), 
-    max_value=hoy, 
-    value=(hoy - timedelta(days=200 if is_micro else 1500), hoy), 
-    format="YYYY-MM-DD"
-)
+start_date, end_date = st.sidebar.slider("📅 Scope Histórico", min_value=hoy - timedelta(days=250 if is_micro else 1500), max_value=hoy, value=(hoy - timedelta(days=200 if is_micro else 1500), hoy), format="YYYY-MM-DD")
 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0
@@ -312,7 +304,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V178.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V179.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -327,7 +319,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V178)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V179)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -372,6 +364,9 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         df['RSI_MA'] = df['RSI'].rolling(14, min_periods=1).mean()
         df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
         
+        # 🔥 FILTRO GAUSSIANO DE RUIDO (CHOPPINESS INDEX) 🔥
+        df['CHOP'] = ta.chop(df['High'], df['Low'], df['Close'], length=14).fillna(50.0)
+        
         macd_df = ta.macd(df['Close'], fast=12, slow=26, signal=9)
         df['MACD'] = macd_df.iloc[:, 0].fillna(0)
         df['MACD_Sig'] = macd_df.iloc[:, 2].fillna(0)
@@ -414,6 +409,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         df['PA_3_Soldiers'] = (df['Vela_Verde']) & (df['Vela_Verde'].shift(1)) & (df['Vela_Verde'].shift(2)) & (df['Close'] > df['Close'].shift(1)) & (df['Close'].shift(1) > df['Close'].shift(2))
         df['PA_3_Crows'] = (df['Vela_Roja']) & (df['Vela_Roja'].shift(1)) & (df['Vela_Roja'].shift(2)) & (df['Close'] < df['Close'].shift(1)) & (df['Close'].shift(1) < df['Close'].shift(2))
 
+        # 🔥 REPARACIÓN DE VARIABLES A_PH300_L 🔥
         df['PL30_L'] = df['Low'].shift(1).rolling(30, min_periods=1).min(); df['PH30_L'] = df['High'].shift(1).rolling(30, min_periods=1).max()
         df['PL100_L'] = df['Low'].shift(1).rolling(100, min_periods=1).min(); df['PH100_L'] = df['High'].shift(1).rolling(100, min_periods=1).max()
         df['PL300_L'] = df['Low'].shift(1).rolling(300, min_periods=1).min(); df['PH300_L'] = df['High'].shift(1).rolling(300, min_periods=1).max()
@@ -445,6 +441,7 @@ a_c = df_global['Close'].values; a_o = df_global['Open'].values; a_h = df_global
 a_rsi = df_global['RSI'].values; a_rsi_ma = df_global['RSI_MA'].values; a_adx = df_global['ADX'].values
 a_macd = df_global['MACD'].values; a_macd_sig = df_global['MACD_Sig'].values
 a_stoch_k = df_global['Stoch_K'].values; a_stoch_d = df_global['Stoch_D'].values
+a_chop = df_global['CHOP'].values
 a_bbl = df_global['BBL'].values; a_bbu = df_global['BBU'].values; a_bw = df_global['BB_Width'].values
 a_bwa_s1 = npshift(df_global['BB_Width_Avg'].values, 1, -1.0)
 a_wt1 = df_global['WT1'].values; a_wt2 = df_global['WT2'].values
@@ -464,7 +461,7 @@ a_pa_3sol_b = df_global['PA_3_Soldiers'].values; a_pa_3cro_s = df_global['PA_3_C
 
 a_pl30_l = df_global['PL30_L'].fillna(0).values; a_ph30_l = df_global['PH30_L'].fillna(99999).values
 a_pl100_l = df_global['PL100_L'].fillna(0).values; a_ph100_l = df_global['PH100_L'].fillna(99999).values
-a_pl300_l = df_global['PL300_L'].fillna(0).values; a_ph30_l = df_global['PH300_L'].fillna(99999).values
+a_pl300_l = df_global['PL300_L'].fillna(0).values; a_ph300_l = df_global['PH300_L'].fillna(99999).values
 
 a_c_s1 = npshift(a_c, 1, 0.0); a_o_s1 = npshift(a_o, 1, 0.0); a_l_s1 = npshift(a_l, 1, 0.0); a_l_s5 = npshift(a_l, 5, 0.0)
 a_h_s1 = npshift(a_h, 1, 0.0); a_h_s5 = npshift(a_h, 5, 0.0)
@@ -573,6 +570,9 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Organic_Safe'] = a_mb & ~a_fk
     s_dict['Organic_Pump'] = pump_memory
     s_dict['Organic_Dump'] = dump_memory
+    
+    # 🔥 WARM-UP DEL FILTRO GAUSSIANO 🔥
+    s_dict['Organic_Gaussian_Clean'] = a_chop < 61.8
 
     return s_dict
 
@@ -604,11 +604,13 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         m_mask_dict = {
             "Bull Only": a_mb, "Bear Only": ~a_mb, "Organic_Vol": s_dict['Organic_Vol'],
             "Organic_Squeeze": s_dict['Organic_Squeeze'], "Organic_Safe": s_dict['Organic_Safe'],
+            "Organic_Gaussian_Clean": s_dict['Organic_Gaussian_Clean'],
             "All-Weather": ones_mask, "Ignore": ones_mask
         }
         v_mask_dict = {
             "Trend": (a_adx >= r_adx), "Range": (a_adx < r_adx), "Organic_Pump": s_dict['Organic_Pump'],
-            "Organic_Dump": s_dict['Organic_Dump'], "All-Weather": ones_mask, "Ignore": ones_mask
+            "Organic_Dump": s_dict['Organic_Dump'], "Organic_Gaussian_Clean": s_dict['Organic_Gaussian_Clean'],
+            "All-Weather": ones_mask, "Ignore": ones_mask
         }
 
         for _ in range(chunk_size): 
@@ -617,8 +619,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             dna_b_team = random.sample(todas_las_armas_b, random.randint(5, 12))
             dna_s_team = random.sample(todas_las_armas_s, random.randint(5, 12))
             
-            dna_macro = random.choice(["All-Weather", "Bull Only", "Bear Only", "Ignore", "Organic_Vol", "Organic_Squeeze", "Organic_Safe"])
-            dna_vol = random.choice(["All-Weather", "Trend", "Range", "Ignore", "Organic_Pump", "Organic_Dump"])
+            dna_macro = random.choice(["All-Weather", "Bull Only", "Bear Only", "Ignore", "Organic_Vol", "Organic_Squeeze", "Organic_Safe", "Organic_Gaussian_Clean"])
+            dna_vol = random.choice(["All-Weather", "Trend", "Range", "Ignore", "Organic_Pump", "Organic_Dump", "Organic_Gaussian_Clean"])
             
             m_mask = m_mask_dict[dna_macro]
             v_mask = v_mask_dict[dna_vol]
@@ -670,7 +672,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 subtitle = f"Progreso Macro: {deep_info['current']:,} / {deep_info['total']:,} Épocas ({macro_pct}%)<br>ETA Bloque: {eta:.1f}s"
                 color = "#9932CC"
             else:
-                title = f"GENESIS LAB V178 (70% TRAIN): {s_id}"
+                title = f"GENESIS LAB V179 (70% TRAIN): {s_id}"
                 subtitle = f"Progreso: {pct_done}% | ADN Probado: {combos:,}<br>ETA: {eta:.1f} segs"
                 color = "#00FFFF"
 
@@ -705,12 +707,14 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     elif vault.get('macro') == "Organic_Vol": m_mask = s_dict['Organic_Vol']
     elif vault.get('macro') == "Organic_Squeeze": m_mask = s_dict['Organic_Squeeze']
     elif vault.get('macro') == "Organic_Safe": m_mask = s_dict['Organic_Safe']
+    elif vault.get('macro') == "Organic_Gaussian_Clean": m_mask = s_dict['Organic_Gaussian_Clean']
     else: m_mask = ones_mask
 
     if vault.get('vol') == "Trend": v_mask = (a_adx >= vault.get('adx_th', 25.0))
     elif vault.get('vol') == "Range": v_mask = (a_adx < vault.get('adx_th', 25.0))
     elif vault.get('vol') == "Organic_Pump": v_mask = s_dict['Organic_Pump']
     elif vault.get('vol') == "Organic_Dump": v_mask = s_dict['Organic_Dump']
+    elif vault.get('vol') == "Organic_Gaussian_Clean": v_mask = s_dict['Organic_Gaussian_Clean']
     else: v_mask = ones_mask
 
     for r in vault.get('b_team', []): f_buy |= s_dict.get(r, default_f)
@@ -726,11 +730,9 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     df_strat['Signal_Buy'], df_strat['Signal_Sell'] = f_buy, f_sell
     df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
     
-    # 🔥 Ajuste: Slippage a 0.0 para paridad exacta con TradingView en la prueba visual
-    eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.0)
+    eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.05)
     return df_strat, eq_curve, t_log, total_comms
 
-# 🔥 Ajuste: Se inyectan com_pct y la fecha de inicio (start_date_obj) real 🔥
 def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0)
     v_adx = vault.get('adx_th', 25.0); v_wf = vault.get('whale_f', 2.5)
@@ -738,7 +740,6 @@ def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_
     json_buy = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {buy_pct}, "limit_price": {{{{close}}}}, "side": "🟢 COMPRA"}}'
     json_sell = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {sell_pct}, "limit_price": {{{{close}}}}, "side": "🔴 VENTA"}}'
 
-    # 🔥 Ajuste: Comisión conectada a la UI y Slippage en 0 🔥
     ps_base = f"""//@version=5
 strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value={buy_pct}, commission_value={com_pct*100}, slippage=0)
 wt_enter_long = input.text_area(defval='{json_buy}', title="🟢 WT: Mensaje Enter Long")
@@ -918,6 +919,10 @@ wt_cross_dn = (wt1 < wt2) and (nz(wt1[1]) >= nz(wt2[1]))
 wt_oversold = wt1 < -60
 wt_overbought = wt1 > 60
 
+// 🔥 FILTRO GAUSSIANO DE RUIDO (Choppiness) 🔥
+chop_v = 100 * math.log10(math.sum(atr, 14) / (ta.highest(high, 14) - ta.lowest(low, 14))) / math.log10(14)
+gaussian_clean = chop_v < 61.8
+
 ping_b = (adx < adx_trend) and (close < bbl) and vela_verde
 ping_s = (close > bbu) or (rsi_v > 70)
 squeeze_b = neon_up
@@ -975,12 +980,14 @@ stoch_ob_sell = (stoch_k > 80) and (stoch_k < stoch_d)
     elif vault.get('macro') == "Organic_Vol": m_cond = "high_vol"
     elif vault.get('macro') == "Organic_Squeeze": m_cond = "squeeze_on"
     elif vault.get('macro') == "Organic_Safe": m_cond = "trinity_safe"
+    elif vault.get('macro') == "Organic_Gaussian_Clean": m_cond = "gaussian_clean"
     else: m_cond = "true"
 
     if vault.get('vol') == "Trend": v_cond = "(adx >= adx_trend)"
     elif vault.get('vol') == "Range": v_cond = "(adx < adx_trend)"
     elif vault.get('vol') == "Organic_Pump": v_cond = "pump_memory"
     elif vault.get('vol') == "Organic_Dump": v_cond = "dump_memory"
+    elif vault.get('vol') == "Organic_Gaussian_Clean": v_cond = "gaussian_clean"
     else: v_cond = "true"
 
     b_cond = " or ".join([pine_map.get(x, "false") for x in vault.get('b_team', [])]) if vault.get('b_team') else "false"
@@ -1001,6 +1008,7 @@ float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
 float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
     ps_exec = """
+// --- REFINAMIENTO DE EJECUCIÓN CUÁNTICA (V179) ---
 var float locked_atr = na
 
 if signal_buy and strategy.position_size == 0 and window
@@ -1008,9 +1016,10 @@ if signal_buy and strategy.position_size == 0 and window
     locked_atr := atr
 
 if strategy.position_size > 0
-    float tp_ticks = (locked_atr * atr_tp_mult) / syminfo.mintick
-    float sl_ticks = (locked_atr * atr_sl_mult) / syminfo.mintick
-    strategy.exit("TP/SL", "In", profit=tp_ticks, loss=sl_ticks, alert_message=wt_exit_long)
+    // Usamos el precio promedio real de posición para amarrar la salida y destruir el repainting
+    float tp_price = strategy.position_avg_price + (locked_atr * atr_tp_mult)
+    float sl_price = strategy.position_avg_price - (locked_atr * atr_sl_mult)
+    strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_message=wt_exit_long)
 
 if signal_sell and strategy.position_size > 0
     strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
@@ -1177,8 +1186,7 @@ c6.metric("Drawdown", f"{mdd:.2f}%", delta_color="inverse")
 c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
 
 with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expanded=False):
-    st.info("Traducción Matemática Idéntica. TV usa Ticks Reales para evitar Fake Trades en Gaps.")
-    # 🔥 Ajuste: Pasar comision_pct real y la primera fecha (df_strat.index[0])
+    st.info("Traducción Matemática Idéntica. TV usa position_avg_price para evitar Repainting.")
     st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct, comision_pct, df_strat.index[0]), language="pine")
 
 st.markdown("---")
@@ -1209,7 +1217,6 @@ fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='
 y_min_force = df_strat['Low'].min() * 0.98
 y_max_force = df_strat['High'].max() * 1.02
 
-# 🔥 DIVISIÓN VISUAL IN-SAMPLE / OUT-OF-SAMPLE (PARCHE V176) 🔥
 if len(df_strat) > 0:
     split_idx = int(len(df_strat) * 0.70)
     if split_idx < len(df_strat):
