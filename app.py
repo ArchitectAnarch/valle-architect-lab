@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V189':
+if st.session_state.get('app_version') != 'V190':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V189'
+    st.session_state['app_version'] = 'V190'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -189,7 +189,7 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
     return mc_curves, risk_of_ruin
 
 # ==========================================
-# 🧬 2. ARSENAL DE INDICADORES (ADN)
+# 🧬 2. ARSENAL DE INDICADORES
 # ==========================================
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
@@ -254,7 +254,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V189</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V190</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -263,7 +263,7 @@ if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=Tr
     gc.collect(); st.rerun()
 
 st.sidebar.markdown("---")
-st.sidebar.info("💡 **TIP:** Si iniciaste una Forja y quieres detenerla al ver un buen récord, usa el botón 'ABORTAR' abajo. **El campeón encontrado se guardará automáticamente.**")
+st.sidebar.info("💡 **TIP:** Usa este botón en cualquier momento si ves un buen récord en el holograma. **La IA abortará pero guardará al campeón inmediatamente.**")
 if st.sidebar.button("🛑 ABORTAR RUN GLOBAL (Y MOSTRAR CAMPEÓN)", use_container_width=True, key="btn_abort"):
     st.session_state['abort_opt'] = True
     st.session_state['global_queue'] = []
@@ -341,7 +341,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V189.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V190.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -356,7 +356,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V189)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V190)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -609,12 +609,18 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     return s_dict
 
+# 🔥 V190: CAJA FUERTE GENÉTICA Y EVOLUCIÓN CONTINUA 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None):
-    best_fit_live = cur_fit; best_net_live = cur_net; best_pf_live = 0.0; best_nt_live = 0; bp = None
-
     vault = st.session_state.get(f'champion_{s_id}', {})
+    
+    best_fit_live = vault.get('fit', -float('inf'))
+    best_net_live = vault.get('net', -float('inf'))
+    best_pf_live = 0.0
+    best_nt_live = 0
+    bp = None
+    
     best_dna = None
-    if vault and vault.get('fit', -float('inf')) != -float('inf'):
+    if best_fit_live != -float('inf'):
         best_dna = vault.copy()
 
     iters = 3000 * epochs
@@ -636,7 +642,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
 
     for c in range(chunks):
         if st.session_state.get('abort_opt', False): 
-            st.warning("🛑 OPTIMIZACIÓN ABORTADA. El mejor campeón ha sido guardado."); break
+            st.warning("🛑 OPTIMIZACIÓN ABORTADA. El campeón actual está a salvo en la bóveda."); break
 
         for _ in range(chunk_size): 
             f_buy.fill(False); f_sell.fill(False)
@@ -758,7 +764,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                         'w_adx': r_w_adx, 'th_buy': r_th_b, 'th_sell': r_th_s, 'atr_tp': r_atr_tp, 'atr_sl': r_atr_sl
                     }
                     best_dna = bp.copy()
-                    save_champion(s_id, bp)
+                    
+                    st.session_state[f'champion_{s_id}'] = bp.copy()
                     st.session_state[f'opt_status_{s_id}'] = True
             
         if c == 0 or c == (chunks - 1) or c % update_mod == 0:
@@ -778,7 +785,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             else:
                 pct_done = int(((c + 1) / chunks) * 100)
                 combos = (c + 1) * chunk_size
-                title = f"GENESIS LAB V189 (70% TRAIN): {s_id}"
+                title = f"GENESIS LAB V190 (70% TRAIN): {s_id}"
                 subtitle = f"Progreso: {pct_done}% | Combinaciones: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
                 color = "#00FFFF"
 
@@ -796,7 +803,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             </div>
             """, unsafe_allow_html=True)
             
-    return bp if bp else None
+    return best_dna
 
 def run_backtest_eval(s_id, cap_ini, com_pct):
     vault = st.session_state.get(f'champion_{s_id}', {})
@@ -841,37 +848,6 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     
     eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.0)
     return df_strat, eq_curve, t_log, total_comms
-
-# ==========================================
-# 🎲 MÓDULO DE ESTRÉS DE MONTE CARLO (V188)
-# ==========================================
-def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
-    if not trades_list or len(trades_list) < 5:
-        return None, 0.0
-    
-    rets = [t['Ganancia_$'] for t in trades_list if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']]
-    
-    if not rets: return None, 0.0
-
-    rets_arr = np.array(rets)
-    n_trades = len(rets_arr)
-    
-    mc_curves = np.zeros((num_simulations, n_trades + 1))
-    mc_curves[:, 0] = cap_ini
-    
-    ruined_count = 0
-    
-    for i in range(num_simulations):
-        np.random.shuffle(rets_arr)
-        for j in range(n_trades):
-            mc_curves[i, j+1] = mc_curves[i, j] + rets_arr[j]
-            if mc_curves[i, j+1] <= 0:
-                mc_curves[i, j+1:] = 0
-                ruined_count += 1
-                break
-                
-    risk_of_ruin = (ruined_count / num_simulations) * 100.0
-    return mc_curves, risk_of_ruin
 
 def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0)
@@ -1148,38 +1124,33 @@ bool signal_sell = ({s_cond}) or (math_score < {vault.get('th_sell',-999):.2f})
 float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
 float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
-    # 🔥 V189 FIX: EJECUCIÓN CUÁNTICA INSTITUCIONAL (ESPEJO EXACTO A PYTHON) 🔥
     ps_exec = """
 var float locked_atr = na
-var float tp_price = na
-var float sl_price = na
+var float expected_entry = na
 
-// Orden de entrada
+// Disparo de Entrada
 if signal_buy and strategy.position_size == 0 and window
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
+    locked_atr := atr
+    expected_entry := close 
 
-// 1. DETECCIÓN DE ENTRADA REAL (Sincronizado con Python 'p_ent = o_arr[i+1]')
-bool just_entered = ta.change(strategy.position_size) > 0
-
-// 2. ANCLAJE MATEMÁTICO INQUEBRANTABLE
-if just_entered
-    locked_atr := atr[1] // ATR de la vela anterior
-    tp_price := strategy.position_avg_price + (locked_atr * atr_tp_mult)
-    sl_price := strategy.position_avg_price - (locked_atr * atr_sl_mult)
-
-// 3. MANTENIMIENTO DE ÓRDENES TP/SL
+// Sincronización del Precio Real
 if strategy.position_size > 0
+    expected_entry := strategy.position_avg_price
+
+// Ejecución Cuántica TP/SL
+if not na(expected_entry)
+    float tp_price = expected_entry + (locked_atr * atr_tp_mult)
+    float sl_price = expected_entry - (locked_atr * atr_sl_mult)
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_message=wt_exit_long)
 
-// 4. SALIDA DINÁMICA (Inteligencia Artificial)
+// Purga de Memoria
+if strategy.position_size == 0 and not signal_buy
+    expected_entry := na
+
+// Salida Dinámica IA
 if signal_sell and strategy.position_size > 0
     strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
-
-// 5. PURGA DE MEMORIA
-if strategy.position_size == 0
-    locked_atr := na
-    tp_price := na
-    sl_price := na
 
 plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.belowbar, color=color.aqua, size=size.tiny)
 plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
@@ -1206,7 +1177,6 @@ if st.session_state.get('run_global', False):
         bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=global_epochs, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))))
         
         if bp: 
-            save_champion(s_id, bp)
             st.session_state[f'opt_status_{s_id}'] = True
         else:
             st.error(f"💀 La IA descartó todas las mutaciones para {s_id}. Ninguna superó la Ley de Hierro.")
@@ -1238,7 +1208,7 @@ if deep_state and not deep_state.get('paused', False) and deep_state.get('curren
     
     bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=chunk, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=deep_info)
     
-    if bp: save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True
+    if bp: st.session_state[f'opt_status_{s_id}'] = True
     
     st.session_state['deep_opt_state']['current_epoch'] += chunk
     
@@ -1302,9 +1272,9 @@ if c_btn1.button(f"🚀 FORJAR RÁPIDO ({global_epochs*3}k)", type="primary", ke
     buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
     bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(ps_buy_pct), float(vault.get('ado', 4.0)), dias_reales, capital_inicial * (buy_hold_ret / 100.0), epochs=global_epochs, cur_net=float(vault.get('net', -float('inf'))), cur_fit=float(vault.get('fit', -float('inf'))))
     if bp: 
-        save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True; st.success("👑 ¡Mutante Forjado!")
+        st.session_state[f'opt_status_{s_id}'] = True; st.success("👑 ¡Mutante Forjado!")
     else:
-        st.error("💀 La IA descartó todas las mutaciones. Ninguna superó la regla de Acumulación y Protección de Tokens.")
+        st.error("💀 La IA descartó todas las mutaciones. Ninguna superó la regla de Acumulación y Protección de Tokens en la fase In-Sample.")
     time.sleep(1); ph_holograma.empty(); st.rerun()
 
 if c_btn2.button(f"🌌 ACTIVAR FORJA PROFUNDA", type="secondary", key=f"btn_deep_{s_id}"):
@@ -1391,7 +1361,7 @@ if mc_curves is not None:
     c_mc2.plotly_chart(fig_mc, use_container_width=True)
 
 with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expanded=False):
-    st.info("Traducción Matemática Idéntica. Ejecución Cuántica con Cero Repainting Activa.")
+    st.info("Traducción Matemática Idéntica. TV usa position_avg_price para evitar Repainting.")
     st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct, comision_pct, df_strat.index[0]), language="pine")
 
 st.markdown("---")
@@ -1417,11 +1387,13 @@ if not dftr.empty:
     loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
     fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white'))), row=1, col=1)
 
+# GRÁFICO INFERIOR: EJE Y SEPARADO PARA EQUIDAD
 fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
 
 y_min_force = df_strat['Low'].min() * 0.98
 y_max_force = df_strat['High'].max() * 1.02
 
+# 🔥 DIVISIÓN VISUAL IN-SAMPLE / OUT-OF-SAMPLE 🔥
 if len(df_strat) > 0:
     split_idx = int(len(df_strat) * 0.70)
     if split_idx < len(df_strat):
@@ -1438,7 +1410,10 @@ if len(df_strat) > 0:
         fig.add_vline(x=split_date_str, line_width=2, line_dash="dash", line_color="yellow")
 
 fig.update_xaxes(fixedrange=False)
+# Eje Y de las velas (ajustado al precio)
 fig.update_yaxes(fixedrange=False, side="right", range=[y_min_force, y_max_force], row=1, col=1)
+# Eje Y de la Equidad (Auto-escalable)
+fig.update_yaxes(fixedrange=False, side="right", row=2, col=1)
 
 fig.update_layout(
     template='plotly_dark', 
