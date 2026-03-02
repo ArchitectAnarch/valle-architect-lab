@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V185':
+if st.session_state.get('app_version') != 'V186':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V185'
+    st.session_state['app_version'] = 'V186'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -44,10 +44,10 @@ def npshift_bool(arr, num, fill_value=False):
     else: result[:] = arr
     return result
 
+# 🔥 NÚCLEO C++ V186: CABECERA LIMPIA DE 13 VARIABLES Y CERO CRASHEOS 🔥
 @njit(fastmath=True)
-def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
-    b_c, s_c, w_rsi, w_z, w_adx, th_buy, th_sell, 
-    atr_tp_mult, atr_sl_mult, cap_ini, com_pct, invest_pct, slippage_pct):
+def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, 
+    b_c, s_c, atr_tp_mult, atr_sl_mult, cap_ini, com_pct, invest_pct, slippage_pct):
     
     cap_act = cap_ini; en_pos = False; p_ent = 0.0
     pos_size = 0.0; invest_amt = 0.0; g_profit = 0.0; g_loss = 0.0; num_trades = 0; max_dd = 0.0; peak = cap_ini
@@ -71,27 +71,29 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 cap_act += profit
                 g_profit += profit; num_trades += 1; en_pos = False
                 if profit > 0: wins += 1
-            else:
-                score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
-                if s_c[i] or (score < th_sell):
-                    exit_price = (o_arr[i+1] if i+1 < len(o_arr) else c_arr[i]) * slip_out
-                    ret = (exit_price - p_ent) / p_ent; gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
-                    cap_act += profit
-                    if profit > 0: 
-                        g_profit += profit; wins += 1
-                    else: 
-                        g_loss += abs(profit)
-                    num_trades += 1; en_pos = False
+            elif s_c[i]:
+                exit_price = (o_arr[i+1] if i+1 < len(o_arr) else c_arr[i]) * slip_out
+                ret = (exit_price - p_ent) / p_ent; gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
+                cap_act += profit
+                if profit > 0: 
+                    g_profit += profit; wins += 1
+                else: 
+                    g_loss += abs(profit)
+                num_trades += 1; en_pos = False
             
             if cap_act > peak: peak = cap_act
             if peak > 0: dd = (peak - cap_act) / peak * 100.0; max_dd = max(max_dd, dd)
             if cap_act <= 0: break
             
         if not en_pos and i+1 < len(h_arr):
-            score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
-            if b_c[i] or (score > th_buy):
-                invest_amt = cap_act * (invest_pct / 100.0) 
+            if b_c[i]:
+                if invest_pct > 0:
+                    invest_amt = cap_act * (invest_pct / 100.0) 
+                else:
+                    invest_amt = cap_ini
+                    
                 if invest_amt > cap_act: invest_amt = cap_act 
+                
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in
                 current_atr = atr_arr[i]
@@ -156,7 +158,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     return curva.tolist(), 0.0, cap_act, registro_trades, en_pos, total_comms
 
 # ==========================================
-# 🧬 2. ARSENAL DE INDICADORES
+# 🧬 2. ARSENAL DE INDICADORES (ADN)
 # ==========================================
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
@@ -221,7 +223,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V185</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V186</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -230,7 +232,8 @@ if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=Tr
     gc.collect(); st.rerun()
 
 st.sidebar.markdown("---")
-if st.sidebar.button("🛑 ABORTAR RUN GLOBAL", use_container_width=True, key="btn_abort"):
+st.sidebar.info("💡 **TIP:** Si iniciaste una Forja y quieres detenerla al ver un buen récord, usa el botón 'ABORTAR' abajo. **El campeón encontrado se guardará automáticamente.**")
+if st.sidebar.button("🛑 ABORTAR RUN GLOBAL (Y MOSTRAR CAMPEÓN)", use_container_width=True, key="btn_abort"):
     st.session_state['abort_opt'] = True
     st.session_state['global_queue'] = []
     st.session_state['run_global'] = False
@@ -307,7 +310,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V185.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V186.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -322,7 +325,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V185)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V186)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -575,7 +578,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     return s_dict
 
-# 🔥 THE SNIPER UPGRADE (V185) 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None):
     best_fit_live = cur_fit; best_net_live = cur_net; best_pf_live = 0.0; best_nt_live = 0; bp = None
 
@@ -603,13 +605,12 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
 
     for c in range(chunks):
         if st.session_state.get('abort_opt', False): 
-            st.warning("🛑 OPTIMIZACIÓN ABORTADA."); break
+            st.warning("🛑 OPTIMIZACIÓN ABORTADA. El mejor campeón ha sido guardado."); break
 
         for _ in range(chunk_size): 
             f_buy.fill(False); f_sell.fill(False)
             
             if best_dna is not None and random.random() < 0.8: 
-                # --- EVOLUCIÓN: Mutación de Gatillo y Confirmación ---
                 dna_b_trigger = best_dna.get('b_trigger', random.choice(todas_las_armas_b))
                 if random.random() < 0.2: dna_b_trigger = random.choice(todas_las_armas_b)
                 
@@ -641,7 +642,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 dna_b_team = [dna_b_trigger, dna_b_confirm]
                 dna_s_team = [dna_s_trigger, dna_s_confirm]
             else: 
-                # --- PIONEROS: Nueva Sangre ---
                 r_hitbox = random.choice([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]); r_therm = random.choice([3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
                 r_adx = random.choice([15.0, 20.0, 25.0, 30.0, 35.0]); r_whale = random.choice([1.5, 2.0, 2.5, 3.0, 3.5, 4.0])
                 
@@ -681,7 +681,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             m_mask = m_mask_dict[dna_macro]
             v_mask = v_mask_dict[dna_vol]
             
-            # 🔥 AQUÍ ESTÁ EL SECRETO: LA CONFLUENCIA DEL AND (&) 🔥
             f_buy_tactical = s_dict.get(dna_b_trigger, default_f) & s_dict.get(dna_b_confirm, default_f)
             f_sell_tactical = s_dict.get(dna_s_trigger, default_f) & s_dict.get(dna_s_confirm, default_f)
             
@@ -692,13 +691,13 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             
             f_sell = f_sell_tactical | (score_arr < r_th_s)
             
+            # 🔥 EJECUCIÓN C++ CORREGIDA A 13 VARIABLES Y ZONA IN-SAMPLE 🔥
             net, pf, nt, mdd, wr = simular_crecimiento_exponencial_ia_core(
                 a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx], a_atr[:split_idx], 
                 f_buy[:split_idx], f_sell[:split_idx], 
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.05
             )
 
-            # --- Paisaje de Recompensas ---
             if nt >= 1: 
                 ado_actual = nt / max(1, dias_entrenamiento)
                 ado_target_safe = max(0.1, target_ado)
@@ -729,6 +728,9 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                         'w_adx': r_w_adx, 'th_buy': r_th_b, 'th_sell': r_th_s, 'atr_tp': r_atr_tp, 'atr_sl': r_atr_sl
                     }
                     best_dna = bp.copy()
+                    # 🔥 V186: INSTANT SAVE PARA EL BOTÓN DE PÁNICO 🔥
+                    save_champion(s_id, bp)
+                    st.session_state[f'opt_status_{s_id}'] = True
             
         if c == 0 or c == (chunks - 1) or c % update_mod == 0:
             global_start = deep_info.get('start_time', start_time) if deep_info else start_time
@@ -747,7 +749,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             else:
                 pct_done = int(((c + 1) / chunks) * 100)
                 combos = (c + 1) * chunk_size
-                title = f"GENESIS LAB V185 (70% TRAIN): {s_id}"
+                title = f"GENESIS LAB V186 (70% TRAIN): {s_id}"
                 subtitle = f"Progreso: {pct_done}% | Combinaciones: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
                 color = "#00FFFF"
 
@@ -998,57 +1000,6 @@ wt_cross_up = (wt1 > wt2) and (nz(wt1[1]) <= nz(wt2[1]))
 wt_cross_dn = (wt1 < wt2) and (nz(wt1[1]) >= nz(wt2[1]))
 wt_oversold = wt1 < -60
 wt_overbought = wt1 > 60
-
-ping_b = (adx < adx_trend) and (close < bbl) and vela_verde
-ping_s = (close > bbu) or (rsi_v > 70)
-squeeze_b = neon_up
-squeeze_s = (close < ema50)
-therm_b = cond_therm_buy_bounce
-therm_s = cond_therm_sell_wall
-climax_b = cond_pink_whale_buy
-climax_s = (rsi_v > 80)
-lock_b = cond_lock_buy_bounce
-lock_s = cond_lock_sell_reject
-defcon_b = cond_defcon_buy
-defcon_s = cond_defcon_sell
-jugg_b = macro_bull and (close > ema50) and nz(close[1]) < nz(ema50[1]) and vela_verde and not is_falling_knife
-jugg_s = (close < ema50)
-trinity_b = macro_bull and (rsi_v < 35) and vela_verde and not is_falling_knife
-trinity_s = (rsi_v > 75) or (close < ema200)
-lev_b = macro_bull and rsi_cross_up and (rsi_v < 45)
-lev_s = (close < ema200)
-commander_b = cond_pink_whale_buy or cond_lock_buy_bounce
-commander_s = (close < ema50)
-
-r_Pink_Whale_Buy = cond_pink_whale_buy
-r_Lock_Bounce = cond_lock_buy_bounce
-r_Lock_Break = cond_lock_buy_break
-r_Neon_Up = neon_up
-r_Defcon_Buy = cond_defcon_buy
-r_Therm_Bounce = cond_therm_buy_bounce
-r_Therm_Vacuum = cond_therm_buy_vacuum
-r_Nuclear_Buy = is_magenta and (wt_oversold or wt_cross_up)
-r_Early_Buy = is_magenta
-r_Rebound_Buy = rsi_cross_up and not is_magenta
-r_Lock_Reject = cond_lock_sell_reject
-r_Lock_Breakd = cond_lock_sell_breakd
-r_Neon_Dn = neon_dn
-r_Defcon_Sell = cond_defcon_sell
-r_Therm_Wall_Sell = cond_therm_sell_wall
-r_Therm_Panic_Sell = cond_therm_sell_panic
-r_Nuclear_Sell = (rsi_v > 70) and (wt_overbought or wt_cross_dn)
-r_Early_Sell = (rsi_v > 70) and vela_roja
-
-wyc_spring_buy = (low < a_tsup) and (close > a_tsup) and high_vol
-wyc_upthrust_sell = (high > a_tres) and (close < a_tres) and high_vol
-vsa_accum_buy = (body_size < atr * 0.5) and (lower_wick > body_size * 1.5) and high_vol and vela_roja
-vsa_dist_sell = (body_size < atr * 0.5) and (upper_wick > body_size * 1.5) and high_vol and vela_verde
-fibo_618_buy = (low < fib_618_b) and (close > fib_618_b)
-fibo_618_sell = (high > fib_618_s) and (close < fib_618_s)
-macd_impulse_buy = (macdLine > signalLine) and (macdLine > 0) and (macdLine > nz(macdLine[1]))
-macd_exhaust_sell = (macdLine < signalLine) and (macdLine > 0) and (macdLine < nz(macdLine[1]))
-stoch_os_buy = (stoch_k < 20) and (stoch_k > stoch_d)
-stoch_ob_sell = (stoch_k > 80) and (stoch_k < stoch_d)
 """
     ps_logic = ""
     if vault.get('macro') == "Bull Only": m_cond = "macro_bull"
@@ -1137,7 +1088,7 @@ if st.session_state.get('run_global', False):
             save_champion(s_id, bp)
             st.session_state[f'opt_status_{s_id}'] = True
         else:
-            st.error(f"💀 La IA descartó todas las mutaciones para {s_id}. Ninguna superó la Ley de Hierro.")
+            st.error(f"💀 La IA descartó todas las mutaciones para {s_id}. Ninguna superó la Ley de Hierro (Avaricia y Protección).")
             
         st.rerun()
     else:
@@ -1302,11 +1253,13 @@ fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='
 y_min_force = df_strat['Low'].min() * 0.98
 y_max_force = df_strat['High'].max() * 1.02
 
+# 🔥 DIVISIÓN VISUAL IN-SAMPLE / OUT-OF-SAMPLE (PARCHE V176 REFORZADO) 🔥
 if len(df_strat) > 0:
     split_idx = int(len(df_strat) * 0.70)
     if split_idx < len(df_strat):
         split_date_str = df_strat.index[split_idx].strftime('%Y-%m-%d %H:%M:%S')
-        fig.add_vline(x=split_date_str, line_width=2, line_dash="dash", line_color="yellow")
+        
+        # Primero agregar la anotación para que el layout la posicione bien
         fig.add_annotation(
             x=split_date_str, y=0.95, yref="paper", 
             text="OUT-OF-SAMPLE (30%) ➡️", 
@@ -1314,6 +1267,9 @@ if len(df_strat) > 0:
             font=dict(color="yellow", size=10),
             bgcolor="rgba(0,0,0,0.5)"
         )
+        
+        # Luego dibujar la línea sin annotation_text para evitar el crash de Plotly con Pandas
+        fig.add_vline(x=split_date_str, line_width=2, line_dash="dash", line_color="yellow")
 
 fig.update_xaxes(fixedrange=False)
 fig.update_yaxes(fixedrange=False, side="right", range=[y_min_force, y_max_force], row=1, col=1)
