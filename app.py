@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V188':
+if st.session_state.get('app_version') != 'V189':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V188'
+    st.session_state['app_version'] = 'V189'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -57,6 +57,7 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
     
     for i in range(len(h_arr)):
         if en_pos:
+            # Primero evalúa Stop Loss para asegurar pesimismo extremo
             if l_arr[i] <= sl_p:
                 exec_p = sl_p * slip_out
                 ret = (exec_p - p_ent) / p_ent
@@ -163,7 +164,6 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
     if not trades_list or len(trades_list) < 5:
         return None, 0.0
     
-    # Extraer solo las ganancias/pérdidas en USD (ignorando comisiones extra, ya están en el trade)
     rets = [t['Ganancia_$'] for t in trades_list if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']]
     
     if not rets: return None, 0.0
@@ -177,19 +177,15 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
     ruined_count = 0
     
     for i in range(num_simulations):
-        # Desordenar aleatoriamente la secuencia histórica de trades
         np.random.shuffle(rets_arr)
-        
-        # Calcular la curva acumulativa
         for j in range(n_trades):
             mc_curves[i, j+1] = mc_curves[i, j] + rets_arr[j]
             if mc_curves[i, j+1] <= 0:
                 mc_curves[i, j+1:] = 0
                 ruined_count += 1
-                break # Ruina total
+                break
                 
     risk_of_ruin = (ruined_count / num_simulations) * 100.0
-    
     return mc_curves, risk_of_ruin
 
 # ==========================================
@@ -258,7 +254,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V188</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V189</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -345,7 +341,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V188.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V189.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -360,7 +356,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V188)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V189)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -782,7 +778,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             else:
                 pct_done = int(((c + 1) / chunks) * 100)
                 combos = (c + 1) * chunk_size
-                title = f"GENESIS LAB V188 (70% TRAIN): {s_id}"
+                title = f"GENESIS LAB V189 (70% TRAIN): {s_id}"
                 subtitle = f"Progreso: {pct_done}% | Combinaciones: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
                 color = "#00FFFF"
 
@@ -845,6 +841,37 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     
     eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.0)
     return df_strat, eq_curve, t_log, total_comms
+
+# ==========================================
+# 🎲 MÓDULO DE ESTRÉS DE MONTE CARLO (V188)
+# ==========================================
+def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
+    if not trades_list or len(trades_list) < 5:
+        return None, 0.0
+    
+    rets = [t['Ganancia_$'] for t in trades_list if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']]
+    
+    if not rets: return None, 0.0
+
+    rets_arr = np.array(rets)
+    n_trades = len(rets_arr)
+    
+    mc_curves = np.zeros((num_simulations, n_trades + 1))
+    mc_curves[:, 0] = cap_ini
+    
+    ruined_count = 0
+    
+    for i in range(num_simulations):
+        np.random.shuffle(rets_arr)
+        for j in range(n_trades):
+            mc_curves[i, j+1] = mc_curves[i, j] + rets_arr[j]
+            if mc_curves[i, j+1] <= 0:
+                mc_curves[i, j+1:] = 0
+                ruined_count += 1
+                break
+                
+    risk_of_ruin = (ruined_count / num_simulations) * 100.0
+    return mc_curves, risk_of_ruin
 
 def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0)
@@ -1121,28 +1148,38 @@ bool signal_sell = ({s_cond}) or (math_score < {vault.get('th_sell',-999):.2f})
 float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
 float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
+    # 🔥 V189 FIX: EJECUCIÓN CUÁNTICA INSTITUCIONAL (ESPEJO EXACTO A PYTHON) 🔥
     ps_exec = """
 var float locked_atr = na
-var float expected_entry = na
+var float tp_price = na
+var float sl_price = na
 
+// Orden de entrada
 if signal_buy and strategy.position_size == 0 and window
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
-    locked_atr := atr
-    expected_entry := close
 
+// 1. DETECCIÓN DE ENTRADA REAL (Sincronizado con Python 'p_ent = o_arr[i+1]')
+bool just_entered = ta.change(strategy.position_size) > 0
+
+// 2. ANCLAJE MATEMÁTICO INQUEBRANTABLE
+if just_entered
+    locked_atr := atr[1] // ATR de la vela anterior
+    tp_price := strategy.position_avg_price + (locked_atr * atr_tp_mult)
+    sl_price := strategy.position_avg_price - (locked_atr * atr_sl_mult)
+
+// 3. MANTENIMIENTO DE ÓRDENES TP/SL
 if strategy.position_size > 0
-    expected_entry := strategy.position_avg_price
-
-if not na(expected_entry)
-    float tp_price = expected_entry + (locked_atr * atr_tp_mult)
-    float sl_price = expected_entry - (locked_atr * atr_sl_mult)
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_message=wt_exit_long)
 
-if strategy.position_size == 0 and not signal_buy
-    expected_entry := na
-
+// 4. SALIDA DINÁMICA (Inteligencia Artificial)
 if signal_sell and strategy.position_size > 0
     strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
+
+// 5. PURGA DE MEMORIA
+if strategy.position_size == 0
+    locked_atr := na
+    tp_price := na
+    sl_price := na
 
 plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.belowbar, color=color.aqua, size=size.tiny)
 plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
@@ -1267,7 +1304,7 @@ if c_btn1.button(f"🚀 FORJAR RÁPIDO ({global_epochs*3}k)", type="primary", ke
     if bp: 
         save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True; st.success("👑 ¡Mutante Forjado!")
     else:
-        st.error("💀 La IA descartó todas las mutaciones. Ninguna superó la regla de Acumulación y Protección de Tokens en la fase In-Sample.")
+        st.error("💀 La IA descartó todas las mutaciones. Ninguna superó la regla de Acumulación y Protección de Tokens.")
     time.sleep(1); ph_holograma.empty(); st.rerun()
 
 if c_btn2.button(f"🌌 ACTIVAR FORJA PROFUNDA", type="secondary", key=f"btn_deep_{s_id}"):
@@ -1354,7 +1391,7 @@ if mc_curves is not None:
     c_mc2.plotly_chart(fig_mc, use_container_width=True)
 
 with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expanded=False):
-    st.info("Traducción Matemática Idéntica. TV usa position_avg_price para evitar Repainting.")
+    st.info("Traducción Matemática Idéntica. Ejecución Cuántica con Cero Repainting Activa.")
     st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct, comision_pct, df_strat.index[0]), language="pine")
 
 st.markdown("---")
