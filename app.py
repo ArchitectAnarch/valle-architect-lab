@@ -24,19 +24,28 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V199 FIX: ORDEN DE COMPILACIÓN ESTRICTO 🔥
-if st.session_state.get('app_version') != 'V199':
+# 🔥 V200 FIX: ARRANQUE LIMPIO 🔥
+if st.session_state.get('app_version') != 'V200':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V199'
+    st.session_state['app_version'] = 'V200'
 
-# 1. INICIALIZACIÓN GLOBAL DE MEMORIA
-if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
-    st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
+# ==========================================
+# 🧠 1. FUNCIONES MATEMÁTICAS Y GUARDIÁN DE MEMORIA
+# ==========================================
+def npshift(arr, num, fill_value=np.nan):
+    result = np.empty_like(arr)
+    if num > 0: result[:num] = fill_value; result[num:] = arr[:-num]
+    elif num < 0: result[num:] = fill_value; result[:num] = arr[-num:]
+    else: result[:] = arr
+    return result
 
-estrategias = st.session_state['ai_algos']
-tab_id_map = {f"🤖 {ai_id}": ai_id for ai_id in estrategias}
+def npshift_bool(arr, num, fill_value=False):
+    result = np.empty_like(arr, dtype=bool)
+    if num > 0: result[:num] = fill_value; result[num:] = arr[:-num]
+    elif num < 0: result[num:] = fill_value; result[:num] = arr[-num:]
+    else: result[:] = arr
+    return result
 
-# 2. LISTAS DE ADN Y TRADUCTORES
 todas_las_armas_b = [
     'Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Jugg_Buy', 'Trinity_Buy', 
     'Commander_Buy', 'Lev_Buy', 'Q_Pink_Whale_Buy', 'Q_Lock_Bounce', 'Q_Lock_Break', 'Q_Neon_Up', 'Q_Defcon_Buy', 
@@ -51,6 +60,13 @@ todas_las_armas_s = [
     'Wyc_Upthrust_Sell', 'VSA_Dist_Sell', 'Fibo_618_Sell', 'MACD_Exhaust_Sell', 'Stoch_OB_Sell',
     'PA_Engulfing_Sell', 'PA_Pinbar_Sell', 'PA_3_Crows_Sell'
 ]
+
+# 1. INICIALIZACIÓN GLOBAL DE MEMORIA
+if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
+    st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
+
+estrategias = st.session_state['ai_algos']
+tab_id_map = {f"🤖 {ai_id}": ai_id for ai_id in estrategias}
 
 pine_map = {
     'Ping_Buy': 'ping_b', 'Ping_Sell': 'ping_s', 'Squeeze_Buy': 'squeeze_b', 'Squeeze_Sell': 'squeeze_s', 
@@ -111,23 +127,6 @@ def save_champion(s_id, bp):
 for s_id in estrategias:
     if f'opt_status_{s_id}' not in st.session_state: st.session_state[f'opt_status_{s_id}'] = False
     load_champion(s_id)
-
-# ==========================================
-# 🧠 4. FUNCIONES MATEMÁTICAS C++
-# ==========================================
-def npshift(arr, num, fill_value=np.nan):
-    result = np.empty_like(arr)
-    if num > 0: result[:num] = fill_value; result[num:] = arr[:-num]
-    elif num < 0: result[num:] = fill_value; result[:num] = arr[-num:]
-    else: result[:] = arr
-    return result
-
-def npshift_bool(arr, num, fill_value=False):
-    result = np.empty_like(arr, dtype=bool)
-    if num > 0: result[:num] = fill_value; result[num:] = arr[:-num]
-    elif num < 0: result[num:] = fill_value; result[:num] = arr[-num:]
-    else: result[:] = arr
-    return result
 
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
@@ -261,9 +260,9 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
     return mc_curves, risk_of_ruin
 
 # ==========================================
-# 🌍 5. SIDEBAR E INFRAESTRUCTURA
+# 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V199</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V200</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -340,7 +339,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V199.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V200.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = load_champion(s_id)
@@ -355,7 +354,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 6. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V199)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V200)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -544,8 +543,10 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     retro_peak = (a_rsi < 30) & (a_c < a_bbl); retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
+    
     support_buy = is_grav_sup & a_rcu
     support_sell = is_grav_res & a_rcd
+    
     div_bull = (a_l_s1 < a_l_s5) & (a_rsi_s1 > a_rsi_s5) & (a_rsi < 35)
     div_bear = (a_h_s1 > a_h_s5) & (a_rsi_s1 < a_rsi_s5) & (a_rsi > 65)
 
@@ -783,12 +784,12 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             current_epoch_val = deep_info['current'] + (c+1)*(chunk_size)
             macro_pct = int((current_epoch_val / deep_info['total']) * 100)
             title = f"🌌 DEEP FORGE: {s_id}"
-            subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo Ejecución: {time_str}"
+            subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"
             color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V199: {s_id}"
+            title = f"GENESIS LAB V200: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
@@ -854,6 +855,31 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     
     eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.0)
     return df_strat, eq_curve, t_log, total_comms
+
+def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
+    if not trades_list or len(trades_list) < 5:
+        return None, 0.0
+    
+    rets = [t['Ganancia_$'] for t in trades_list if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']]
+    if not rets: return None, 0.0
+
+    rets_arr = np.array(rets)
+    n_trades = len(rets_arr)
+    mc_curves = np.zeros((num_simulations, n_trades + 1))
+    mc_curves[:, 0] = cap_ini
+    ruined_count = 0
+    
+    for i in range(num_simulations):
+        np.random.shuffle(rets_arr)
+        for j in range(n_trades):
+            mc_curves[i, j+1] = mc_curves[i, j] + rets_arr[j]
+            if mc_curves[i, j+1] <= 0:
+                mc_curves[i, j+1:] = 0
+                ruined_count += 1
+                break
+                
+    risk_of_ruin = (ruined_count / num_simulations) * 100.0
+    return mc_curves, risk_of_ruin
 
 def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0)
@@ -1157,7 +1183,7 @@ if just_entered
 bool hit_sl = low <= sl_price
 bool hit_tp = high >= tp_price
 
-// Damos prioridad al SL (pesimismo matemático igual que en Python 'if l_arr[i] <= sl_p')
+// Damos prioridad al SL (pesimismo matemático)
 if strategy.position_size > 0
     if hit_sl
         strategy.close("In", comment="SL_Hit", alert_message=wt_exit_long)
@@ -1308,6 +1334,9 @@ if not dftr.empty:
         wr = (ws / tt) * 100
         gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum(); gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
         pf_val = gpp / gll if gll > 0 else float('inf')
+
+ado_val = tt / dias_reales if dias_reales > 0 else 0.0
+mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
 
 c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 c1.metric("Net Profit", f"${eq_curve[-1]-capital_inicial:,.2f}", f"{ret_pct:.2f}%")
