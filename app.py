@@ -24,10 +24,10 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V200 FIX: ARRANQUE LIMPIO 🔥
-if st.session_state.get('app_version') != 'V200':
+# 🔥 V201 FIX: EL LÁTIGO INSTITUCIONAL 🔥
+if st.session_state.get('app_version') != 'V201':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V200'
+    st.session_state['app_version'] = 'V201'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS Y GUARDIÁN DE MEMORIA
@@ -123,7 +123,6 @@ def save_champion(s_id, bp):
             json.dump(vault, f)
     except: pass
 
-# Carga de seguridad para la UI
 for s_id in estrategias:
     if f'opt_status_{s_id}' not in st.session_state: st.session_state[f'opt_status_{s_id}'] = False
     load_champion(s_id)
@@ -262,7 +261,7 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V200</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V201</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -339,7 +338,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V200.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V201.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = load_champion(s_id)
@@ -354,7 +353,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 6. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V200)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V201)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -453,10 +452,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         
         target_start = pd.to_datetime(datetime.combine(start, datetime.min.time())) + timedelta(hours=offset)
         df = df[df.index >= target_start]
-
-        split_idx = int(len(df) * 0.70)
-        df['Is_Train'] = False
-        if len(df) > 0: df.loc[df.index[:split_idx], 'Is_Train'] = True
 
         gc.collect()
         return df, "OK"
@@ -749,15 +744,32 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 m_mask[:split_idx], v_mask[:split_idx]
             )
 
+            # 🔥 V201 FIX: EL LÁTIGO INSTITUCIONAL (FIN DEL ESPEJISMO DE PROFIT FACTOR) 🔥
             if nt >= 3: 
+                ado_actual = nt / max(1, dias_entrenamiento)
+                ado_target_safe = max(0.1, target_ado)
+                
                 if net > 0:
+                    # 1. MATAR EL ESPEJISMO DEL PROFIT FACTOR INFINITO (Tope máximo de 3.0x)
+                    safe_pf = min(pf, 3.0) 
+                    
+                    # 2. CASTIGOS POR RIESGO DE RUINA O SUERTE EXTREMA
                     penalty = 1.0
-                    if mdd > 20.0: penalty = (20.0 / mdd)
+                    if mdd > 20.0: penalty *= (20.0 / mdd)
                     if wr < 40.0: penalty *= (wr / 40.0) 
+                    
+                    # 3. EL LÁTIGO DEL ADO (Castiga severamente si ignora tu slider de frecuencia)
+                    ado_penalty = min(1.0, ado_actual / ado_target_safe)
+                    ado_penalty = max(0.01, ado_penalty) # Piso para no matar pioneros de 1 época
+                    
+                    # 4. BONO HFT LOGARÍTMICO (Acelera la búsqueda de la máquina registradora)
                     hft_bonus = np.log10(max(10, nt)) 
-                    fit_score = net * penalty * pf * hft_bonus
+                    
+                    # ECUACIÓN MAESTRA
+                    fit_score = net * penalty * safe_pf * ado_penalty * hft_bonus
                 else:
-                    fit_score = net - mdd
+                    ado_diff = abs(ado_actual - ado_target_safe) * 5
+                    fit_score = net - mdd - ado_diff
 
                 if fit_score > best_fit_live:
                     best_fit_live = fit_score; best_net_live = net; best_pf_live = pf; best_nt_live = nt
@@ -767,7 +779,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                         'macro': dna_macro, 'vol': dna_vol, 'hitbox': r_hitbox, 'therm_w': r_therm, 
                         'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 'net': net, 'winrate': wr, 
                         'pf': pf, 'nt': nt,
-                        'reinv': invest_pct, 'ado': nt / max(1, dias_entrenamiento), 'w_rsi': r_w_rsi, 'w_z': r_w_z, 
+                        'reinv': invest_pct, 'ado': ado_actual, 'w_rsi': r_w_rsi, 'w_z': r_w_z, 
                         'w_adx': r_w_adx, 'th_buy': r_th_b, 'th_sell': r_th_s, 'atr_tp': r_atr_tp, 'atr_sl': r_atr_sl
                     }
                     best_dna = bp.copy()
@@ -789,7 +801,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V200: {s_id}"
+            title = f"GENESIS LAB V201: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
