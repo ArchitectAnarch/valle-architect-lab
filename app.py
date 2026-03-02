@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V183':
+if st.session_state.get('app_version') != 'V184':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V183'
+    st.session_state['app_version'] = 'V184'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -44,7 +44,6 @@ def npshift_bool(arr, num, fill_value=False):
     else: result[:] = arr
     return result
 
-# 🔥 NÚCLEO C++ V183: LIMPIEZA TOTAL (SOLO RECIBE 13 PARÁMETROS) 🔥
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, 
     b_c, s_c, atr_tp_mult, atr_sl_mult, cap_ini, com_pct, invest_pct, slippage_pct):
@@ -58,7 +57,6 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
     
     for i in range(len(h_arr)):
         if en_pos:
-            # Primero evalúa Stop Loss para asegurar pesimismo extremo
             if l_arr[i] <= sl_p:
                 exec_p = sl_p * slip_out
                 ret = (exec_p - p_ent) / p_ent
@@ -72,7 +70,7 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 cap_act += profit
                 g_profit += profit; num_trades += 1; en_pos = False
                 if profit > 0: wins += 1
-            elif s_c[i]: # 🔥 Ya viene pre-filtrado por Numpy 🔥
+            elif s_c[i]:
                 exit_price = (o_arr[i+1] if i+1 < len(o_arr) else c_arr[i]) * slip_out
                 ret = (exit_price - p_ent) / p_ent; gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
                 cap_act += profit
@@ -87,7 +85,7 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
             if cap_act <= 0: break
             
         if not en_pos and i+1 < len(h_arr):
-            if b_c[i]: # 🔥 Ya viene pre-filtrado por Numpy 🔥
+            if b_c[i]:
                 if invest_pct > 0:
                     invest_amt = cap_act * (invest_pct / 100.0)
                 else:
@@ -159,7 +157,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     return curva.tolist(), 0.0, cap_act, registro_trades, en_pos, total_comms
 
 # ==========================================
-# 🧬 2. ARSENAL DE INDICADORES (ADN)
+# 🧬 2. ARSENAL DE INDICADORES
 # ==========================================
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
@@ -224,7 +222,7 @@ def save_champion(s_id, bp):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V183</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V184</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -310,7 +308,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V183.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V184.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = st.session_state.get(f'champion_{s_id}', {})
@@ -325,7 +323,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V183)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V184)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -722,7 +720,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             else:
                 pct_done = int(((c + 1) / chunks) * 100)
                 combos = (c + 1) * chunk_size
-                title = f"GENESIS LAB V183 (70% TRAIN): {s_id}"
+                title = f"GENESIS LAB V184 (70% TRAIN): {s_id}"
                 subtitle = f"Progreso: {pct_done}% | Combinaciones: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
                 color = "#00FFFF"
 
@@ -851,7 +849,9 @@ trinity_safe = macro_bull and not is_falling_knife
 [macdLine, signalLine, _] = ta.macd(close, 12, 26, 9)
 stoch_k = ta.sma(ta.stoch(close, high, low, 14), 3)
 stoch_d = ta.sma(stoch_k, 3)
-chop_v = 100 * math.log10(math.sum(atr, 14) / (ta.highest(high, 14) - ta.lowest(low, 14))) / math.log10(14)
+
+// 🔥 V184: ERROR DE CHOPPINESS REPARADO (ta.tr en vez de atr) 🔥
+chop_v = 100 * math.log10(math.sum(ta.tr, 14) / (ta.highest(high, 14) - ta.lowest(low, 14))) / math.log10(14)
 gaussian_clean = chop_v < 61.8
 
 local_high = ta.highest(high[1], 30)
@@ -1055,18 +1055,32 @@ bool signal_sell = ({s_cond}) or (math_score < {vault.get('th_sell',-999):.2f})
 float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
 float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
+    # 🔥 V184: EJECUCIÓN CUÁNTICA CERO REPAINTING 🔥
     ps_exec = """
 var float locked_atr = na
+var float expected_entry = na
 
+// Disparo de Entrada y "Anclaje" de Órdenes TP/SL en la misma milésima de segundo
 if signal_buy and strategy.position_size == 0 and window
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
     locked_atr := atr
+    expected_entry := close // Proxy de entrada para que el TP/SL se active INMEDIATAMENTE
 
+// Actualización de precisión cuando el trade es confirmado por el exchange
 if strategy.position_size > 0
-    float tp_price = strategy.position_avg_price + (locked_atr * atr_tp_mult)
-    float sl_price = strategy.position_avg_price - (locked_atr * atr_sl_mult)
+    expected_entry := strategy.position_avg_price
+
+// Ejecución Cuántica: El TP/SL existe desde el primer milisegundo del trade
+if not na(expected_entry)
+    float tp_price = expected_entry + (locked_atr * atr_tp_mult)
+    float sl_price = expected_entry - (locked_atr * atr_sl_mult)
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_message=wt_exit_long)
 
+// Limpieza de memoria al salir
+if strategy.position_size == 0 and not signal_buy
+    expected_entry := na
+
+// Salida Dinámica Matemática (Inteligencia Artificial)
 if signal_sell and strategy.position_size > 0
     strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
 
