@@ -23,9 +23,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V194':
+if st.session_state.get('app_version') != 'V195':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V194'
+    st.session_state['app_version'] = 'V195'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS C++
@@ -44,7 +44,6 @@ def npshift_bool(arr, num, fill_value=False):
     else: result[:] = arr
     return result
 
-# 🔥 V194: MOTOR C++ TURBO (Calcula el score matemático DENTRO de Numba) 🔥
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
     b_c, s_c, w_rsi, w_z, w_adx, th_buy, th_sell, 
@@ -59,7 +58,6 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
     
     for i in range(len(h_arr)):
         if en_pos:
-            # Primero evalúa Stop Loss para asegurar pesimismo extremo
             if l_arr[i] <= sl_p:
                 exec_p = sl_p * slip_out
                 ret = (exec_p - p_ent) / p_ent
@@ -74,7 +72,6 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 g_profit += profit; num_trades += 1; en_pos = False
                 if profit > 0: wins += 1
             else:
-                # Salida dinámica calculada milisegundo a milisegundo
                 score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
                 if s_c[i] or (score < th_sell):
                     exit_price = (o_arr[i+1] if i+1 < len(o_arr) else c_arr[i]) * slip_out
@@ -93,8 +90,11 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
         if not en_pos and i+1 < len(h_arr):
             score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
             if b_c[i] or (score > th_buy):
-                if invest_pct > 0: invest_amt = cap_act * (invest_pct / 100.0) 
-                else: invest_amt = cap_ini
+                if invest_pct > 0:
+                    invest_amt = cap_act * (invest_pct / 100.0) 
+                else:
+                    invest_amt = cap_ini
+                    
                 if invest_amt > cap_act: invest_amt = cap_act 
                 
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
@@ -162,18 +162,14 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
 # 🎲 MÓDULO DE ESTRÉS DE MONTE CARLO
 # ==========================================
 def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
-    if not trades_list or len(trades_list) < 5:
-        return None, 0.0
-    
+    if not trades_list or len(trades_list) < 5: return None, 0.0
     rets = [t['Ganancia_$'] for t in trades_list if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']]
     if not rets: return None, 0.0
-
     rets_arr = np.array(rets)
     n_trades = len(rets_arr)
     mc_curves = np.zeros((num_simulations, n_trades + 1))
     mc_curves[:, 0] = cap_ini
     ruined_count = 0
-    
     for i in range(num_simulations):
         np.random.shuffle(rets_arr)
         for j in range(n_trades):
@@ -182,7 +178,6 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
                 mc_curves[i, j+1:] = 0
                 ruined_count += 1
                 break
-                
     risk_of_ruin = (ruined_count / num_simulations) * 100.0
     return mc_curves, risk_of_ruin
 
@@ -245,7 +240,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V194</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V195</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -331,23 +326,10 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.session_state['deep_opt_state']['paused'] = True
             st.rerun()
 
-def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V194.0**\n\n"
-    res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
-    for s_id in estrategias:
-        v = st.session_state.get(f'champion_{s_id}', {})
-        opt_icon = "✅" if st.session_state.get(f'opt_status_{s_id}', False) else "➖"
-        res_str += f"🧬 **{s_id}** [{opt_icon}]\nNet Profit: ${v.get('net',0):,.2f} \nWin Rate: {v.get('winrate',0):.1f}%\n---\n"
-    return res_str
-
-st.sidebar.markdown("---")
-if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_univ_report"):
-    st.sidebar.text_area("Block Note Universal:", value=generar_reporte_universal(capital_inicial, comision_pct), height=200)
-
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V194)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V195)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -519,17 +501,18 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     cond_therm_sell_panic = is_abyss & a_vr
 
     tol = a_atr * 0.5; is_grav_sup = a_dsup < hitbox; is_grav_res = a_dres < hitbox
-    cross_up_res = (close > a_tres) and (nz(close[1]) <= nz(a_tres[1]))
-    cross_dn_sup = (close < a_tsup) and (nz(close[1]) >= nz(a_tsup[1]))
-    cond_lock_buy_bounce = is_grav_sup and (low <= a_tsup + tol) and (close > a_tsup) and vela_verde
-    cond_lock_buy_break = is_grav_res and cross_up_res and high_vol and vela_verde
-    cond_lock_sell_reject = is_grav_res and (high >= a_tres - tol) and (close < a_tres) and vela_roja
-    cond_lock_sell_breakd = is_grav_sup and cross_dn_sup and vela_roja
+    cross_up_res = (a_c > a_tres) & (a_c_s1 <= npshift(a_tres, 1, 0)); cross_dn_sup = (a_c < a_tsup) & (a_c_s1 >= npshift(a_tsup, 1, 0))
+    cond_lock_buy_bounce = is_grav_sup & (a_l <= a_tsup + tol) & (a_c > a_tsup) & a_vv
+    cond_lock_buy_break = is_grav_res & cross_up_res & a_hvol & a_vv
+    cond_lock_sell_reject = is_grav_res & (a_h >= a_tres - tol) & (a_c < a_tres) & a_vr
+    cond_lock_sell_breakd = is_grav_sup & cross_dn_sup & a_vr
 
-    flash_vol = (a_rvol > whale_f * 0.8) and (np.abs(a_c - a_o) > a_atr * 0.3)
-    whale_buy = flash_vol and vela_verde, whale_sell = flash_vol and vela_roja
+    # 🔥 FIX V195: Sintaxis correcta de Python/NumPy 🔥
+    flash_vol = (a_rvol > whale_f * 0.8) & (np.abs(a_c - a_o) > a_atr * 0.3)
+    whale_buy = flash_vol & a_vv
+    whale_sell = flash_vol & a_vr
     whale_memory = whale_buy | npshift_bool(whale_buy, 1) | npshift_bool(whale_buy, 2) | whale_sell | npshift_bool(whale_sell, 1) | npshift_bool(whale_sell, 2)
-    is_whale_icon = whale_buy and not nz(whale_buy[1])
+    is_whale_icon = whale_buy & ~npshift_bool(whale_buy, 1)
 
     rsi_vel = a_rsi - a_rsi_s1
     pre_pump = ((a_h > a_bbu) | (rsi_vel > 5)) & flash_vol & a_vv; pump_memory = pre_pump | npshift_bool(pre_pump, 1) | npshift_bool(pre_pump, 2)
@@ -537,8 +520,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     retro_peak = (a_rsi < 30) & (a_c < a_bbl); retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
-    support_buy = is_grav_sup and rsi_cross_up
-    support_sell = is_grav_res and rsi_cross_dn
+    support_buy = is_grav_sup & a_rcu; support_sell = is_grav_res & a_rcd
     div_bull = (a_l_s1 < a_l_s5) & (a_rsi_s1 > a_rsi_s5) & (a_rsi < 35); div_bear = (a_h_s1 > a_h_s5) & (a_rsi_s1 < a_rsi_s5) & (a_rsi > 65)
 
     buy_score = np.zeros(n_len); base_mask = retro_peak | k_break_up | support_buy | div_bull
@@ -601,10 +583,8 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     return s_dict
 
-# 🔥 V194: CAJA FUERTE GENÉTICA, HILL CLIMBING Y EVOLUCIÓN CONTINUA 🔥
+# 🔥 V195: CAJA FUERTE GENÉTICA, HILL CLIMBING Y EVOLUCIÓN CONTINUA 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None):
-    # Ya no dependemos de la memoria de la bóveda para la retención durante el bucle,
-    # solo para arrancar.
     vault = st.session_state.get(f'champion_{s_id}', {})
     
     best_fit_live = vault.get('fit', -float('inf'))
@@ -636,13 +616,11 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
     for c in range(chunks):
         if st.session_state.get('abort_opt', False): 
             st.warning("🛑 OPTIMIZACIÓN ABORTADA. Extrayendo el campeón retenido en memoria..."); 
-            # Interrumpimos el bucle, pero devolvemos lo mejor que tenemos.
             break
 
         for _ in range(chunk_size): 
             f_buy.fill(False); f_sell.fill(False)
             
-            # 🔥 EVOLUCIÓN CON CATACLISMO PARA SALIR DE ESTANCAMIENTOS 🔥
             if best_dna is not None: 
                 rand_val = random.random()
                 
@@ -748,7 +726,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             f_buy = f_buy_tactical & m_mask & v_mask
             f_sell = f_sell_tactical
             
-            # 🔥 EJECUCIÓN TURBO (PERCEPTRO ADENTRO) 🔥
             net, pf, nt, mdd, wr = simular_crecimiento_exponencial_ia_core(
                 a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx], a_atr[:split_idx], 
                 a_rsi[:split_idx], a_zscore[:split_idx], a_adx[:split_idx],
@@ -757,7 +734,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.05
             )
 
-            # 🔥 EVALUADOR DE FITNESS CRUEL Y REALISTA 🔥
             if nt >= 3: 
                 if net > 0:
                     penalty = 1.0
@@ -767,7 +743,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 else:
                     fit_score = net - mdd
 
-                # Si rompemos el récord, LO GUARDAMOS EN LA VARIABLE LOCAL PARA EL RETURN FINAL
                 if fit_score > best_fit_live:
                     best_fit_live = fit_score; best_net_live = net; best_pf_live = pf; best_nt_live = nt
                     bp = {
@@ -780,7 +755,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     }
                     best_dna = bp.copy()
                     
-                    # Y por redundancia de seguridad global, lo inyectamos al dict de la página.
                     st.session_state[f'champion_{s_id}'] = bp.copy()
                     st.session_state[f'opt_status_{s_id}'] = True
             
@@ -801,12 +775,10 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             else:
                 pct_done = int(((c + 1) / chunks) * 100)
                 combos = (c + 1) * chunk_size
-                title = f"GENESIS LAB V194 (70% TRAIN): {s_id}"
+                title = f"GENESIS LAB V195 (70% TRAIN): {s_id}"
                 subtitle = f"Progreso: {pct_done}% | Combinaciones: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
                 color = "#00FFFF"
 
-            # 🔥 UI HOLOGRÁFICA CORREGIDA 🔥
-            # Ahora muestra las ganancias reales y no un score inflado
             ph_holograma.markdown(f"""
             <style>
             .loader-container {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; text-align: center; background: rgba(0,0,0,0.95); padding: 35px; border-radius: 20px; border: 2px solid {color}; box-shadow: 0 0 50px {color};}}
@@ -822,7 +794,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             </div>
             """, unsafe_allow_html=True)
             
-    # DEVUELVE EL CAMPEÓN GUARDADO SIEMPRE, INCLUSO SI ABORTA
     return best_dna
 
 def run_backtest_eval(s_id, cap_ini, com_pct):
@@ -1036,9 +1007,11 @@ cond_lock_sell_reject = is_grav_res and (high >= a_tres - tol) and (close < a_tr
 cond_lock_sell_breakd = is_grav_sup and cross_dn_sup and vela_roja
 
 flash_vol = (rvol > whale_factor * 0.8) and (body_size > atr * 0.3)
-whale_buy = flash_vol and vela_verde, whale_sell = flash_vol and vela_roja
+whale_buy = flash_vol and vela_verde
+whale_sell = flash_vol and vela_roja
 whale_memory = whale_buy or nz(whale_buy[1]) or nz(whale_buy[2]) or whale_sell or nz(whale_sell[1]) or nz(whale_sell[2])
 is_whale_icon = whale_buy and not nz(whale_buy[1])
+
 rsi_vel = rsi_v - nz(rsi_v[1])
 pre_pump = (high > bbu or rsi_vel > 5) and flash_vol and vela_verde
 pump_memory = pre_pump or nz(pre_pump[1]) or nz(pre_pump[2])
