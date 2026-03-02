@@ -24,9 +24,9 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-if st.session_state.get('app_version') != 'V197':
+if st.session_state.get('app_version') != 'V198':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V197'
+    st.session_state['app_version'] = 'V198'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS Y GUARDIÁN DE MEMORIA
@@ -45,7 +45,6 @@ def npshift_bool(arr, num, fill_value=False):
     else: result[:] = arr
     return result
 
-# 🔥 V197 FIX: GUARDIÁN DE ESTADO (Previene KeyErrors de Streamlit) 🔥
 todas_las_armas_b = [
     'Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Jugg_Buy', 'Trinity_Buy', 
     'Commander_Buy', 'Lev_Buy', 'Q_Pink_Whale_Buy', 'Q_Lock_Bounce', 'Q_Lock_Break', 'Q_Neon_Up', 'Q_Defcon_Buy', 
@@ -65,7 +64,6 @@ def load_champion(s_id):
     if f'champion_{s_id}' in st.session_state:
         return st.session_state[f'champion_{s_id}']
     
-    # Intentar cargar desde archivo físico si existe
     try:
         if os.path.exists(f"champ_{s_id}.json"):
             with open(f"champ_{s_id}.json", "r") as f:
@@ -74,7 +72,6 @@ def load_champion(s_id):
                 return data
     except: pass
     
-    # Si no existe en memoria ni en disco, forjamos el ADN Base Virgen para evitar KeyErrors
     default_dna = {
         'b_team': [], 's_team': [], 
         'b_trigger': random.choice(todas_las_armas_b), 'b_confirm': random.choice(todas_las_armas_b), 'b_op': '&',
@@ -227,15 +224,6 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
     risk_of_ruin = (ruined_count / num_simulations) * 100.0
     return mc_curves, risk_of_ruin
 
-# ==========================================
-# 🧬 2. ARSENAL DE INDICADORES (PINE MAP)
-# ==========================================
-if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
-    st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
-
-estrategias = st.session_state['ai_algos']
-tab_id_map = {f"🤖 {ai_id}": ai_id for ai_id in estrategias}
-
 pine_map = {
     'Ping_Buy': 'ping_b', 'Ping_Sell': 'ping_s', 'Squeeze_Buy': 'squeeze_b', 'Squeeze_Sell': 'squeeze_s', 
     'Thermal_Buy': 'therm_b', 'Thermal_Sell': 'therm_s', 'Climax_Buy': 'climax_b', 'Climax_Sell': 'climax_s', 
@@ -266,7 +254,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V197</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V198</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -343,7 +331,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V197.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V198.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = load_champion(s_id)
@@ -358,7 +346,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V197)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V198)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -458,6 +446,10 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         target_start = pd.to_datetime(datetime.combine(start, datetime.min.time())) + timedelta(hours=offset)
         df = df[df.index >= target_start]
 
+        split_idx = int(len(df) * 0.70)
+        df['Is_Train'] = False
+        if len(df) > 0: df.loc[df.index[:split_idx], 'Is_Train'] = True
+
         gc.collect()
         return df, "OK"
     except Exception as e: return pd.DataFrame(), f"❌ ERROR FATAL GENERAL: {str(e)}"
@@ -531,6 +523,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     cond_lock_sell_reject = is_grav_res & (a_h >= a_tres - tol) & (a_c < a_tres) & a_vr
     cond_lock_sell_breakd = is_grav_sup & cross_dn_sup & a_vr
 
+    # 🔥 FIX V198: LÓGICA DE MATRICES NUMPY REPARADA 🔥
     flash_vol = (a_rvol > whale_f * 0.8) & (np.abs(a_c - a_o) > a_atr * 0.3)
     whale_buy = flash_vol & a_vv
     whale_sell = flash_vol & a_vr
@@ -543,9 +536,13 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     retro_peak = (a_rsi < 30) & (a_c < a_bbl); retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
-    support_buy = is_grav_sup and rsi_cross_up
-    support_sell = is_grav_res and rsi_cross_dn
-    div_bull = (a_l_s1 < a_l_s5) & (a_rsi_s1 > a_rsi_s5) & (a_rsi < 35); div_bear = (a_h_s1 > a_h_s5) & (a_rsi_s1 < a_rsi_s5) & (a_rsi > 65)
+    
+    # Reparación Exacta de rsi_cross_up
+    support_buy = is_grav_sup & a_rcu
+    support_sell = is_grav_res & a_rcd
+    
+    div_bull = (a_l_s1 < a_l_s5) & (a_rsi_s1 > a_rsi_s5) & (a_rsi < 35)
+    div_bear = (a_h_s1 > a_h_s5) & (a_rsi_s1 < a_rsi_s5) & (a_rsi > 65)
 
     buy_score = np.zeros(n_len); base_mask = retro_peak | k_break_up | support_buy | div_bull
     buy_score = np.where(base_mask & retro_peak, 50.0, np.where(base_mask & ~retro_peak, 30.0, buy_score))
@@ -607,7 +604,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     return s_dict
 
-# 🔥 V197: CAJA FUERTE GENÉTICA Y OPTIMIZACIÓN DEL 100% 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None):
     
     vault = load_champion(s_id)
@@ -627,7 +623,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
     start_time = time.time()
     n_len = len(a_c)
 
-    # 🔥 V197: OPTIMIZAMOS SOBRE EL 100% DE LA HISTORIA PARA EVITAR ESPEJISMOS 🔥
     split_idx = n_len
     dias_entrenamiento = max(1, dias_reales)
 
@@ -646,7 +641,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             if best_dna is not None: 
                 rand_val = random.random()
                 
-                # 70% Hill Climbing (Microajustes)
                 if rand_val < 0.7:
                     dna_b_trigger = best_dna.get('b_trigger', random.choice(todas_las_armas_b))
                     dna_b_confirm = best_dna.get('b_confirm', random.choice(todas_las_armas_b))
@@ -685,7 +679,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     r_th_b = max(0.0, min(100.0, r_th_b))
                     r_th_s = max(-100.0, min(0.0, r_th_s))
                 
-                # 30% CATACLISMO GENÉTICO
                 else:
                     dna_b_trigger = random.choice(todas_las_armas_b)
                     dna_b_confirm = random.choice(todas_las_armas_b)
@@ -705,7 +698,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     r_th_b = random.uniform(0.0, 100.0); r_th_s = random.uniform(-100.0, 0.0)
                     r_atr_tp = round(random.uniform(0.5, 15.0), 2); r_atr_sl = round(random.uniform(1.0, 10.0), 2)
             else: 
-                # PIONEROS
                 r_hitbox = random.choice([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]); r_therm = random.choice([3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
                 r_adx = random.choice([15.0, 20.0, 25.0, 30.0, 35.0]); r_whale = random.choice([1.5, 2.0, 2.5, 3.0, 3.5, 4.0])
                 dna_b_trigger = random.choice(todas_las_armas_b); dna_b_confirm = random.choice(todas_las_armas_b); dna_b_op = random.choice(['&', '|'])
@@ -761,7 +753,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 else:
                     fit_score = net - mdd
 
-                # 🔥 TATUAJE FÍSICO INMEDIATO 🔥
                 if fit_score > best_fit_live:
                     best_fit_live = fit_score; best_net_live = net; best_pf_live = pf; best_nt_live = nt
                     bp = {
@@ -777,40 +768,39 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     save_champion(s_id, bp)
                     st.session_state[f'opt_status_{s_id}'] = True
             
-        if c == 0 or c == (chunks - 1) or c % update_mod == 0:
-            global_start = deep_info.get('start_time', start_time) if deep_info else start_time
-            total_elapsed_sec = time.time() - global_start
-            h, rem = divmod(total_elapsed_sec, 3600)
-            m, s = divmod(rem, 60)
-            time_str = f"{int(h):02d}h:{int(m):02d}m:{int(s):02d}s"
+        global_start = deep_info.get('start_time', start_time) if deep_info else start_time
+        total_elapsed_sec = time.time() - global_start
+        h, rem = divmod(total_elapsed_sec, 3600)
+        m, s = divmod(rem, 60)
+        time_str = f"{int(h):02d}h:{int(m):02d}m:{int(s):02d}s"
 
-            if deep_info:
-                current_epoch_val = deep_info['current'] + (c+1)*(chunk_size)
-                macro_pct = int((current_epoch_val / deep_info['total']) * 100)
-                title = f"🌌 DEEP FORGE: {s_id}"
-                subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"
-                color = "#9932CC"
-            else:
-                pct_done = int(((c + 1) / chunks) * 100)
-                combos = (c + 1) * chunk_size
-                title = f"GENESIS LAB V197: {s_id}"
-                subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo: {time_str}"
-                color = "#00FFFF"
+        if deep_info:
+            current_epoch_val = deep_info['current'] + (c+1)*(chunk_size)
+            macro_pct = int((current_epoch_val / deep_info['total']) * 100)
+            title = f"🌌 DEEP FORGE: {s_id}"
+            subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"
+            color = "#9932CC"
+        else:
+            pct_done = int(((c + 1) / chunks) * 100)
+            combos = (c + 1) * chunk_size
+            title = f"GENESIS LAB V198: {s_id}"
+            subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo: {time_str}"
+            color = "#00FFFF"
 
-            ph_holograma.markdown(f"""
-            <style>
-            .loader-container {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; text-align: center; background: rgba(0,0,0,0.95); padding: 35px; border-radius: 20px; border: 2px solid {color}; box-shadow: 0 0 50px {color};}}
-            .rocket {{ font-size: 8rem; animation: spin 1s linear infinite; filter: drop-shadow(0 0 20px {color}); }}
-            @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
-            </style>
-            <div class="loader-container">
-                <div class="rocket">🧬</div>
-                <div style="color: {color}; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">{title}</div>
-                <div style="color: white; font-size: 1.3rem;">{subtitle}</div>
-                <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Récord Global (Neto Real): ${best_net_live:.2f}</div>
-                <div style="color: cyan; font-size: 1.0rem;">Trades: {best_nt_live} | Win Rate: {best_pf_live:.2f}x PF | Score IA: {best_fit_live:.1f}</div>
-            </div>
-            """, unsafe_allow_html=True)
+        ph_holograma.markdown(f"""
+        <style>
+        .loader-container {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; text-align: center; background: rgba(0,0,0,0.95); padding: 35px; border-radius: 20px; border: 2px solid {color}; box-shadow: 0 0 50px {color};}}
+        .rocket {{ font-size: 8rem; animation: spin 1s linear infinite; filter: drop-shadow(0 0 20px {color}); }}
+        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+        </style>
+        <div class="loader-container">
+            <div class="rocket">🧬</div>
+            <div style="color: {color}; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">{title}</div>
+            <div style="color: white; font-size: 1.3rem;">{subtitle}</div>
+            <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Récord Global (Neto Real): ${best_net_live:.2f}</div>
+            <div style="color: cyan; font-size: 1.0rem;">Trades: {best_nt_live} | Win Rate: {best_pf_live:.2f}x PF | Score IA: {best_fit_live:.1f}</div>
+        </div>
+        """, unsafe_allow_html=True)
             
     return best_dna
 
@@ -859,6 +849,31 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     
     eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.0)
     return df_strat, eq_curve, t_log, total_comms
+
+def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
+    if not trades_list or len(trades_list) < 5:
+        return None, 0.0
+    
+    rets = [t['Ganancia_$'] for t in trades_list if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']]
+    if not rets: return None, 0.0
+
+    rets_arr = np.array(rets)
+    n_trades = len(rets_arr)
+    mc_curves = np.zeros((num_simulations, n_trades + 1))
+    mc_curves[:, 0] = cap_ini
+    ruined_count = 0
+    
+    for i in range(num_simulations):
+        np.random.shuffle(rets_arr)
+        for j in range(n_trades):
+            mc_curves[i, j+1] = mc_curves[i, j] + rets_arr[j]
+            if mc_curves[i, j+1] <= 0:
+                mc_curves[i, j+1:] = 0
+                ruined_count += 1
+                break
+                
+    risk_of_ruin = (ruined_count / num_simulations) * 100.0
+    return mc_curves, risk_of_ruin
 
 def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0)
@@ -1140,6 +1155,7 @@ float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
 float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
 
+    # 🔥 V198 FIX: EJECUCIÓN 100% MATEMÁTICA (IGNORA EL MOTOR DE TRADINGVIEW) 🔥
     ps_exec = """
 var float locked_atr = na
 var float tp_price = na
@@ -1314,7 +1330,10 @@ if not dftr.empty:
         gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum(); gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
         pf_val = gpp / gll if gll > 0 else float('inf')
 
-# 🔥 V197: DETECTOR DE ESPEJISMOS ELIMINADO (100% SCOPE) 🔥
+vault['net'] = eq_curve[-1] - capital_inicial; vault['winrate'] = wr
+mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
+ado_val = tt / dias_reales if dias_reales > 0 else 0.0
+
 c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 c1.metric("Net Profit", f"${eq_curve[-1]-capital_inicial:,.2f}", f"{ret_pct:.2f}%")
 c2.metric("ALPHA", f"{alpha_pct:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
