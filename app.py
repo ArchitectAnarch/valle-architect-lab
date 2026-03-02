@@ -24,10 +24,10 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V202: ARRANQUE BLINDADO ANTI-CORRUPCIÓN 🔥
-if st.session_state.get('app_version') != 'V202':
+# 🔥 V203: BLINDAJE ABSOLUTO DE UI 🔥
+if st.session_state.get('app_version') != 'V203':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V202'
+    st.session_state['app_version'] = 'V203'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS Y GUARDIÁN DE MEMORIA
@@ -61,13 +61,6 @@ todas_las_armas_s = [
     'PA_Engulfing_Sell', 'PA_Pinbar_Sell', 'PA_3_Crows_Sell'
 ]
 
-# 1. INICIALIZACIÓN GLOBAL DE MEMORIA
-if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
-    st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
-
-estrategias = st.session_state['ai_algos']
-tab_id_map = {f"🤖 {ai_id}": ai_id for ai_id in estrategias}
-
 pine_map = {
     'Ping_Buy': 'ping_b', 'Ping_Sell': 'ping_s', 'Squeeze_Buy': 'squeeze_b', 'Squeeze_Sell': 'squeeze_s', 
     'Thermal_Buy': 'therm_b', 'Thermal_Sell': 'therm_s', 'Climax_Buy': 'climax_b', 'Climax_Sell': 'climax_s', 
@@ -90,7 +83,14 @@ pine_map = {
     'PA_3_Soldiers_Buy': 'pa_3_soldiers', 'PA_3_Crows_Sell': 'pa_3_crows'
 }
 
-# 🔥 GUARDIÁN BLINDADO (Anti-NoneType) 🔥
+# 1. INICIALIZACIÓN GLOBAL DE MEMORIA
+if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
+    st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
+
+estrategias = st.session_state['ai_algos']
+tab_id_map = {f"🤖 {ai_id}": ai_id for ai_id in estrategias}
+
+# 🔥 EL ÚNICO GUARDIÁN DE ESTADO (V203) 🔥
 def get_default_dna():
     return {
         'b_team': [], 's_team': [], 
@@ -102,10 +102,10 @@ def get_default_dna():
     }
 
 def get_safe_vault(s_id):
-    vault = None
-    if f'champion_{s_id}' in st.session_state:
-        vault = st.session_state[f'champion_{s_id}']
+    # 1. Intentar Memoria RAM
+    vault = st.session_state.get(f'champion_{s_id}')
     
+    # 2. Intentar Disco Duro
     if not vault or not isinstance(vault, dict):
         try:
             if os.path.exists(f"champ_{s_id}.json"):
@@ -115,6 +115,7 @@ def get_safe_vault(s_id):
                         vault = data
         except: pass
 
+    # 3. Forzar ADN Base (A prueba de balas)
     if not vault or not isinstance(vault, dict):
         vault = get_default_dna()
         
@@ -133,7 +134,7 @@ def save_champion(s_id, bp):
             json.dump(vault, f)
     except: pass
 
-# Carga de seguridad para la UI
+# Pre-carga de seguridad
 for s_id in estrategias:
     if f'opt_status_{s_id}' not in st.session_state: st.session_state[f'opt_status_{s_id}'] = False
     get_safe_vault(s_id)
@@ -272,7 +273,7 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V202</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V203</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -305,7 +306,7 @@ comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) /
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 style='text-align: center; color: lime;'>🤖 CÁMARA DE MUTACIÓN</h3>", unsafe_allow_html=True)
-global_epochs = st.sidebar.slider("Épocas de Evolución (x250)", 1, 1000, 50)
+global_epochs = st.sidebar.slider("Épocas de Evolución (x3000)", 1, 1000, 50)
 target_strats = st.sidebar.multiselect("🎯 Mutantes a Forjar:", estrategias, default=estrategias)
 
 if st.sidebar.button(f"🧠 DEEP MINE GLOBAL", type="primary", use_container_width=True, key="btn_global"):
@@ -349,7 +350,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V202.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V203.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = get_safe_vault(s_id)
@@ -362,9 +363,9 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
     st.sidebar.text_area("Block Note Universal:", value=generar_reporte_universal(capital_inicial, comision_pct), height=200)
 
 # ==========================================
-# 🛑 6. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
+# 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V202)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V203)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -463,6 +464,9 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         
         target_start = pd.to_datetime(datetime.combine(start, datetime.min.time())) + timedelta(hours=offset)
         df = df[df.index >= target_start]
+
+        split_idx = int(len(df) * 1.0)
+        df['Is_Train'] = True
 
         gc.collect()
         return df, "OK"
@@ -758,7 +762,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 m_mask[:split_idx], v_mask[:split_idx]
             )
 
-            # 🔥 LÁTIGO INSTITUCIONAL (Evaluación Anti-Espejismo) 🔥
             if nt >= 5: 
                 ado_actual = nt / max(1, dias_entrenamiento)
                 ado_target_safe = max(0.1, target_ado)
@@ -809,7 +812,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V202: {s_id}"
+            title = f"GENESIS LAB V203: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
@@ -875,6 +878,31 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     
     eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.0)
     return df_strat, eq_curve, t_log, total_comms
+
+def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
+    if not trades_list or len(trades_list) < 5:
+        return None, 0.0
+    
+    rets = [t['Ganancia_$'] for t in trades_list if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']]
+    if not rets: return None, 0.0
+
+    rets_arr = np.array(rets)
+    n_trades = len(rets_arr)
+    mc_curves = np.zeros((num_simulations, n_trades + 1))
+    mc_curves[:, 0] = cap_ini
+    ruined_count = 0
+    
+    for i in range(num_simulations):
+        np.random.shuffle(rets_arr)
+        for j in range(n_trades):
+            mc_curves[i, j+1] = mc_curves[i, j] + rets_arr[j]
+            if mc_curves[i, j+1] <= 0:
+                mc_curves[i, j+1:] = 0
+                ruined_count += 1
+                break
+                
+    risk_of_ruin = (ruined_count / num_simulations) * 100.0
+    return mc_curves, risk_of_ruin
 
 def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0)
@@ -1201,17 +1229,14 @@ plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=locatio
 # ==========================================
 # 🛑 7. UI GLOBAL Y RENDERIZADO
 # ==========================================
+vault = get_safe_vault(s_id) # Carga ultra segura antes de la UI
+
 c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
-
-# 🔥 EXTRACCIÓN SEGURA DE VARIABLES UI 🔥
-ado_val_ui = float(vault.get('ado', 4.0)) if vault.get('ado') is not None else 4.0
-reinv_val_ui = float(vault.get('reinv', 20.0)) if vault.get('reinv') is not None else 20.0
-
-ado_ui = c_ia1.slider("🎯 Target ADO (IA Override)", 0.0, 100.0, value=ado_val_ui, key=f"ui_{s_id}_ado_w", step=0.5)
-reinv_ui = c_ia2.slider("💵 Reinversión % (IA Override)", 0.0, 100.0, value=reinv_val_ui, key=f"ui_{s_id}_reinv_w", step=5.0)
+ado_ui = c_ia1.slider("🎯 Target ADO (IA Override)", 0.0, 100.0, value=float(vault.get('ado', 4.0)), key=f"ui_{s_id}_ado_w", step=0.5)
+reinv_ui = c_ia2.slider("💵 Reinversión % (IA Override)", 0.0, 100.0, value=float(vault.get('reinv', 20.0)), key=f"ui_{s_id}_reinv_w", step=5.0)
 
 c_ps1, c_ps2 = st.columns(2)
-ps_buy_pct = c_ps1.number_input("🟢 % Inversión Compra (Pine Script)", min_value=0, max_value=100, value=int(reinv_val_ui), step=1, key=f"ui_{s_id}_ps_buy")
+ps_buy_pct = c_ps1.number_input("🟢 % Inversión Compra (Pine Script)", min_value=0, max_value=100, value=int(vault.get('reinv', 20.0)), step=1, key=f"ui_{s_id}_ps_buy")
 ps_sell_pct = c_ps2.number_input("🔴 % Desinversión Venta (Pine Script)", min_value=1, max_value=100, value=100, step=1, key=f"ui_{s_id}_ps_sell")
 
 st.session_state[f'champion_{s_id}']['ado'] = ado_ui
