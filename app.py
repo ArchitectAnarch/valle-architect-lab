@@ -24,10 +24,10 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V201 FIX: EL LÁTIGO INSTITUCIONAL 🔥
-if st.session_state.get('app_version') != 'V201':
+# 🔥 V202 FIX: ARRANQUE LIMPIO Y ANTI-CRASH 🔥
+if st.session_state.get('app_version') != 'V202':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V201'
+    st.session_state['app_version'] = 'V202'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS Y GUARDIÁN DE MEMORIA
@@ -90,7 +90,6 @@ pine_map = {
     'PA_3_Soldiers_Buy': 'pa_3_soldiers', 'PA_3_Crows_Sell': 'pa_3_crows'
 }
 
-# 3. GUARDIÁN FÍSICO DE LA BÓVEDA
 def load_champion(s_id):
     if f'champion_{s_id}' in st.session_state:
         return st.session_state[f'champion_{s_id}']
@@ -123,6 +122,7 @@ def save_champion(s_id, bp):
             json.dump(vault, f)
     except: pass
 
+# Carga de seguridad
 for s_id in estrategias:
     if f'opt_status_{s_id}' not in st.session_state: st.session_state[f'opt_status_{s_id}'] = False
     load_champion(s_id)
@@ -261,7 +261,7 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V201</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V202</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -294,7 +294,7 @@ comision_pct = st.sidebar.number_input("Comisión (%)", value=0.25, step=0.05) /
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 style='text-align: center; color: lime;'>🤖 CÁMARA DE MUTACIÓN</h3>", unsafe_allow_html=True)
-global_epochs = st.sidebar.slider("Épocas de Evolución (x3000)", 1, 1000, 50)
+global_epochs = st.sidebar.slider("Épocas de Evolución (x250)", 1, 1000, 50)
 target_strats = st.sidebar.multiselect("🎯 Mutantes a Forjar:", estrategias, default=estrategias)
 
 if st.sidebar.button(f"🧠 DEEP MINE GLOBAL", type="primary", use_container_width=True, key="btn_global"):
@@ -337,23 +337,10 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.session_state['deep_opt_state']['paused'] = True
             st.rerun()
 
-def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V201.0**\n\n"
-    res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
-    for s_id in estrategias:
-        v = load_champion(s_id)
-        opt_icon = "✅" if st.session_state.get(f'opt_status_{s_id}', False) else "➖"
-        res_str += f"🧬 **{s_id}** [{opt_icon}]\nNet Profit: ${v.get('net',0):,.2f} \nWin Rate: {v.get('winrate',0):.1f}%\n---\n"
-    return res_str
-
-st.sidebar.markdown("---")
-if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_univ_report"):
-    st.sidebar.text_area("Block Note Universal:", value=generar_reporte_universal(capital_inicial, comision_pct), height=200)
-
 # ==========================================
-# 🛑 6. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
+# 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V201)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V202)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -452,6 +439,9 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         
         target_start = pd.to_datetime(datetime.combine(start, datetime.min.time())) + timedelta(hours=offset)
         df = df[df.index >= target_start]
+
+        split_idx = int(len(df) * 1.0) # V202: Entrenamiento en el 100% de los datos para evitar ilusiones
+        df['Is_Train'] = True
 
         gc.collect()
         return df, "OK"
@@ -605,8 +595,8 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     return s_dict
 
+# 🔥 V202: THE QUANTUM ENGINE (Anti-OOM, Hill Climbing Dinámico) 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None):
-    
     vault = load_champion(s_id)
     
     best_fit_live = vault.get('fit', -float('inf'))
@@ -618,8 +608,9 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
     if best_fit_live != -float('inf'):
         best_dna = vault.copy()
 
-    iters = 3000 * epochs
-    chunk_size = 2000
+    # 🔥 V202 FIX: Reducción de Chunk para evitar EOF de Streamlit 🔥
+    iters = 250 * epochs
+    chunk_size = 250 
     chunks = max(1, iters // chunk_size)
     start_time = time.time()
     n_len = len(a_c)
@@ -630,7 +621,9 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
     default_f = np.zeros(n_len, dtype=bool)
     ones_mask = np.ones(n_len, dtype=bool)
 
-    macro_cache = {}
+    # 🔥 V202 FIX: Eliminación del Macro Cache para evitar sobrecarga de RAM (OOM) 🔥
+    last_macro_params = None
+    cached_s_dict = None
 
     for c in range(chunks):
         if st.session_state.get('abort_opt', False): 
@@ -642,31 +635,20 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             if best_dna is not None: 
                 rand_val = random.random()
                 
-                if rand_val < 0.7:
+                # 50% Micro-Mutación (Ajuste fino de pesos)
+                if rand_val < 0.50:
                     dna_b_trigger = best_dna.get('b_trigger', random.choice(todas_las_armas_b))
                     dna_b_confirm = best_dna.get('b_confirm', random.choice(todas_las_armas_b))
                     dna_b_op = best_dna.get('b_op', '&')
-                    
                     dna_s_trigger = best_dna.get('s_trigger', random.choice(todas_las_armas_s))
                     dna_s_confirm = best_dna.get('s_confirm', random.choice(todas_las_armas_s))
                     dna_s_op = best_dna.get('s_op', '&')
-                    
-                    if random.random() < 0.15: dna_b_trigger = random.choice(todas_las_armas_b)
-                    if random.random() < 0.15: dna_s_trigger = random.choice(todas_las_armas_s)
-                    if random.random() < 0.05: dna_b_op = random.choice(['&', '|'])
-                    
                     dna_macro = best_dna.get('macro', 'All-Weather')
                     dna_vol = best_dna.get('vol', 'All-Weather')
                     r_hitbox = best_dna.get('hitbox', 1.5)
                     r_therm = best_dna.get('therm_w', 4.0)
                     r_adx = best_dna.get('adx_th', 25.0)
                     r_whale = best_dna.get('whale_f', 2.5)
-
-                    if random.random() < 0.1:
-                        target_env = random.choice(['hb', 'th', 'adx', 'wh'])
-                        if target_env == 'hb': r_hitbox = random.choice([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
-                        elif target_env == 'th': r_therm = random.choice([3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
-                        elif target_env == 'adx': r_adx = random.choice([15.0, 20.0, 25.0, 30.0, 35.0])
 
                     r_w_rsi = best_dna.get('w_rsi', 0.0) + random.gauss(0, 0.1)
                     r_w_z = best_dna.get('w_z', 0.0) + random.gauss(0, 0.5) 
@@ -676,10 +658,32 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     r_atr_tp = max(0.1, best_dna.get('atr_tp', 2.0) + random.gauss(0, 0.2))
                     r_atr_sl = max(0.1, best_dna.get('atr_sl', 1.0) + random.gauss(0, 0.2))
                     
-                    r_w_z = max(-10.0, min(10.0, r_w_z))
-                    r_th_b = max(0.0, min(100.0, r_th_b))
-                    r_th_s = max(-100.0, min(0.0, r_th_s))
-                
+                # 35% Mutación Estructural (Salto para salir de Mínimo Local)
+                elif rand_val < 0.85:
+                    dna_b_trigger = random.choice(todas_las_armas_b) if random.random() < 0.5 else best_dna.get('b_trigger')
+                    dna_b_confirm = random.choice(todas_las_armas_b) if random.random() < 0.5 else best_dna.get('b_confirm')
+                    dna_b_op = random.choice(['&', '|']) if random.random() < 0.5 else best_dna.get('b_op')
+                    dna_s_trigger = random.choice(todas_las_armas_s) if random.random() < 0.5 else best_dna.get('s_trigger')
+                    dna_s_confirm = random.choice(todas_las_armas_s) if random.random() < 0.5 else best_dna.get('s_confirm')
+                    dna_s_op = random.choice(['&', '|']) if random.random() < 0.5 else best_dna.get('s_op')
+                    dna_macro = random.choice(["All-Weather", "Bull Only", "Bear Only", "Organic_Vol", "Organic_Squeeze", "Organic_Safe"]) if random.random() < 0.5 else best_dna.get('macro')
+                    dna_vol = random.choice(["All-Weather", "Trend", "Range", "Organic_Pump", "Organic_Dump"]) if random.random() < 0.5 else best_dna.get('vol')
+                    
+                    r_hitbox = best_dna.get('hitbox', 1.5)
+                    r_therm = best_dna.get('therm_w', 4.0)
+                    r_adx = best_dna.get('adx_th', 25.0)
+                    r_whale = best_dna.get('whale_f', 2.5)
+
+                    # Mantiene la inteligencia de los pesos aprendida
+                    r_w_rsi = best_dna.get('w_rsi', 0.0)
+                    r_w_z = best_dna.get('w_z', 0.0) 
+                    r_w_adx = best_dna.get('w_adx', 0.0) 
+                    r_th_b = best_dna.get('th_buy', 50.0) 
+                    r_th_s = best_dna.get('th_sell', -50.0) 
+                    r_atr_tp = best_dna.get('atr_tp', 2.0) 
+                    r_atr_sl = best_dna.get('atr_sl', 1.0) 
+
+                # 15% CATACLISMO GENÉTICO (Exploración de la Frontera)
                 else:
                     dna_b_trigger = random.choice(todas_las_armas_b)
                     dna_b_confirm = random.choice(todas_las_armas_b)
@@ -698,7 +702,14 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     r_w_rsi = random.uniform(-2.0, 2.0); r_w_z = random.uniform(-10.0, 10.0); r_w_adx = random.uniform(-2.0, 2.0)
                     r_th_b = random.uniform(0.0, 100.0); r_th_s = random.uniform(-100.0, 0.0)
                     r_atr_tp = round(random.uniform(0.5, 15.0), 2); r_atr_sl = round(random.uniform(1.0, 10.0), 2)
+                
+                # Barreras matemáticas para que el genoma no estalle
+                r_w_z = max(-10.0, min(10.0, r_w_z))
+                r_th_b = max(0.0, min(100.0, r_th_b))
+                r_th_s = max(-100.0, min(0.0, r_th_s))
+
             else: 
+                # PIONEROS
                 r_hitbox = random.choice([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]); r_therm = random.choice([3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
                 r_adx = random.choice([15.0, 20.0, 25.0, 30.0, 35.0]); r_whale = random.choice([1.5, 2.0, 2.5, 3.0, 3.5, 4.0])
                 dna_b_trigger = random.choice(todas_las_armas_b); dna_b_confirm = random.choice(todas_las_armas_b); dna_b_op = random.choice(['&', '|'])
@@ -709,10 +720,12 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 r_th_b = random.uniform(0.0, 100.0); r_th_s = random.uniform(-100.0, 0.0)
                 r_atr_tp = round(random.uniform(0.5, 15.0), 2); r_atr_sl = round(random.uniform(1.0, 10.0), 2)
 
+            # 🔥 CÁLCULO DINÁMICO (Sin fugas de RAM) 🔥
             current_macro_params = (r_hitbox, r_therm, r_adx, r_whale)
-            if current_macro_params not in macro_cache:
-                macro_cache[current_macro_params] = calcular_señales_numpy(r_hitbox, r_therm, r_adx, r_whale)
-            s_dict = macro_cache[current_macro_params]
+            if current_macro_params != last_macro_params or cached_s_dict is None:
+                cached_s_dict = calcular_señales_numpy(r_hitbox, r_therm, r_adx, r_whale)
+                last_macro_params = current_macro_params
+            s_dict = cached_s_dict
 
             m_mask_dict = {
                 "Bull Only": a_mb, "Bear Only": ~a_mb, "Organic_Vol": s_dict['Organic_Vol'],
@@ -726,8 +739,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 "All-Weather": ones_mask, "Ignore": ones_mask
             }
             
-            m_mask = m_mask_dict[dna_macro]
-            v_mask = v_mask_dict[dna_vol]
+            m_mask = m_mask_dict.get(dna_macro, ones_mask)
+            v_mask = v_mask_dict.get(dna_vol, ones_mask)
             
             if dna_b_op == '&': f_buy_tactical = s_dict.get(dna_b_trigger, default_f) & s_dict.get(dna_b_confirm, default_f)
             else: f_buy_tactical = s_dict.get(dna_b_trigger, default_f) | s_dict.get(dna_b_confirm, default_f)
@@ -744,28 +757,22 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 m_mask[:split_idx], v_mask[:split_idx]
             )
 
-            # 🔥 V201 FIX: EL LÁTIGO INSTITUCIONAL (FIN DEL ESPEJISMO DE PROFIT FACTOR) 🔥
-            if nt >= 3: 
+            # 🔥 LÁTIGO INSTITUCIONAL (Evaluación Anti-Espejismo) 🔥
+            if nt >= 5: 
                 ado_actual = nt / max(1, dias_entrenamiento)
                 ado_target_safe = max(0.1, target_ado)
                 
                 if net > 0:
-                    # 1. MATAR EL ESPEJISMO DEL PROFIT FACTOR INFINITO (Tope máximo de 3.0x)
                     safe_pf = min(pf, 3.0) 
-                    
-                    # 2. CASTIGOS POR RIESGO DE RUINA O SUERTE EXTREMA
                     penalty = 1.0
                     if mdd > 20.0: penalty *= (20.0 / mdd)
                     if wr < 40.0: penalty *= (wr / 40.0) 
                     
-                    # 3. EL LÁTIGO DEL ADO (Castiga severamente si ignora tu slider de frecuencia)
                     ado_penalty = min(1.0, ado_actual / ado_target_safe)
-                    ado_penalty = max(0.01, ado_penalty) # Piso para no matar pioneros de 1 época
+                    ado_penalty = max(0.01, ado_penalty) 
                     
-                    # 4. BONO HFT LOGARÍTMICO (Acelera la búsqueda de la máquina registradora)
                     hft_bonus = np.log10(max(10, nt)) 
                     
-                    # ECUACIÓN MAESTRA
                     fit_score = net * penalty * safe_pf * ado_penalty * hft_bonus
                 else:
                     ado_diff = abs(ado_actual - ado_target_safe) * 5
@@ -801,7 +808,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V201: {s_id}"
+            title = f"GENESIS LAB V202: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
@@ -867,31 +874,6 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     
     eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.0)
     return df_strat, eq_curve, t_log, total_comms
-
-def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
-    if not trades_list or len(trades_list) < 5:
-        return None, 0.0
-    
-    rets = [t['Ganancia_$'] for t in trades_list if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']]
-    if not rets: return None, 0.0
-
-    rets_arr = np.array(rets)
-    n_trades = len(rets_arr)
-    mc_curves = np.zeros((num_simulations, n_trades + 1))
-    mc_curves[:, 0] = cap_ini
-    ruined_count = 0
-    
-    for i in range(num_simulations):
-        np.random.shuffle(rets_arr)
-        for j in range(n_trades):
-            mc_curves[i, j+1] = mc_curves[i, j] + rets_arr[j]
-            if mc_curves[i, j+1] <= 0:
-                mc_curves[i, j+1:] = 0
-                ruined_count += 1
-                break
-                
-    risk_of_ruin = (ruined_count / num_simulations) * 100.0
-    return mc_curves, risk_of_ruin
 
 def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0)
@@ -1216,114 +1198,22 @@ plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=locatio
     return ps_base + ps_indicators + ps_logic + ps_exec
 
 # ==========================================
-# 🛑 7. EJECUCIÓN GLOBAL (COLA ASÍNCRONA)
+# 🛑 7. UI GLOBAL Y RENDERIZADO
 # ==========================================
-if 'global_queue' not in st.session_state:
-    st.session_state['global_queue'] = []
-
-if st.session_state.get('run_global', False):
-    time.sleep(0.1) 
-    if len(st.session_state['global_queue']) > 0:
-        s_id = st.session_state['global_queue'].pop(0)
-        ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid cyan; border-radius: 10px;'><h2 style='color:cyan;'>⚙️ Forjando ADN: {s_id}...</h2><h4 style='color:lime;'>Quedan {len(st.session_state['global_queue'])} mutantes en incubación.</h4></div>", unsafe_allow_html=True)
-        time.sleep(0.1)
-        
-        v = load_champion(s_id)
-        buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
-        buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
-        
-        bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=global_epochs, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))))
-        
-        st.rerun()
-    else:
-        st.session_state['run_global'] = False
-        ph_holograma.empty()
-        st.sidebar.success("✅ ¡Incubación Genética Completada!")
-        time.sleep(2); st.rerun()
-
-# ==========================================
-# 🌌 8. EJECUCIÓN PROFUNDA (DEEP FORGE STANDBY)
-# ==========================================
-deep_state = st.session_state.get('deep_opt_state', {})
-if deep_state and not deep_state.get('paused', False) and deep_state.get('current_epoch', 0) < deep_state.get('target_epochs', 0):
-    time.sleep(0.1) 
-    
-    chunk = 50 
-    if deep_state['target_epochs'] - deep_state['current_epoch'] < chunk:
-        chunk = deep_state['target_epochs'] - deep_state['current_epoch']
-        
-    s_id = deep_state['s_id']
-    v = load_champion(s_id)
-    buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
-    buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
-    
-    deep_info = {'current': deep_state['current_epoch'], 'total': deep_state['target_epochs'], 'start_time': deep_state.get('start_time', time.time())}
-    
-    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=chunk, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=deep_info)
-    
-    st.session_state['deep_opt_state']['current_epoch'] += chunk
-    
-    if st.session_state['deep_opt_state']['current_epoch'] >= deep_state['target_epochs']:
-        st.session_state['deep_opt_state']['paused'] = True
-        ph_holograma.empty()
-        st.sidebar.success(f"🌌 ¡FORJA PROFUNDA COMPLETADA PARA {s_id}!")
-        time.sleep(2)
-        
-    st.rerun()
-
-st.title("🛡️ GENESIS LAB - The Omni-Brain")
-
-with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Neta)", expanded=False):
-    leaderboard_data = []
-    for s in estrategias:
-        v = load_champion(s)
-        fit = v.get('fit', -float('inf'))
-        opt_str = "✅" if fit != -float('inf') else "➖ No Opt"
-        net_val = v.get('net', 0)
-        leaderboard_data.append({"Mutante": s, "Neto_Num": net_val, "Rentabilidad": f"${net_val:,.2f}", "WinRate": f"{v.get('winrate', 0):.1f}%", "Estado": opt_str})
-    
-    leaderboard_data.sort(key=lambda x: x['Neto_Num'], reverse=True)
-    for item in leaderboard_data: del item['Neto_Num']
-    st.table(pd.DataFrame(leaderboard_data))
-
-st.markdown("<h3 style='text-align: center; color: #00FF00;'>🎡 CARRUSEL DE MUTANTES IA</h3>", unsafe_allow_html=True)
-tab_names = list(tab_id_map.keys())
-selected_tab_name = st.selectbox("Selecciona un Espécimen:", tab_names, index=len(tab_names)-1)
-
-s_id = tab_id_map[selected_tab_name]
-is_opt = st.session_state.get(f'opt_status_{s_id}', False)
-opt_badge = "<span style='color: lime;'>✅ ADN OPTIMIZADO</span>" if is_opt else "<span style='color: gray;'>➖ ADN VIRGEN</span>"
-vault = load_champion(s_id)
-
-st.markdown(f"### {selected_tab_name} {opt_badge}", unsafe_allow_html=True)
-
-with st.expander("🧬 VER ADN DEL MUTANTE Y ARMAS TÁCTICAS", expanded=True):
-    st.markdown(f"**🟢 Gatillo Compra:** `{vault.get('b_trigger', '')}` | **Operador:** `{vault.get('b_op', '')}` | **Confirmador:** `{vault.get('b_confirm', '')}`")
-    st.markdown(f"**🔴 Gatillo Venta:** `{vault.get('s_trigger', '')}` | **Operador:** `{vault.get('s_op', '')}` | **Confirmador:** `{vault.get('s_confirm', '')}`")
-    st.markdown(f"**🌍 Clima Macro:** `{vault.get('macro', '')}` | **🌪️ Clima Volatilidad:** `{vault.get('vol', '')}`")
-    st.markdown(f"**🎛️ Pesos del Perceptrón:** RSI: `{vault.get('w_rsi',0):.2f}` | Z-Score: `{vault.get('w_z',0):.2f}` | ADX: `{vault.get('w_adx',0):.2f}`")
-    st.markdown(f"**📏 Gatillos Sensibles:** Buy > `{vault.get('th_buy',0):.2f}` | Sell < `{vault.get('th_sell',0):.2f}`")
-    st.markdown(f"**🎯 Camaleón ATR (Toma de Ganancias):** TP: `{vault.get('atr_tp',0):.2f}x` | SL: `{vault.get('atr_sl',0):.2f}x`")
-
 c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
-st.session_state[f'champion_{s_id}']['ado'] = c_ia1.slider("🎯 Target ADO (IA Override)", 0.0, 100.0, value=float(vault.get('ado', 4.0)), key=f"ui_{s_id}_ado_w", step=0.5)
-st.session_state[f'champion_{s_id}']['reinv'] = c_ia2.slider("💵 Reinversión % (IA Override)", 0.0, 100.0, value=float(vault.get('reinv', 20.0)), key=f"ui_{s_id}_reinv_w", step=5.0)
+ado_ui = c_ia1.slider("🎯 Target ADO (IA Override)", 0.0, 100.0, value=float(vault.get('ado', 4.0)), key=f"ui_{s_id}_ado_w", step=0.5)
+reinv_ui = c_ia2.slider("💵 Reinversión % (IA Override)", 0.0, 100.0, value=float(vault.get('reinv', 20.0)), key=f"ui_{s_id}_reinv_w", step=5.0)
 
 c_ps1, c_ps2 = st.columns(2)
 ps_buy_pct = c_ps1.number_input("🟢 % Inversión Compra (Pine Script)", min_value=0, max_value=100, value=int(vault.get('reinv', 20.0)), step=1, key=f"ui_{s_id}_ps_buy")
 ps_sell_pct = c_ps2.number_input("🔴 % Desinversión Venta (Pine Script)", min_value=1, max_value=100, value=100, step=1, key=f"ui_{s_id}_ps_sell")
 
-st.session_state[f'champion_{s_id}']['reinv'] = ps_buy_pct 
-
 c_btn1, c_btn2 = c_ia3.columns(2)
 if c_btn1.button(f"🚀 FORJAR RÁPIDO ({global_epochs*3}k)", type="primary", key=f"btn_opt_{s_id}"):
     st.session_state['abort_opt'] = False
-    ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid #FF00FF; border-radius: 10px;'><h2 style='color:#FF00FF;'>🚀 Mutando {s_id}...</h2></div>", unsafe_allow_html=True)
-    time.sleep(0.1)
-    buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
-    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(ps_buy_pct), float(vault.get('ado', 4.0)), dias_reales, capital_inicial * (buy_hold_ret / 100.0), epochs=global_epochs, cur_net=float(vault.get('net', -float('inf'))), cur_fit=float(vault.get('fit', -float('inf'))))
-    st.success("👑 ¡Mutante Forjado!")
-    time.sleep(1); ph_holograma.empty(); st.rerun()
+    st.session_state['global_queue'] = [s_id]
+    st.session_state['run_global'] = True
+    st.rerun()
 
 if c_btn2.button(f"🌌 ACTIVAR FORJA PROFUNDA", type="secondary", key=f"btn_deep_{s_id}"):
     st.session_state['abort_opt'] = False
@@ -1376,35 +1266,13 @@ else:
     c_mc1.success(f"🛡️ RIESGO DE RUINA: {risk_of_ruin:.1f}%")
     c_mc1.caption("Mutante Anti-Frágil. Listo para la guerra.")
 
-# --- GRÁFICO DE MONTE CARLO ---
 if mc_curves is not None:
     fig_mc = go.Figure()
-    
     for i in range(min(50, len(mc_curves))):
-        fig_mc.add_trace(go.Scatter(
-            y=mc_curves[i], 
-            mode='lines', 
-            line=dict(color='rgba(255, 255, 255, 0.1)', width=1),
-            hoverinfo='skip'
-        ))
-        
+        fig_mc.add_trace(go.Scatter(y=mc_curves[i], mode='lines', line=dict(color='rgba(255, 255, 255, 0.1)', width=1), hoverinfo='skip'))
     real_curve = [capital_inicial] + [capital_inicial + sum([t['Ganancia_$'] for t in t_log if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']][:k+1]) for k in range(len([t for t in t_log if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']]))]
-    
-    fig_mc.add_trace(go.Scatter(
-        y=real_curve, 
-        mode='lines', 
-        name='Histórico Real',
-        line=dict(color='gold', width=3)
-    ))
-    
-    fig_mc.update_layout(
-        title='Proyección Estocástica de Equidad (500 Realidades Alternativas)',
-        template='plotly_dark',
-        height=300,
-        margin=dict(l=10, r=10, t=30, b=10),
-        showlegend=False,
-        yaxis_title='Capital ($)'
-    )
+    fig_mc.add_trace(go.Scatter(y=real_curve, mode='lines', name='Histórico Real', line=dict(color='gold', width=3)))
+    fig_mc.update_layout(title='Proyección Estocástica de Equidad (500 Realidades Alternativas)', template='plotly_dark', height=300, margin=dict(l=10, r=10, t=30, b=10), showlegend=False, yaxis_title='Capital ($)')
     c_mc2.plotly_chart(fig_mc, use_container_width=True)
 
 with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expanded=False):
@@ -1412,15 +1280,9 @@ with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expan
     st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct, comision_pct, df_strat.index[0]), language="pine")
 
 st.markdown("---")
-st.info("🖱️ **TIP GRÁFICO:** Si las velas se ven aplanadas, haz **Doble Clic** dentro del gráfico o usa el botón **'Autoscale'** (Casita) en el menú de la esquina superior derecha.")
-
+st.info("🖱️ **TIP GRÁFICO:** Si las velas se ven aplanadas, haz **Doble Clic** dentro del gráfico.")
 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
-
-fig.add_trace(go.Candlestick(
-    x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], 
-    name="Precio", increasing_line_color='cyan', decreasing_line_color='magenta'
-), row=1, col=1)
-
+fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio", increasing_line_color='cyan', decreasing_line_color='magenta'), row=1, col=1)
 fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='Río Center (EMA 50)', line=dict(color='yellow', width=1, dash='dot')), row=1, col=1)
 fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='Macro Trend (EMA 200)', line=dict(color='purple', width=2)), row=1, col=1)
 fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['BBU'], mode='lines', name='Squeeze Top (BBU)', line=dict(color='rgba(128,128,128,0.5)', width=1)), row=1, col=1)
@@ -1434,32 +1296,11 @@ if not dftr.empty:
     loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
     fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white'))), row=1, col=1)
 
-# GRÁFICO INFERIOR: EJE Y SEPARADO PARA EQUIDAD
 fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
-
 y_min_force = df_strat['Low'].min() * 0.98
 y_max_force = df_strat['High'].max() * 1.02
-
 fig.update_xaxes(fixedrange=False)
 fig.update_yaxes(fixedrange=False, side="right", range=[y_min_force, y_max_force], row=1, col=1)
 fig.update_yaxes(fixedrange=False, side="right", row=2, col=1)
-
-fig.update_layout(
-    template='plotly_dark', 
-    height=800, 
-    xaxis_rangeslider_visible=False,
-    dragmode='pan',
-    hovermode='x unified',
-    margin=dict(l=10, r=50, t=30, b=10)
-)
-
-st.plotly_chart(
-    fig, 
-    use_container_width=True, 
-    key=f"chart_{s_id}", 
-    config={
-        'scrollZoom': True,
-        'displayModeBar': True,
-        'modeBarButtonsToRemove': ['lasso2d', 'select2d']
-    }
-)
+fig.update_layout(template='plotly_dark', height=800, xaxis_rangeslider_visible=False, dragmode='pan', hovermode='x unified', margin=dict(l=10, r=50, t=30, b=10))
+st.plotly_chart(fig, use_container_width=True, key=f"chart_{s_id}", config={'scrollZoom': True, 'displayModeBar': True, 'modeBarButtonsToRemove': ['lasso2d', 'select2d']})
