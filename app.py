@@ -23,10 +23,11 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V235: EMULADOR INTRABARRA Y DESTRUCCIÓN DE LA BARRA CIEGA 🔥
-if st.session_state.get('app_version') != 'V235':
+# 🔥 V236: PURGADOR DE CACHÉ Y SINTAXIS NUMPY CORREGIDA 🔥
+if st.session_state.get('app_version') != 'V236':
+    st.cache_data.clear() # Destructor de Caché Obligatorio
     st.session_state.clear()
-    st.session_state['app_version'] = 'V235'
+    st.session_state['app_version'] = 'V236'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS BASE
@@ -140,7 +141,6 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
         if cap_act <= 0: break
         
         # 4. EVALUACIÓN DE ENTRADA (CERO CEGUERA TEMPORAL)
-        # Eliminamos "not cierra" para permitir re-entradas en la misma barra donde cerramos una operación
         if not en_pos and not pending_dyn_exit and i+1 < len(h_arr):
             score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
             if (b_c[i] or (score > th_buy)) and m_mask[i] and v_mask[i]:
@@ -152,7 +152,6 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
-                # TP/SL ANCLADOS ABSOLUTOS
                 current_atr = atr_arr[i]
                 base_p = c_arr[i] 
                 tp_p = base_p + (current_atr * atr_tp_mult)
@@ -166,7 +165,7 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
     return (cap_act - cap_ini), pf, num_trades, max_dd, wr
 
 # ==========================================
-# 📊 SIMULADOR VISUAL (Sincronizado V235)
+# 📊 SIMULADOR VISUAL (Sincronizado V236)
 # ==========================================
 def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     registro_trades = []
@@ -300,7 +299,8 @@ def get_safe_vault(s_id):
             if os.path.exists(f"champ_{s_id}.json"):
                 with open(f"champ_{s_id}.json", "r") as f:
                     data = json.load(f)
-                    if data and isinstance(data, dict): vault = data
+                    if data and isinstance(data, dict):
+                        vault = data
         except: pass
     if not vault or not isinstance(vault, dict):
         vault = get_default_dna()
@@ -324,7 +324,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V235</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V236</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -402,7 +402,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V235.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V236.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = get_safe_vault(s_id)
@@ -433,7 +433,7 @@ def rma_pine(s, length):
                 out[i] = alpha * s[i] + (1.0 - alpha) * out[i-1]
     return out
 
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V235)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V236)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -480,8 +480,8 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         a_c = df['Close'].values
         a_o = df['Open'].values
             
-        df['EMA_200'] = df['Close'].ewm(span=200, min_periods=1, adjust=False).mean()
-        df['EMA_50'] = df['Close'].ewm(span=50, min_periods=1, adjust=False).mean()
+        df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
+        df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
         df['Vol_MA_20'] = df['Volume'].rolling(window=20).mean()
         df['Vol_MA_100'] = df['Volume'].rolling(window=100).mean()
         
@@ -535,27 +535,26 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['Stoch_D'] = df['Stoch_K'].rolling(3).mean()
 
         ap = (df['High'] + df['Low'] + df['Close']) / 3.0
-        esa = ap.ewm(span=10, min_periods=1, adjust=False).mean()
-        d_wt = (ap - esa).abs().ewm(span=10, min_periods=1, adjust=False).mean()
-        df['WT1'] = ((ap - esa) / (0.015 * np.where(d_wt == 0, 1, d_wt))).ewm(span=21, min_periods=1, adjust=False).mean()
-        df['WT2'] = df['WT1'].rolling(4, min_periods=1).mean()
+        esa = ap.ewm(span=10, adjust=False).mean()
+        d_wt = (ap - esa).abs().ewm(span=10, adjust=False).mean()
+        df['WT1'] = ((ap - esa) / (0.015 * np.where(d_wt == 0, 1, d_wt))).ewm(span=21, adjust=False).mean()
+        df['WT2'] = df['WT1'].rolling(4).mean()
         
-        df['Basis'] = df['Close'].rolling(20, min_periods=1).mean()
-        dev = df['Close'].rolling(20, min_periods=1).std(ddof=0)
+        df['Basis'] = df['Close'].rolling(20).mean()
+        dev = df['Close'].rolling(20).std(ddof=0)
         df['BBU'] = df['Basis'] + (2.0 * dev)
         df['BBL'] = df['Basis'] - (2.0 * dev)
         df['BB_Width'] = (df['BBU'] - df['BBL']) / np.where(df['Basis'] == 0, 1, df['Basis'])
-        df['BB_Width_Avg'] = df['BB_Width'].rolling(20, min_periods=1).mean()
+        df['BB_Width_Avg'] = df['BB_Width'].rolling(20).mean()
         df['BB_Delta'] = df['BB_Width'] - df['BB_Width'].shift(1).fillna(0)
-        df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10, min_periods=1).mean()
+        df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10).mean()
         
-        kc_basis = df['Close'].rolling(20, min_periods=1).mean()
-        df['KC_Upper'] = kc_basis + (df['ATR'] * 1.5)
-        df['KC_Lower'] = kc_basis - (df['ATR'] * 1.5)
+        df['KC_Upper'] = df['Basis'] + (df['ATR'] * 1.5)
+        df['KC_Lower'] = df['Basis'] - (df['ATR'] * 1.5)
         df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
         df['Z_Score'] = np.where(dev == 0, 0, (df['Close'] - df['Basis']) / dev)
-        df['RSI_BB_Basis'] = df['RSI'].rolling(14, min_periods=1).mean()
-        df['RSI_BB_Dev'] = df['RSI'].rolling(14, min_periods=1).std(ddof=0) * 2.0
+        df['RSI_BB_Basis'] = df['RSI'].rolling(14).mean()
+        df['RSI_BB_Dev'] = df['RSI'].rolling(14).std(ddof=0) * 2.0
         
         df['Vela_Verde'] = df['Close'] > df['Open']
         df['Vela_Roja'] = df['Close'] < df['Open']
@@ -727,6 +726,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     whale_memory = whale_buy | npshift_bool(whale_buy, 1) | npshift_bool(whale_buy, 2) | whale_sell | npshift_bool(whale_sell, 1) | npshift_bool(whale_sell, 2)
     is_whale_icon = whale_buy & ~npshift_bool(whale_buy, 1)
 
+    # 🔥 V236: SINTAXIS PINE SCRIPT DESTRUIDA - USO DE VECTORES PYTHON CORRECTOS 🔥
     rsi_vel = a_rsi - a_rsi_s1
     pre_pump = ((a_h > a_bbu) | (rsi_vel > 5)) & flash_vol & a_vv
     pump_memory = pre_pump | npshift_bool(pre_pump, 1) | npshift_bool(pre_pump, 2)
@@ -1077,7 +1077,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V235: {s_id}"
+            title = f"GENESIS LAB V236: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
