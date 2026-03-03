@@ -23,8 +23,8 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V238: CACHÉ FORZADO + PRECISIÓN DECIMAL EXACTA 🔥
-APP_VERSION = 'V238'
+# 🔥 V239: CACHÉ FORZADO + PRECISIÓN DECIMAL EXACTA + CÓDIGO COMPLETO 🔥
+APP_VERSION = 'V239'
 if st.session_state.get('app_version') != APP_VERSION:
     st.cache_data.clear()
     for key in list(st.session_state.keys()):
@@ -128,7 +128,7 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
-                # 🔥 V238: TRUNCADO A 5 DECIMALES PARA SINCRONÍA DE TICK 🔥
+                # 🔥 V239: TRUNCADO A 5 DECIMALES PARA SINCRONÍA DE TICK 🔥
                 current_atr = atr_arr[i]
                 base_p = c_arr[i] 
                 tp_p = np.round(base_p + (current_atr * atr_tp_mult), 5)
@@ -284,7 +284,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V238</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V239</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); st.session_state.clear(); gc.collect(); st.rerun()
 
@@ -331,7 +331,7 @@ def rma_pine(s, length):
             else: out[i] = alpha * s[i] + (1.0 - alpha) * out[i-1]
     return out
 
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V238)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V239)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -547,12 +547,8 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Trinity_Buy'] = a_mb & (a_rsi < 35) & a_vv & ~a_fk; s_dict['Trinity_Sell'] = (a_rsi > 75) | (a_c < a_ema200)
     s_dict['Lev_Buy'] = a_mb & a_rcu & (a_rsi < 45); s_dict['Lev_Sell'] = (a_c < a_ema200)
 
-    s_dict['Q_Pink_Whale_Buy'] = cond_pink_whale_buy; s_dict['Q_Lock_Bounce'] = cond_lock_buy_bounce; s_dict['Q_Lock_Break'] = cond_lock_buy_break
-    s_dict['Q_Neon_Up'] = neon_up; s_dict['Q_Defcon_Buy'] = cond_defcon_buy; s_dict['Q_Therm_Bounce'] = cond_therm_buy_bounce; s_dict['Q_Therm_Vacuum'] = cond_therm_buy_vacuum
-    s_dict['Q_Nuclear_Buy'] = is_magenta & (wt_oversold | wt_cross_up); s_dict['Q_Early_Buy'] = is_magenta; s_dict['Q_Rebound_Buy'] = a_rcu & ~is_magenta
-    s_dict['Q_Lock_Reject'] = cond_lock_sell_reject; s_dict['Q_Lock_Breakd'] = cond_lock_sell_breakd; s_dict['Q_Neon_Dn'] = neon_dn
-    s_dict['Q_Defcon_Sell'] = cond_defcon_sell; s_dict['Q_Therm_Wall_Sell'] = cond_therm_sell_wall; s_dict['Q_Therm_Panic_Sell'] = cond_therm_sell_panic
-    s_dict['Q_Nuclear_Sell'] = (a_rsi > 70) & (wt_overbought | wt_cross_dn); s_dict['Q_Early_Sell'] = (a_rsi > 70) & a_vr
+    s_dict['Q_Pink_Whale_Buy'] = cond_pink_whale_buy; s_dict['Q_Lock_Bounce'] = cond_lock_buy_bounce; s_dict['Q_Lock_Break'] = cond_lock_buy_break; s_dict['Q_Neon_Up'] = neon_up; s_dict['Q_Defcon_Buy'] = cond_defcon_buy; s_dict['Q_Therm_Bounce'] = cond_therm_buy_bounce; s_dict['Q_Therm_Vacuum'] = cond_therm_buy_vacuum; s_dict['Q_Nuclear_Buy'] = is_magenta & (wt_oversold | wt_cross_up); s_dict['Q_Early_Buy'] = is_magenta; s_dict['Q_Rebound_Buy'] = a_rcu & ~is_magenta
+    s_dict['Q_Lock_Reject'] = cond_lock_sell_reject; s_dict['Q_Lock_Breakd'] = cond_lock_sell_breakd; s_dict['Q_Neon_Dn'] = neon_dn; s_dict['Q_Defcon_Sell'] = cond_defcon_sell; s_dict['Q_Therm_Wall_Sell'] = cond_therm_sell_wall; s_dict['Q_Therm_Panic_Sell'] = cond_therm_sell_panic; s_dict['Q_Nuclear_Sell'] = (a_rsi > 70) & (wt_overbought | wt_cross_dn); s_dict['Q_Early_Sell'] = (a_rsi > 70) & a_vr
 
     s_dict['Wyc_Spring_Buy'] = (a_l < a_tsup) & (a_c > a_tsup) & a_hvol; s_dict['Wyc_Upthrust_Sell'] = (a_h > a_tres) & (a_c < a_tres) & a_hvol
     s_dict['VSA_Accum_Buy'] = (a_bs < a_atr * 0.5) & (a_lw > a_bs * 1.5) & a_hvol & a_vr; s_dict['VSA_Dist_Sell'] = (a_bs < a_atr * 0.5) & (a_uw > a_bs * 1.5) & a_hvol & a_vv
@@ -589,11 +585,9 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 if rand_val < 0.50:
                     dna_b_trigger = best_dna.get('b_trigger', random.choice(todas_las_armas_b)); dna_b_confirm = best_dna.get('b_confirm', random.choice(todas_las_armas_b)); dna_b_op = best_dna.get('b_op', '&')
                     dna_s_trigger = best_dna.get('s_trigger', random.choice(todas_las_armas_s)); dna_s_confirm = best_dna.get('s_confirm', random.choice(todas_las_armas_s)); dna_s_op = best_dna.get('s_op', '&')
-                    
                     if random.random() < 0.15: dna_b_trigger = random.choice(todas_las_armas_b)
                     if random.random() < 0.15: dna_s_trigger = random.choice(todas_las_armas_s)
                     if random.random() < 0.05: dna_b_op = random.choice(['&', '|'])
-                    
                     dna_macro = best_dna.get('macro', 'All-Weather'); dna_vol = best_dna.get('vol', 'All-Weather')
                     r_hitbox = best_dna.get('hitbox', 1.5); r_therm = best_dna.get('therm_w', 4.0); r_adx = best_dna.get('adx_th', 25.0); r_whale = best_dna.get('whale_f', 2.5)
 
@@ -691,9 +685,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             title = f"🌌 DEEP FORGE: {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V238: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
+            title = f"GENESIS LAB V239: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
 
-        # 🔥 AQUI SE CORRIGIÓ EL ERROR SYNTAX DE TRUNCADO 🔥
         html_str = f"""
         <style>
         .loader-container {{ position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 99999; text-align: center; background: rgba(0,0,0,0.95); padding: 35px; border-radius: 20px; border: 2px solid {color}; box-shadow: 0 0 50px {color};}}
@@ -704,8 +697,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             <div class="rocket">🧬</div>
             <div style="color: {color}; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">{title}</div>
             <div style="color: white; font-size: 1.3rem;">{subtitle}</div>
-            <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Récord Global (Neto Real): ${best_net_live:.2f}</div>
-            <div style="color: cyan; font-size: 1.0rem;">Trades: {best_nt_live} | Win Rate: {best_pf_live:.2f}x PF | Score IA: {best_fit_live:.1f}</div>
+            <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Récord Global: ${best_net_live:.2f}</div>
+            <div style="color: cyan; font-size: 1.0rem;">Trades: {best_nt_live} | Win Rate: {best_pf_live:.2f}x PF</div>
         </div>
         """
         ph_holograma.markdown(html_str, unsafe_allow_html=True)
@@ -762,7 +755,8 @@ hitbox_pct   = {v_hb}
 therm_wall   = {v_tw}
 adx_trend    = {v_adx}
 whale_factor = {v_wf}
-
+"""
+    ps_indicators = """
 vol_ma_20 = ta.sma(volume, 20); vol_ma_100 = ta.sma(volume, 100); ema50  = ta.ema(close, 50); ema200 = ta.ema(close, 200)
 rsi_v = ta.rsi(close, 14); atr = ta.atr(14)
 body_size = math.abs(close - open); lower_wick = math.min(open, close) - low; upper_wick = high - math.max(open, close)
@@ -902,7 +896,7 @@ var float sl_price = na
 
 if signal_buy and strategy.position_size == 0 and window
     locked_atr := atr
-    // 🔥 V238: TRUNCADO DECIMAL (Sincronía con Python y Coinbase) 🔥
+    // 🔥 V239: TRUNCADO DECIMAL A 5 DIGITOS (Sincronía con Python y Coinbase) 🔥
     tp_price := math.round(close + (locked_atr * atr_tp_mult), 5)
     sl_price := math.round(close - (locked_atr * atr_sl_mult), 5)
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
