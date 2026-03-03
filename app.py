@@ -24,10 +24,10 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V227: SINCRONÍA MATEMÁTICA DEFINITIVA 🔥
-if st.session_state.get('app_version') != 'V227':
+# 🔥 V228: DESTRUCTOR DE CACHÉ Y MATEMÁTICA ESTRICTA 🔥
+if st.session_state.get('app_version') != 'V228':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V227'
+    st.session_state['app_version'] = 'V228'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS BASE
@@ -57,7 +57,7 @@ def npshift_bool(arr, num, fill_value=False):
     return result
 
 # ==========================================
-# ⚙️ 2. NÚCLEO C++ (EMULACIÓN ESTRICTA PINE SCRIPT)
+# ⚙️ 2. NÚCLEO C++ (EMULACIÓN ESTRICTA DE PINE SCRIPT)
 # ==========================================
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
@@ -351,10 +351,10 @@ def get_safe_vault(s_id):
             if os.path.exists(f"champ_{s_id}.json"):
                 with open(f"champ_{s_id}.json", "r") as f:
                     data = json.load(f)
-                    if data and isinstance(data, dict):
-                        vault = data
+                    if data and isinstance(data, dict): vault = data
         except: pass
-    if not vault or not isinstance(vault, dict): vault = get_default_dna()
+    if not vault or not isinstance(vault, dict):
+        vault = get_default_dna()
     st.session_state[f'champion_{s_id}'] = vault
     return vault
 
@@ -375,7 +375,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V226</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V228</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -453,7 +453,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V226.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V228.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = get_safe_vault(s_id)
@@ -468,8 +468,9 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V226)...")
-def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
+# 🔥 V228 FIX: SE AÑADE 'version_key' AL DECORADOR PARA DESTRUIR EL CACHÉ VIEJO 🔥
+@st.cache_data(ttl=3600, show_spinner="📡 Forzando Recálculo de Matriz (V228)...")
+def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
         warmup_days = 40 if is_micro else 150
@@ -523,7 +524,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
         df['CHOP'] = ta.chop(df['High'], df['Low'], df['Close'], length=14).fillna(50.0)
         
-        # 🔥 FIX V226: MACD CON min_periods=1 PARA EMPATAR CON TRADINGVIEW 🔥
+        # 🔥 V228 FIX: MACD y Signal calculados idénticos a TradingView (min_periods=1) 🔥
         macd_fast = df['Close'].ewm(span=12, min_periods=1, adjust=False).mean()
         macd_slow = df['Close'].ewm(span=26, min_periods=1, adjust=False).mean()
         df['MACD'] = macd_fast - macd_slow
@@ -534,9 +535,9 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         df['Stoch_D'] = stoch_df.iloc[:, 1].fillna(50)
 
         ap = (df['High'] + df['Low'] + df['Close']) / 3.0
-        esa = ap.ewm(span=10, adjust=False).mean()
-        d_wt = (ap - esa).abs().ewm(span=10, adjust=False).mean()
-        df['WT1'] = ((ap - esa) / (0.015 * np.where(d_wt == 0, 1, d_wt))).ewm(span=21, adjust=False).mean()
+        esa = ap.ewm(span=10, min_periods=1, adjust=False).mean()
+        d_wt = (ap - esa).abs().ewm(span=10, min_periods=1, adjust=False).mean()
+        df['WT1'] = ((ap - esa) / (0.015 * np.where(d_wt == 0, 1, d_wt))).ewm(span=21, min_periods=1, adjust=False).mean()
         df['WT2'] = df['WT1'].rolling(4, min_periods=1).mean()
         
         df['Basis'] = df['Close'].rolling(20, min_periods=1).mean()
@@ -552,7 +553,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         df['KC_Upper'] = kc_basis + (df['ATR'] * 1.5)
         df['KC_Lower'] = kc_basis - (df['ATR'] * 1.5)
         df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
-        
         df['Z_Score'] = np.where(dev == 0, 0, (df['Close'] - df['Basis']) / dev)
         df['RSI_BB_Basis'] = df['RSI'].rolling(14, min_periods=1).mean()
         df['RSI_BB_Dev'] = df['RSI'].rolling(14, min_periods=1).std(ddof=0) * 2.0
@@ -594,7 +594,8 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     except Exception as e: 
         return pd.DataFrame(), f"❌ ERROR FATAL GENERAL: {str(e)}"
 
-df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, utc_offset, is_micro)
+# 🔥 Llamada a cargar_matriz con la VERSIÓN incluida para FORZAR DESTRUCCIÓN DEL CACHÉ VIEJO 🔥
+df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, utc_offset, is_micro, st.session_state['app_version'])
 if df_global.empty: 
     st.error(status_api)
     st.stop()
@@ -1077,7 +1078,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V227: {s_id}"
+            title = f"GENESIS LAB V228: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
@@ -1203,8 +1204,11 @@ is_falling_knife = (open[1] - close[1]) > (atr[1] * 1.5)
 rvol = volume / (vol_ma_100 == 0 ? 1 : vol_ma_100)
 high_vol = volume > vol_ma_20
 
-ap = hlc3, esa = ta.ema(ap, 10), d_wt = ta.ema(math.abs(ap - esa), 10)
-wt1 = ta.ema((ap - esa) / (0.015 * (d_wt == 0 ? 1 : d_wt)), 21), wt2 = ta.sma(wt1, 4)
+ap = hlc3
+esa = ta.ema(ap, 10)
+d_wt = ta.ema(math.abs(ap - esa), 10)
+wt1 = ta.ema((ap - esa) / (0.015 * (d_wt == 0 ? 1 : d_wt)), 21)
+wt2 = ta.sma(wt1, 4)
 
 basis = ta.sma(close, 20)
 stdev20 = ta.stdev(close, 20)
@@ -1221,9 +1225,11 @@ kc_l = ta.sma(close, 20) - (atr * 1.5)
 squeeze_on = (bbu < kc_u) and (bbl > kc_l)
 
 z_score = stdev20 == 0 ? 0 : (close - basis) / stdev20
-rsi_bb_basis = ta.sma(rsi_v, 14), rsi_bb_dev = ta.stdev(rsi_v, 14) * 2.0
+rsi_bb_basis = ta.sma(rsi_v, 14)
+rsi_bb_dev = ta.stdev(rsi_v, 14) * 2.0
 
-vela_verde = close > open, vela_roja = close < open
+vela_verde = close > open
+vela_roja = close < open
 rsi_ma = ta.sma(rsi_v, 14)
 rsi_cross_up = (rsi_v > rsi_ma) and (nz(rsi_v[1]) <= nz(rsi_ma[1]))
 rsi_cross_dn = (rsi_v < rsi_ma) and (nz(rsi_v[1]) >= nz(rsi_ma[1]))
@@ -1249,17 +1255,22 @@ pa_pinbar_sell = upper_wick > body_size * 2.5 and lower_wick < body_size
 pa_3_soldiers = vela_verde and nz(vela_verde[1]) and nz(vela_verde[2]) and close > nz(close[1]) and nz(close[1]) > nz(close[2])
 pa_3_crows = vela_roja and nz(vela_roja[1]) and nz(vela_roja[2]) and close < nz(close[1]) and nz(close[1]) < nz(close[2])
 
-low_30 = ta.lowest(low[1], 30), low_100 = ta.lowest(low[1], 100), low_300 = ta.lowest(low[1], 300)
+low_30 = ta.lowest(low[1], 30)
+low_100 = ta.lowest(low[1], 100)
+low_300 = ta.lowest(low[1], 300)
 a_tsup = math.max(nz(low_30, 0), nz(low_100, 0), nz(low_300, 0))
 
-high_30 = ta.highest(high[1], 30), high_100 = ta.highest(high[1], 100), high_300 = ta.highest(high[1], 300)
+high_30 = ta.highest(high[1], 30)
+high_100 = ta.highest(high[1], 100)
+high_300 = ta.highest(high[1], 300)
 a_tres = math.min(nz(high_30, 99999), nz(high_100, 99999), nz(high_300, 99999))
 
 a_dsup = close == 0 ? 0 : math.abs(close - a_tsup) / close * 100
 a_dres = close == 0 ? 0 : math.abs(close - a_tres) / close * 100
 sr_val = atr * 2.0
 
-ceil_w = 0, floor_w = 0
+ceil_w = 0
+floor_w = 0
 ceil_w += (nz(high_30) > close and nz(high_30) <= close + sr_val) ? 1 : 0
 ceil_w += (nz(low_30) > close and nz(low_30) <= close + sr_val) ? 1 : 0
 ceil_w += (nz(high_100) > close and nz(high_100) <= close + sr_val) ? 3 : 0
@@ -1457,31 +1468,22 @@ var float locked_atr = na
 var float tp_price = na
 var float sl_price = na
 
-// 1. DETECCIÓN DE ENTRADA REAL (Sincronizado con Python 'p_ent = o_arr[i+1]')
-// Usamos ta.change(strategy.position_size) para detectar la VELA EXACTA donde se ejecutó la compra
 bool just_entered = ta.change(strategy.position_size) > 0
 
-// Orden de entrada
 if signal_buy and strategy.position_size == 0 and window
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
 
-// 2. ANCLAJE MATEMÁTICO INQUEBRANTABLE
 if just_entered
-    // strategy.position_avg_price es el precio real al que entró el broker (incluye slippage)
-    locked_atr := atr[1] // ATR de la vela anterior (la que generó la señal)
+    locked_atr := atr[1] 
     tp_price := strategy.position_avg_price + (locked_atr * atr_tp_mult)
     sl_price := strategy.position_avg_price - (locked_atr * atr_sl_mult)
 
-// 3. MANTENIMIENTO DE ÓRDENES TP/SL
 if strategy.position_size > 0
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
-// 4. SALIDA DINÁMICA (Inteligencia Artificial)
-// Pine Script ejecutará esto al CIERRE de la vela si se cumple la señal, igual que Python
 if signal_sell and strategy.position_size > 0
     strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
 
-// 5. PURGA DE MEMORIA
 if strategy.position_size == 0
     locked_atr := na
     tp_price := na
