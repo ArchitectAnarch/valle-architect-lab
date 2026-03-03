@@ -24,10 +24,10 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V226: EL ESPEJO ABSOLUTO (MATCH DE PRIMERA VELA >= 1) 🔥
-if st.session_state.get('app_version') != 'V226':
+# 🔥 V227: SINCRONÍA MATEMÁTICA DEFINITIVA 🔥
+if st.session_state.get('app_version') != 'V227':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V226'
+    st.session_state['app_version'] = 'V227'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS BASE
@@ -57,7 +57,7 @@ def npshift_bool(arr, num, fill_value=False):
     return result
 
 # ==========================================
-# ⚙️ 2. NÚCLEO C++ (EVALUACIÓN INTRABAR DESDE VELA 1)
+# ⚙️ 2. NÚCLEO C++ (EMULACIÓN ESTRICTA PINE SCRIPT)
 # ==========================================
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
@@ -89,7 +89,7 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
         if en_pos:
             bars_in_trade += 1
             
-            # 🔥 FIX DEFINITIVO V226: Evaluamos DESDE LA PRIMERA VELA (bars_in_trade >= 1) 🔥
+            # 🔥 EVALUACIÓN INTRABAR (Activa desde vela 1 = vela de entrada)
             if bars_in_trade >= 1: 
                 if l_arr[i] <= sl_p:
                     # GAP CHECK
@@ -291,8 +291,8 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
             pos_size = invest_amt - comm_in
             
             p_ent = o_arr[i+1] * slip_in
-            tp_act = atr_arr[i] * float(tp_arr[i])
-            sl_act = atr_arr[i] * float(sl_arr[i])
+            tp_act = atr_arr[i] * float(df_sim['Active_TP'].values[i])
+            sl_act = atr_arr[i] * float(df_sim['Active_SL'].values[i])
             tp_p = p_ent + tp_act
             sl_p = p_ent - sl_act
             
@@ -330,42 +330,10 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
 # ==========================================
 # 🧬 3. DICCIONARIOS Y GUARDIANES
 # ==========================================
-todas_las_armas_b = [
-    'Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Jugg_Buy', 'Trinity_Buy', 
-    'Commander_Buy', 'Lev_Buy', 'Q_Pink_Whale_Buy', 'Q_Lock_Bounce', 'Q_Lock_Break', 'Q_Neon_Up', 'Q_Defcon_Buy', 
-    'Q_Therm_Bounce', 'Q_Therm_Vacuum', 'Q_Nuclear_Buy', 'Q_Early_Buy', 'Q_Rebound_Buy',
-    'Wyc_Spring_Buy', 'VSA_Accum_Buy', 'Fibo_618_Buy', 'MACD_Impulse_Buy', 'Stoch_OS_Buy',
-    'PA_Engulfing_Buy', 'PA_Pinbar_Buy', 'PA_3_Soldiers_Buy'
-]
-todas_las_armas_s = [
-    'Ping_Sell', 'Climax_Sell', 'Thermal_Sell', 'Lock_Sell', 'Squeeze_Sell', 'Defcon_Sell', 'Jugg_Sell', 'Trinity_Sell', 
-    'Commander_Sell', 'Lev_Sell', 'Q_Lock_Reject', 'Q_Lock_Breakd', 'Q_Neon_Dn', 'Q_Defcon_Sell', 'Q_Therm_Wall_Sell', 
-    'Q_Therm_Panic_Sell', 'Q_Nuclear_Sell', 'Q_Early_Sell',
-    'Wyc_Upthrust_Sell', 'VSA_Dist_Sell', 'Fibo_618_Sell', 'MACD_Exhaust_Sell', 'Stoch_OB_Sell',
-    'PA_Engulfing_Sell', 'PA_Pinbar_Sell', 'PA_3_Crows_Sell'
-]
+todas_las_armas_b = ['Ping_Buy', 'Climax_Buy', 'Thermal_Buy', 'Lock_Buy', 'Squeeze_Buy', 'Defcon_Buy', 'Jugg_Buy', 'Trinity_Buy', 'Commander_Buy', 'Lev_Buy', 'Q_Pink_Whale_Buy', 'Q_Lock_Bounce', 'Q_Lock_Break', 'Q_Neon_Up', 'Q_Defcon_Buy', 'Q_Therm_Bounce', 'Q_Therm_Vacuum', 'Q_Nuclear_Buy', 'Q_Early_Buy', 'Q_Rebound_Buy', 'Wyc_Spring_Buy', 'VSA_Accum_Buy', 'Fibo_618_Buy', 'MACD_Impulse_Buy', 'Stoch_OS_Buy', 'PA_Engulfing_Buy', 'PA_Pinbar_Buy', 'PA_3_Soldiers_Buy']
+todas_las_armas_s = ['Ping_Sell', 'Climax_Sell', 'Thermal_Sell', 'Lock_Sell', 'Squeeze_Sell', 'Defcon_Sell', 'Jugg_Sell', 'Trinity_Sell', 'Commander_Sell', 'Lev_Sell', 'Q_Lock_Reject', 'Q_Lock_Breakd', 'Q_Neon_Dn', 'Q_Defcon_Sell', 'Q_Therm_Wall_Sell', 'Q_Therm_Panic_Sell', 'Q_Nuclear_Sell', 'Q_Early_Sell', 'Wyc_Upthrust_Sell', 'VSA_Dist_Sell', 'Fibo_618_Sell', 'MACD_Exhaust_Sell', 'Stoch_OB_Sell', 'PA_Engulfing_Sell', 'PA_Pinbar_Sell', 'PA_3_Crows_Sell']
 
-pine_map = {
-    'Ping_Buy': 'ping_b', 'Ping_Sell': 'ping_s', 'Squeeze_Buy': 'squeeze_b', 'Squeeze_Sell': 'squeeze_s', 
-    'Thermal_Buy': 'therm_b', 'Thermal_Sell': 'therm_s', 'Climax_Buy': 'climax_b', 'Climax_Sell': 'climax_s', 
-    'Lock_Buy': 'lock_b', 'Lock_Sell': 'lock_s', 'Defcon_Buy': 'defcon_b', 'Defcon_Sell': 'defcon_s', 
-    'Jugg_Buy': 'jugg_b', 'Jugg_Sell': 'jugg_s', 'Trinity_Buy': 'trinity_b', 'Trinity_Sell': 'trinity_s', 
-    'Lev_Buy': 'lev_b', 'Lev_Sell': 'lev_s', 'Commander_Buy': 'commander_b', 'Commander_Sell': 'commander_s', 
-    'Q_Pink_Whale_Buy': 'r_Pink_Whale_Buy', 'Q_Lock_Bounce': 'r_Lock_Bounce', 'Q_Lock_Break': 'r_Lock_Break', 
-    'Q_Neon_Up': 'r_Neon_Up', 'Q_Defcon_Buy': 'r_Defcon_Buy', 'Q_Therm_Bounce': 'r_Therm_Bounce', 
-    'Q_Therm_Vacuum': 'r_Therm_Vacuum', 'Q_Nuclear_Buy': 'r_Nuclear_Buy', 'Q_Early_Buy': 'r_Early_Buy', 
-    'Q_Rebound_Buy': 'r_Rebound_Buy', 'Q_Lock_Reject': 'r_Lock_Reject', 'Q_Lock_Breakd': 'r_Lock_Breakd', 
-    'Q_Neon_Dn': 'r_Neon_Dn', 'Q_Defcon_Sell': 'r_Defcon_Sell', 'Q_Therm_Wall_Sell': 'r_Therm_Wall_Sell', 
-    'Q_Therm_Panic_Sell': 'r_Therm_Panic_Sell', 'Q_Nuclear_Sell': 'r_Nuclear_Sell', 'Q_Early_Sell': 'r_Early_Sell',
-    'Wyc_Spring_Buy': 'wyc_spring_buy', 'Wyc_Upthrust_Sell': 'wyc_upthrust_sell',
-    'VSA_Accum_Buy': 'vsa_accum_buy', 'VSA_Dist_Sell': 'vsa_dist_sell',
-    'Fibo_618_Buy': 'fibo_618_buy', 'Fibo_618_Sell': 'fibo_618_sell',
-    'MACD_Impulse_Buy': 'macd_impulse_buy', 'MACD_Exhaust_Sell': 'macd_exhaust_sell',
-    'Stoch_OS_Buy': 'stoch_os_buy', 'Stoch_OB_Sell': 'stoch_ob_sell',
-    'PA_Engulfing_Buy': 'pa_engulfing_buy', 'PA_Engulfing_Sell': 'pa_engulfing_sell',
-    'PA_Pinbar_Buy': 'pa_pinbar_buy', 'PA_Pinbar_Sell': 'pa_pinbar_sell',
-    'PA_3_Soldiers_Buy': 'pa_3_soldiers', 'PA_3_Crows_Sell': 'pa_3_crows'
-}
+pine_map = {'Ping_Buy': 'ping_b', 'Ping_Sell': 'ping_s', 'Squeeze_Buy': 'squeeze_b', 'Squeeze_Sell': 'squeeze_s', 'Thermal_Buy': 'therm_b', 'Thermal_Sell': 'therm_s', 'Climax_Buy': 'climax_b', 'Climax_Sell': 'climax_s', 'Lock_Buy': 'lock_b', 'Lock_Sell': 'lock_s', 'Defcon_Buy': 'defcon_b', 'Defcon_Sell': 'defcon_s', 'Jugg_Buy': 'jugg_b', 'Jugg_Sell': 'jugg_s', 'Trinity_Buy': 'trinity_b', 'Trinity_Sell': 'trinity_s', 'Lev_Buy': 'lev_b', 'Lev_Sell': 'lev_s', 'Commander_Buy': 'commander_b', 'Commander_Sell': 'commander_s', 'Q_Pink_Whale_Buy': 'r_Pink_Whale_Buy', 'Q_Lock_Bounce': 'r_Lock_Bounce', 'Q_Lock_Break': 'r_Lock_Break', 'Q_Neon_Up': 'r_Neon_Up', 'Q_Defcon_Buy': 'r_Defcon_Buy', 'Q_Therm_Bounce': 'r_Therm_Bounce', 'Q_Therm_Vacuum': 'r_Therm_Vacuum', 'Q_Nuclear_Buy': 'r_Nuclear_Buy', 'Q_Early_Buy': 'r_Early_Buy', 'Q_Rebound_Buy': 'r_Rebound_Buy', 'Q_Lock_Reject': 'r_Lock_Reject', 'Q_Lock_Breakd': 'r_Lock_Breakd', 'Q_Neon_Dn': 'r_Neon_Dn', 'Q_Defcon_Sell': 'r_Defcon_Sell', 'Q_Therm_Wall_Sell': 'r_Therm_Wall_Sell', 'Q_Therm_Panic_Sell': 'r_Therm_Panic_Sell', 'Q_Nuclear_Sell': 'r_Nuclear_Sell', 'Q_Early_Sell': 'r_Early_Sell', 'Wyc_Spring_Buy': 'wyc_spring_buy', 'Wyc_Upthrust_Sell': 'wyc_upthrust_sell', 'VSA_Accum_Buy': 'vsa_accum_buy', 'VSA_Dist_Sell': 'vsa_dist_sell', 'Fibo_618_Buy': 'fibo_618_buy', 'Fibo_618_Sell': 'fibo_618_sell', 'MACD_Impulse_Buy': 'macd_impulse_buy', 'MACD_Exhaust_Sell': 'macd_exhaust_sell', 'Stoch_OS_Buy': 'stoch_os_buy', 'Stoch_OB_Sell': 'stoch_ob_sell', 'PA_Engulfing_Buy': 'pa_engulfing_buy', 'PA_Engulfing_Sell': 'pa_engulfing_sell', 'PA_Pinbar_Buy': 'pa_pinbar_buy', 'PA_Pinbar_Sell': 'pa_pinbar_sell', 'PA_3_Soldiers_Buy': 'pa_3_soldiers', 'PA_3_Crows_Sell': 'pa_3_crows'}
 
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
@@ -374,14 +342,7 @@ estrategias = st.session_state['ai_algos']
 tab_id_map = {f"🤖 {ai_id}": ai_id for ai_id in estrategias}
 
 def get_default_dna():
-    return {
-        'b_team': [], 's_team': [], 
-        'b_trigger': random.choice(todas_las_armas_b), 'b_confirm': random.choice(todas_las_armas_b), 'b_op': '&',
-        's_trigger': random.choice(todas_las_armas_s), 's_confirm': random.choice(todas_las_armas_s), 's_op': '&',
-        'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 
-        'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0,
-        'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0
-    }
+    return {'b_team': [], 's_team': [], 'b_trigger': random.choice(todas_las_armas_b), 'b_confirm': random.choice(todas_las_armas_b), 'b_op': '&', 's_trigger': random.choice(todas_las_armas_s), 's_confirm': random.choice(todas_las_armas_s), 's_op': '&', 'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0, 'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0}
 
 def get_safe_vault(s_id):
     vault = st.session_state.get(f'champion_{s_id}')
@@ -393,8 +354,7 @@ def get_safe_vault(s_id):
                     if data and isinstance(data, dict):
                         vault = data
         except: pass
-    if not vault or not isinstance(vault, dict):
-        vault = get_default_dna()
+    if not vault or not isinstance(vault, dict): vault = get_default_dna()
     st.session_state[f'champion_{s_id}'] = vault
     return vault
 
@@ -405,8 +365,7 @@ def save_champion(s_id, bp):
     for k in bp.keys(): vault[k] = bp[k]
     st.session_state[f'champion_{s_id}'] = vault
     try:
-        with open(f"champ_{s_id}.json", "w") as f:
-            json.dump(vault, f)
+        with open(f"champ_{s_id}.json", "w") as f: json.dump(vault, f)
     except: pass
 
 for s_id in estrategias:
@@ -564,9 +523,11 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
         df['CHOP'] = ta.chop(df['High'], df['Low'], df['Close'], length=14).fillna(50.0)
         
-        macd_df = ta.macd(df['Close'], fast=12, slow=26, signal=9)
-        df['MACD'] = macd_df.iloc[:, 0].fillna(0)
-        df['MACD_Sig'] = macd_df.iloc[:, 2].fillna(0)
+        # 🔥 FIX V226: MACD CON min_periods=1 PARA EMPATAR CON TRADINGVIEW 🔥
+        macd_fast = df['Close'].ewm(span=12, min_periods=1, adjust=False).mean()
+        macd_slow = df['Close'].ewm(span=26, min_periods=1, adjust=False).mean()
+        df['MACD'] = macd_fast - macd_slow
+        df['MACD_Sig'] = df['MACD'].ewm(span=9, min_periods=1, adjust=False).mean()
         
         stoch_df = ta.stoch(df['High'], df['Low'], df['Close'], k=14, d=3, smooth_k=3)
         df['Stoch_K'] = stoch_df.iloc[:, 0].fillna(50)
@@ -1116,7 +1077,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V226: {s_id}"
+            title = f"GENESIS LAB V227: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
@@ -1242,11 +1203,8 @@ is_falling_knife = (open[1] - close[1]) > (atr[1] * 1.5)
 rvol = volume / (vol_ma_100 == 0 ? 1 : vol_ma_100)
 high_vol = volume > vol_ma_20
 
-ap = hlc3
-esa = ta.ema(ap, 10)
-d_wt = ta.ema(math.abs(ap - esa), 10)
-wt1 = ta.ema((ap - esa) / (0.015 * (d_wt == 0 ? 1 : d_wt)), 21)
-wt2 = ta.sma(wt1, 4)
+ap = hlc3, esa = ta.ema(ap, 10), d_wt = ta.ema(math.abs(ap - esa), 10)
+wt1 = ta.ema((ap - esa) / (0.015 * (d_wt == 0 ? 1 : d_wt)), 21), wt2 = ta.sma(wt1, 4)
 
 basis = ta.sma(close, 20)
 stdev20 = ta.stdev(close, 20)
@@ -1263,11 +1221,9 @@ kc_l = ta.sma(close, 20) - (atr * 1.5)
 squeeze_on = (bbu < kc_u) and (bbl > kc_l)
 
 z_score = stdev20 == 0 ? 0 : (close - basis) / stdev20
-rsi_bb_basis = ta.sma(rsi_v, 14)
-rsi_bb_dev = ta.stdev(rsi_v, 14) * 2.0
+rsi_bb_basis = ta.sma(rsi_v, 14), rsi_bb_dev = ta.stdev(rsi_v, 14) * 2.0
 
-vela_verde = close > open
-vela_roja = close < open
+vela_verde = close > open, vela_roja = close < open
 rsi_ma = ta.sma(rsi_v, 14)
 rsi_cross_up = (rsi_v > rsi_ma) and (nz(rsi_v[1]) <= nz(rsi_ma[1]))
 rsi_cross_dn = (rsi_v < rsi_ma) and (nz(rsi_v[1]) >= nz(rsi_ma[1]))
@@ -1293,22 +1249,17 @@ pa_pinbar_sell = upper_wick > body_size * 2.5 and lower_wick < body_size
 pa_3_soldiers = vela_verde and nz(vela_verde[1]) and nz(vela_verde[2]) and close > nz(close[1]) and nz(close[1]) > nz(close[2])
 pa_3_crows = vela_roja and nz(vela_roja[1]) and nz(vela_roja[2]) and close < nz(close[1]) and nz(close[1]) < nz(close[2])
 
-low_30 = ta.lowest(low[1], 30)
-low_100 = ta.lowest(low[1], 100)
-low_300 = ta.lowest(low[1], 300)
+low_30 = ta.lowest(low[1], 30), low_100 = ta.lowest(low[1], 100), low_300 = ta.lowest(low[1], 300)
 a_tsup = math.max(nz(low_30, 0), nz(low_100, 0), nz(low_300, 0))
 
-high_30 = ta.highest(high[1], 30)
-high_100 = ta.highest(high[1], 100)
-high_300 = ta.highest(high[1], 300)
+high_30 = ta.highest(high[1], 30), high_100 = ta.highest(high[1], 100), high_300 = ta.highest(high[1], 300)
 a_tres = math.min(nz(high_30, 99999), nz(high_100, 99999), nz(high_300, 99999))
 
 a_dsup = close == 0 ? 0 : math.abs(close - a_tsup) / close * 100
 a_dres = close == 0 ? 0 : math.abs(close - a_tres) / close * 100
 sr_val = atr * 2.0
 
-ceil_w = 0
-floor_w = 0
+ceil_w = 0, floor_w = 0
 ceil_w += (nz(high_30) > close and nz(high_30) <= close + sr_val) ? 1 : 0
 ceil_w += (nz(low_30) > close and nz(low_30) <= close + sr_val) ? 1 : 0
 ceil_w += (nz(high_100) > close and nz(high_100) <= close + sr_val) ? 3 : 0
