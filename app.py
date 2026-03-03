@@ -24,13 +24,13 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V218: SINCRONIZACIÓN MILIMÉTRICA Y PRECISIÓN FLOAT 🔥
-if st.session_state.get('app_version') != 'V218':
+# 🔥 V219: SINCRONÍA INSTITUCIONAL ABSOLUTA 🔥
+if st.session_state.get('app_version') != 'V219':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V218'
+    st.session_state['app_version'] = 'V219'
 
 # ==========================================
-# 🧠 1. FUNCIONES MATEMÁTICAS 
+# 🧠 1. FUNCIONES MATEMÁTICAS BASE
 # ==========================================
 def npshift(arr, num, fill_value=np.nan):
     result = np.empty_like(arr)
@@ -47,7 +47,7 @@ def npshift_bool(arr, num, fill_value=False):
     return result
 
 # ==========================================
-# ⚙️ 2. NÚCLEO C++ (EMULACIÓN 1:1 DE TRADINGVIEW)
+# ⚙️ 2. NÚCLEO C++ (ESPEJO EXACTO DE TRADINGVIEW)
 # ==========================================
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
@@ -67,47 +67,47 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
         
         if en_pos:
             bars_in_trade += 1
-            cierra = False
             
-            # 🔥 EVALUACIÓN INTRABAR (Activo a partir de la vela 2)
-            if bars_in_trade > 1: 
+            # 🔥 1. EVALUACIÓN INTRABAR TP/SL (Sin 'continue' para no ignorar señales) 🔥
+            if bars_in_trade > 1:
                 if l_arr[i] <= sl_p:
                     exec_p = sl_p * slip_out
                     ret = (exec_p - p_ent) / p_ent
                     gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
                     cap_act += profit
-                    g_loss += abs(profit); num_trades += 1; en_pos = False; cierra = True
+                    if profit > 0: wins += 1; g_profit += profit
+                    else: g_loss += abs(profit)
+                    num_trades += 1; en_pos = False
                     if cap_act > peak: peak = cap_act
                     if peak > 0: dd = (peak - cap_act) / peak * 100.0; max_dd = max(max_dd, dd)
-                
                 elif h_arr[i] >= tp_p:
                     exec_p = tp_p * slip_out
                     ret = (exec_p - p_ent) / p_ent
                     gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
                     cap_act += profit
-                    g_profit += profit; num_trades += 1; en_pos = False; cierra = True
-                    if profit > 0: wins += 1
+                    if profit > 0: wins += 1; g_profit += profit
+                    else: g_loss += abs(profit)
+                    num_trades += 1; en_pos = False
                     if cap_act > peak: peak = cap_act
                     if peak > 0: dd = (peak - cap_act) / peak * 100.0; max_dd = max(max_dd, dd)
 
-            # 🔥 EVALUACIÓN DE CIERRE DINÁMICO (Pine Script: strategy.close)
-            if not cierra:
+            # 🔥 2. EVALUACIÓN DE SALIDA DINÁMICA (Si sigue en posición) 🔥
+            if en_pos: 
                 score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
                 if s_c[i] or (score < th_sell):
-                    exit_price = (o_arr[i+1] if i+1 < len(o_arr) else c_arr[i]) * slip_out 
-                    ret = (exit_price - p_ent) / p_ent; gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
+                    exit_price = (o_arr[i+1] if i+1 < len(o_arr) else c_arr[i]) * slip_out
+                    ret = (exit_price - p_ent) / p_ent
+                    gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
                     cap_act += profit
-                    if profit > 0: 
-                        g_profit += profit; wins += 1
-                    else: 
-                        g_loss += abs(profit)
-                    num_trades += 1; en_pos = False
-                    # Bloqueamos la entrada en la misma vela, idéntico a TradingView
-                    just_closed_dyn = True
+                    if profit > 0: wins += 1; g_profit += profit
+                    else: g_loss += abs(profit)
+                    num_trades += 1; en_pos = False; just_closed_dyn = True
+                    if cap_act > peak: peak = cap_act
+                    if peak > 0: dd = (peak - cap_act) / peak * 100.0; max_dd = max(max_dd, dd)
             
             if cap_act <= 0: break
             
-        # 🔥 EVALUACIÓN DE ENTRADA (Bloqueado si se hizo Dyn_Exit este mismo tick)
+        # 🔥 3. EVALUACIÓN DE ENTRADA 🔥
         if not en_pos and not just_closed_dyn and i+1 < len(h_arr):
             score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
             if (b_c[i] or (score > th_buy)) and m_mask[i] and v_mask[i]:
@@ -143,9 +143,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     slip_out = 1.0 - (slippage_pct/100.0)
 
     for i in range(n):
-        cierra = False
         just_closed_dyn = False
-        
         if en_pos:
             bars_in_trade += 1
             if bars_in_trade > 1:
@@ -154,20 +152,19 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
                     ret = (exec_p - p_ent) / p_ent; gross = pos_size * (1 + ret); comm_out = gross * com_pct; total_comms += comm_out; net = gross - comm_out; profit = net - invest_amt
                     cap_act += profit
                     if cap_act <= 0: cap_act = 0
-                    registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'SL', 'Precio': exec_p, 'Ganancia_$': profit}); en_pos, cierra = False, True
+                    registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'SL', 'Precio': exec_p, 'Ganancia_$': profit}); en_pos = False
                 elif h_arr[i] >= tp_p:
                     exec_p = tp_p * slip_out
                     ret = (exec_p - p_ent) / p_ent; gross = pos_size * (1 + ret); comm_out = gross * com_pct; total_comms += comm_out; net = gross - comm_out; profit = net - invest_amt
                     cap_act += profit
-                    registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'TP', 'Precio': exec_p, 'Ganancia_$': profit}); en_pos, cierra = False, True
+                    registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'TP', 'Precio': exec_p, 'Ganancia_$': profit}); en_pos = False
             
-            if not cierra and sell_arr[i]:
+            if en_pos and sell_arr[i]:
                 exit_price = (o_arr[i+1] if i+1 < n else c_arr[i]) * slip_out
                 ret = (exit_price - p_ent) / p_ent; gross = pos_size * (1 + ret); comm_out = gross * com_pct; total_comms += comm_out; net = gross - comm_out; profit = net - invest_amt
                 cap_act += profit
                 if cap_act <= 0: cap_act = 0
-                registro_trades.append({'Fecha': f_arr[i+1] if i+1 < n else f_arr[i], 'Tipo': 'DYN_WIN' if profit>0 else 'DYN_LOSS', 'Precio': exit_price, 'Ganancia_$': profit}); en_pos, cierra = False, True
-                just_closed_dyn = True
+                registro_trades.append({'Fecha': f_arr[i+1] if i+1 < n else f_arr[i], 'Tipo': 'DYN_WIN' if profit>0 else 'DYN_LOSS', 'Precio': exit_price, 'Ganancia_$': profit}); en_pos = False; just_closed_dyn = True
         
         if not en_pos and not just_closed_dyn and buy_arr[i] and i+1 < n and cap_act > 0:
             if invest_pct > 0: invest_amt = cap_act * (invest_pct / 100.0)
@@ -298,7 +295,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V218</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V219</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -375,7 +372,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V218.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V219.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = get_safe_vault(s_id)
@@ -390,7 +387,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V218)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V219)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -428,8 +425,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         df['Vol_MA_100'] = df['Volume'].rolling(window=100, min_periods=1).mean()
         df['RVol'] = df['Volume'] / df['Vol_MA_100'].replace(0, 1)
         df['High_Vol'] = df['Volume'] > df['Vol_MA_20']
-        tr = df[['High', 'Low']].max(axis=1) - df[['High', 'Low']].min(axis=1)
-        df['ATR'] = tr.ewm(alpha=1/14, min_periods=1, adjust=False).mean().fillna(df['High']-df['Low']).replace(0, 0.001)
+        df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14).fillna(df['High']-df['Low']).replace(0, 0.001)
         df['RSI'] = ta.rsi(df['Close'], length=14).fillna(50.0)
         df['RSI_MA'] = df['RSI'].rolling(14, min_periods=1).mean()
         df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
@@ -708,7 +704,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                         elif target_env == 'th': r_therm = random.choice([3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
                         elif target_env == 'adx': r_adx = random.choice([15.0, 20.0, 25.0, 30.0, 35.0])
 
-                    # 🔥 V218 FIX: REDONDEO DE GENES AL MISMO DECIMAL DE TRADINGVIEW 🔥
                     r_w_rsi = round(best_dna.get('w_rsi', 0.0) + random.gauss(0, 0.1), 4)
                     r_w_z = round(best_dna.get('w_z', 0.0) + random.gauss(0, 0.5), 4) 
                     r_w_adx = round(best_dna.get('w_adx', 0.0) + random.gauss(0, 0.1), 4)
@@ -865,7 +860,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V218: {s_id}"
+            title = f"GENESIS LAB V219: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
@@ -892,7 +887,6 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     
     n_len = len(a_c)
     
-    # 🔥 Sincronizando visualización con los floats exactos de PineScript 🔥
     w_rsi = round(float(vault.get('w_rsi', 0.0)), 4)
     w_z = round(float(vault.get('w_z', 0.0)), 4)
     w_adx = round(float(vault.get('w_adx', 0.0)), 4)
@@ -1223,13 +1217,13 @@ float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
 float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
 
+    # 🔥 V219: BLOQUE PINE SCRIPT INSTITUCIONAL BLINDADO 🔥
     ps_exec = """
 var float locked_atr = na
 var float tp_price = na
 var float sl_price = na
 
-// 1. DETECCIÓN DE ENTRADA REAL (Sincronizado con Python 'p_ent = o_arr[i+1]')
-// Usamos ta.change(strategy.position_size) para detectar la VELA EXACTA donde se ejecutó la compra
+// 1. DETECCIÓN DE ENTRADA REAL
 bool just_entered = ta.change(strategy.position_size) > 0
 
 // Orden de entrada
@@ -1238,8 +1232,7 @@ if signal_buy and strategy.position_size == 0 and window
 
 // 2. ANCLAJE MATEMÁTICO INQUEBRANTABLE
 if just_entered
-    // strategy.position_avg_price es el precio real al que entró el broker (incluye slippage)
-    locked_atr := atr[1] // ATR de la vela anterior (la que generó la señal)
+    locked_atr := atr[1] 
     tp_price := strategy.position_avg_price + (locked_atr * atr_tp_mult)
     sl_price := strategy.position_avg_price - (locked_atr * atr_sl_mult)
 
@@ -1247,8 +1240,7 @@ if just_entered
 if strategy.position_size > 0
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, comment_profit="TP_Hit", comment_loss="SL_Hit", alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
-// 4. SALIDA DINÁMICA (Inteligencia Artificial)
-// Pine Script ejecutará esto al CIERRE de la vela si se cumple la señal, igual que Python
+// 4. SALIDA DINÁMICA
 if signal_sell and strategy.position_size > 0
     strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
 
