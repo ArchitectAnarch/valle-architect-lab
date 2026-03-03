@@ -24,13 +24,13 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V210: PURE MONEY FITNESS & INTRABAR SYNC 🔥
-if st.session_state.get('app_version') != 'V210':
+# 🔥 V211: RESTAURACIÓN TOTAL (PINE SCRIPT INSTITUCIONAL) 🔥
+if st.session_state.get('app_version') != 'V211':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V210'
+    st.session_state['app_version'] = 'V211'
 
 # ==========================================
-# 🧠 1. FUNCIONES MATEMÁTICAS (SIEMPRE ARRIBA)
+# 🧠 1. FUNCIONES MATEMÁTICAS 
 # ==========================================
 def npshift(arr, num, fill_value=np.nan):
     result = np.empty_like(arr)
@@ -98,9 +98,11 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in
+                
+                # 🔥 RESTAURADO: Cálculo basado en Precio de Entrada (Igual a Pine Script) 🔥
                 current_atr = atr_arr[i]
-                tp_p = c_arr[i] + (current_atr * atr_tp_mult)
-                sl_p = c_arr[i] - (current_atr * atr_sl_mult)
+                tp_p = p_ent + (current_atr * atr_tp_mult)
+                sl_p = p_ent - (current_atr * atr_sl_mult)
                 en_pos = True
                 
     pf = g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0)
@@ -147,11 +149,11 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
             comm_in = invest_amt * com_pct; total_comms += comm_in; pos_size = invest_amt - comm_in
             p_ent = o_arr[i+1] * slip_in
             
-            # Matemática Visual Idéntica a TradingView
+            # 🔥 RESTAURADO: Cálculo basado en Precio de Entrada 🔥
             tp_act = atr_arr[i] * float(tp_arr[i])
             sl_act = atr_arr[i] * float(sl_arr[i])
-            tp_p = c_arr[i] + tp_act
-            sl_p = c_arr[i] - sl_act
+            tp_p = p_ent + tp_act
+            sl_p = p_ent - sl_act
             
             en_pos = True
             registro_trades.append({'Fecha': f_arr[i+1], 'Tipo': 'ENTRY', 'Precio': p_ent, 'Ganancia_$': 0})
@@ -275,7 +277,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V210</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V211</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -304,7 +306,7 @@ is_micro = iv_download in ["1m", "5m", "15m", "30m"]
 start_date, end_date = st.sidebar.slider("📅 Scope Histórico", min_value=hoy - timedelta(days=250 if is_micro else 1500), max_value=hoy, value=(hoy - timedelta(days=200 if is_micro else 1500), hoy), format="YYYY-MM-DD")
 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
-comision_pct = st.sidebar.number_input("Comisión (%)", value=0.15, step=0.05) / 100.0 # Ajustado default a 0.15%
+comision_pct = st.sidebar.number_input("Comisión (%)", value=0.15, step=0.05) / 100.0 
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 style='text-align: center; color: lime;'>🤖 CÁMARA DE MUTACIÓN</h3>", unsafe_allow_html=True)
@@ -352,7 +354,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V210.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V211.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = get_safe_vault(s_id)
@@ -367,7 +369,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V210)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V211)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -787,21 +789,17 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 m_mask[:split_idx], v_mask[:split_idx]
             )
 
-            # 🔥 V210 FIX: PURE MONEY FITNESS SCORE 🔥
+            # 🔥 V211: EVALUADOR DE FITNESS PURE MONEY 🔥
             if nt >= 5: 
                 ado_actual = nt / max(1, dias_entrenamiento)
                 ado_target_safe = max(0.1, target_ado)
                 
                 if net > 0:
-                    # 1. El dinero neto es el Rey absoluto.
                     safe_pf = min(pf, 3.0) 
-                    
-                    # 2. Castigo suave por Drawdown alto
                     dd_penalty = 1.0
                     if mdd > 25.0: dd_penalty = (25.0 / mdd)
                     if wr < 40.0: dd_penalty *= (wr / 40.0)
                     
-                    # 3. ADO Sano (Dejamos que busque trades rentables sin matarlo si no cumple exactamente)
                     ado_factor = 1.0
                     if ado_actual < (ado_target_safe * 0.3): 
                         ado_factor = max(0.2, ado_actual / (ado_target_safe * 0.3))
@@ -841,7 +839,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V210: {s_id}"
+            title = f"GENESIS LAB V211: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
@@ -1188,29 +1186,39 @@ float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
 float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
 
+    # 🔥 V211: PINE SCRIPT INSTITUCIONAL RESTAURADO 🔥
     ps_exec = """
+var float locked_atr = na
 var float tp_price = na
 var float sl_price = na
 
-// 1. CONDICIONES DE ENTRADA Y CÁLCULO DE NIVELES EXACTOS
+// 1. DETECCIÓN DE ENTRADA REAL (Sincronizado con Python 'p_ent = o_arr[i+1]')
+// Usamos ta.change(strategy.position_size) para detectar la VELA EXACTA donde se ejecutó la compra
+bool just_entered = ta.change(strategy.position_size) > 0
+
+// Orden de entrada
 if signal_buy and strategy.position_size == 0 and window
-    // Fijamos TP y SL basados en el precio de cierre de la señal
-    tp_price := close + (atr * atr_tp_mult)
-    sl_price := close - (atr * atr_sl_mult)
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
-    // CRÍTICO: Desplegamos la orden de salida en la MISMA vela para activar protección intrabar inmediata
-    strategy.exit("Out", "In", limit=tp_price, stop=sl_price, comment_profit="TP_Hit", comment_loss="SL_Hit", alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
-// 2. MANTENIMIENTO DE ÓRDENES INTRABAR
+// 2. ANCLAJE MATEMÁTICO INQUEBRANTABLE
+if just_entered
+    // strategy.position_avg_price es el precio real al que entró el broker
+    locked_atr := atr[1] // ATR de la vela anterior (la que generó la señal)
+    tp_price := strategy.position_avg_price + (locked_atr * atr_tp_mult)
+    sl_price := strategy.position_avg_price - (locked_atr * atr_sl_mult)
+
+// 3. MANTENIMIENTO DE ÓRDENES TP/SL INTRABAR
 if strategy.position_size > 0
-    strategy.exit("Out", "In", limit=tp_price, stop=sl_price, comment_profit="TP_Hit", comment_loss="SL_Hit", alert_profit=wt_exit_long, alert_loss=wt_exit_long)
-    
-    // 3. SALIDA DINÁMICA (Si ocurre antes de tocar TP o SL)
-    if signal_sell
-        strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
+    strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
-// 4. PURGA DE NIVELES (Para limpiar la memoria en el gráfico)
+// 4. SALIDA DINÁMICA (Inteligencia Artificial)
+// Pine Script ejecutará esto al CIERRE de la vela si se cumple la señal, igual que Python
+if signal_sell and strategy.position_size > 0
+    strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
+
+// 5. PURGA DE MEMORIA
 if strategy.position_size == 0
+    locked_atr := na
     tp_price := na
     sl_price := na
 
@@ -1220,118 +1228,202 @@ plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=locatio
     return ps_base + ps_indicators + ps_logic + ps_exec
 
 # ==========================================
-# 🛑 7. UI GLOBAL Y RENDERIZADO
+# 🛑 7. BUCLES DE EJECUCIÓN GLOBALES Y PROFUNDOS
 # ==========================================
-vault = get_safe_vault(s_id) 
+if st.session_state.get('run_global', False):
+    time.sleep(0.1) 
+    if len(st.session_state['global_queue']) > 0:
+        s_id = st.session_state['global_queue'].pop(0)
+        ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid cyan; border-radius: 10px;'><h2 style='color:cyan;'>⚙️ Forjando ADN: {s_id}...</h2><h4 style='color:lime;'>Quedan {len(st.session_state['global_queue'])} mutantes en incubación.</h4></div>", unsafe_allow_html=True)
+        time.sleep(0.1)
+        
+        v = get_safe_vault(s_id)
+        buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
+        buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
+        
+        bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=global_epochs, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))))
+        
+        st.rerun()
+    else:
+        st.session_state['run_global'] = False
+        ph_holograma.empty()
+        st.sidebar.success("✅ ¡Incubación Genética Completada!")
+        time.sleep(2); st.rerun()
 
-c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
-
-ado_val_ui = float(vault.get('ado', 4.0)) if vault.get('ado') is not None else 4.0
-reinv_val_ui = float(vault.get('reinv', 20.0)) if vault.get('reinv') is not None else 20.0
-
-ado_ui = c_ia1.slider("🎯 Target ADO (IA Override)", 0.0, 100.0, value=ado_val_ui, key=f"ui_{s_id}_ado_w", step=0.5)
-reinv_ui = c_ia2.slider("💵 Reinversión % (IA Override)", 0.0, 100.0, value=reinv_val_ui, key=f"ui_{s_id}_reinv_w", step=5.0)
-
-c_ps1, c_ps2 = st.columns(2)
-ps_buy_pct = c_ps1.number_input("🟢 % Inversión Compra (Pine Script)", min_value=0, max_value=100, value=int(reinv_val_ui), step=1, key=f"ui_{s_id}_ps_buy")
-ps_sell_pct = c_ps2.number_input("🔴 % Desinversión Venta (Pine Script)", min_value=1, max_value=100, value=100, step=1, key=f"ui_{s_id}_ps_sell")
-
-st.session_state[f'champion_{s_id}']['ado'] = ado_ui
-st.session_state[f'champion_{s_id}']['reinv'] = ps_buy_pct 
-
-c_btn1, c_btn2 = c_ia3.columns(2)
-if c_btn1.button(f"🚀 FORJAR RÁPIDO ({global_epochs*250})", type="primary", key=f"btn_opt_{s_id}"):
-    st.session_state['abort_opt'] = False
-    st.session_state['global_queue'] = [s_id]
-    st.session_state['run_global'] = True
+deep_state = st.session_state.get('deep_opt_state', {})
+if deep_state and not deep_state.get('paused', False) and deep_state.get('current_epoch', 0) < deep_state.get('target_epochs', 0):
+    time.sleep(0.1) 
+    
+    chunk = 50 
+    if deep_state['target_epochs'] - deep_state['current_epoch'] < chunk:
+        chunk = deep_state['target_epochs'] - deep_state['current_epoch']
+        
+    s_id = deep_state['s_id']
+    v = get_safe_vault(s_id)
+    buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
+    buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
+    
+    deep_info = {'current': deep_state['current_epoch'], 'total': deep_state['target_epochs'], 'start_time': deep_state.get('start_time', time.time())}
+    
+    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=chunk, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=deep_info)
+    
+    st.session_state['deep_opt_state']['current_epoch'] += chunk
+    
+    if st.session_state['deep_opt_state']['current_epoch'] >= deep_state['target_epochs']:
+        st.session_state['deep_opt_state']['paused'] = True
+        ph_holograma.empty()
+        st.sidebar.success(f"🌌 ¡FORJA PROFUNDA COMPLETADA PARA {s_id}!")
+        time.sleep(2)
+        
     st.rerun()
 
-if c_btn2.button(f"🌌 ACTIVAR FORJA PROFUNDA", type="secondary", key=f"btn_deep_{s_id}"):
-    st.session_state['abort_opt'] = False
-    st.session_state['deep_opt_state'] = {'s_id': s_id, 'target_epochs': deep_epochs_target, 'current_epoch': 0, 'paused': False, 'start_time': time.time()}
-    st.rerun()
+# ==========================================
+# 🛑 8. PANEL DE RENDERIZADO VISUAL
+# ==========================================
+st.title("🛡️ GENESIS LAB - The Omni-Brain")
 
-df_strat, eq_curve, t_log, total_comms = run_backtest_eval(s_id, capital_inicial, comision_pct)
-df_strat['Total_Portfolio'] = eq_curve
-ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
-buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
-alpha_pct = ret_pct - buy_hold_ret
+with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Neta)", expanded=False):
+    leaderboard_data = []
+    for s in estrategias:
+        v = get_safe_vault(s)
+        fit = v.get('fit', -float('inf'))
+        opt_str = "✅" if fit != -float('inf') else "➖ No Opt"
+        net_val = v.get('net', 0)
+        leaderboard_data.append({"Mutante": s, "Neto_Num": net_val, "Rentabilidad": f"${net_val:,.2f}", "WinRate": f"{v.get('winrate', 0):.1f}%", "Estado": opt_str})
+    
+    leaderboard_data.sort(key=lambda x: x['Neto_Num'], reverse=True)
+    for item in leaderboard_data: del item['Neto_Num']
+    st.table(pd.DataFrame(leaderboard_data))
 
-dftr = pd.DataFrame(t_log)
-tt, wr, pf_val = 0, 0.0, 0.0
-if not dftr.empty:
-    exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
-    tt = len(exs)
-    if tt > 0:
-        ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
-        wr = (ws / tt) * 100
-        gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum(); gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
-        pf_val = gpp / gll if gll > 0 else float('inf')
+st.markdown("<h3 style='text-align: center; color: #00FF00;'>🎡 CARRUSEL DE MUTANTES IA</h3>", unsafe_allow_html=True)
+tab_names = list(tab_id_map.keys())
 
-ado_val = tt / dias_reales if dias_reales > 0 else 0.0
-mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
+if len(tab_names) > 0:
+    selected_tab_name = st.selectbox("Selecciona un Espécimen:", tab_names, index=len(tab_names)-1)
+    s_id = tab_id_map[selected_tab_name]
+    is_opt = st.session_state.get(f'opt_status_{s_id}', False)
+    opt_badge = "<span style='color: lime;'>✅ ADN OPTIMIZADO</span>" if is_opt else "<span style='color: gray;'>➖ ADN VIRGEN</span>"
+    
+    vault = get_safe_vault(s_id) 
 
-c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-c1.metric("Net Profit", f"${eq_curve[-1]-capital_inicial:,.2f}", f"{ret_pct:.2f}%")
-c2.metric("ALPHA", f"{alpha_pct:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
-c3.metric("Trades", f"{tt}", f"ADO: {ado_val:.2f}")
-c4.metric("Win Rate", f"{wr:.1f}%")
-c5.metric("Profit Factor", f"{pf_val:.2f}x")
-c6.metric("Drawdown", f"{mdd:.2f}%", delta_color="inverse")
-c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
+    st.markdown(f"### {selected_tab_name} {opt_badge}", unsafe_allow_html=True)
 
-# --- EJECUCIÓN DEL TEST DE MONTE CARLO ---
-mc_curves, risk_of_ruin = simular_monte_carlo(t_log, capital_inicial, 500)
+    with st.expander("🧬 VER ADN DEL MUTANTE Y ARMAS TÁCTICAS", expanded=True):
+        st.markdown(f"**🟢 Gatillo Compra:** `{vault.get('b_trigger', '')}` | **Operador:** `{vault.get('b_op', '')}` | **Confirmador:** `{vault.get('b_confirm', '')}`")
+        st.markdown(f"**🔴 Gatillo Venta:** `{vault.get('s_trigger', '')}` | **Operador:** `{vault.get('s_op', '')}` | **Confirmador:** `{vault.get('s_confirm', '')}`")
+        st.markdown(f"**🌍 Clima Macro:** `{vault.get('macro', '')}` | **🌪️ Clima Volatilidad:** `{vault.get('vol', '')}`")
+        st.markdown(f"**🎛️ Pesos del Perceptrón:** RSI: `{vault.get('w_rsi',0):.2f}` | Z-Score: `{vault.get('w_z',0):.2f}` | ADX: `{vault.get('w_adx',0):.2f}`")
+        st.markdown(f"**📏 Gatillos Sensibles:** Buy > `{vault.get('th_buy',0):.2f}` | Sell < `{vault.get('th_sell',0):.2f}`")
+        st.markdown(f"**🎯 Camaleón ATR (Toma de Ganancias):** TP: `{vault.get('atr_tp',0):.2f}x` | SL: `{vault.get('atr_sl',0):.2f}x`")
 
-st.markdown("<br>", unsafe_allow_html=True)
-c_mc1, c_mc2 = st.columns([1, 4])
+    c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
+    
+    ado_val_ui = float(vault.get('ado', 4.0)) if vault.get('ado') is not None else 4.0
+    reinv_val_ui = float(vault.get('reinv', 20.0)) if vault.get('reinv') is not None else 20.0
 
-c_mc1.markdown("### 🎲 Test de Estrés (Monte Carlo)")
-if risk_of_ruin > 10.0:
-    c_mc1.error(f"⚠️ RIESGO DE RUINA: {risk_of_ruin:.1f}%")
-    c_mc1.caption("La IA es frágil ante malas rachas. Se recomienda re-forjar.")
-elif risk_of_ruin > 0.0:
-    c_mc1.warning(f"⚠️ RIESGO DE RUINA: {risk_of_ruin:.1f}%")
-    c_mc1.caption("Riesgo moderado. Gestionar tamaño de posición.")
-else:
-    c_mc1.success(f"🛡️ RIESGO DE RUINA: {risk_of_ruin:.1f}%")
-    c_mc1.caption("Mutante Anti-Frágil. Listo para la guerra.")
+    ado_ui = c_ia1.slider("🎯 Target ADO (IA Override)", 0.0, 100.0, value=ado_val_ui, key=f"ui_{s_id}_ado_w", step=0.5)
+    reinv_ui = c_ia2.slider("💵 Reinversión % (IA Override)", 0.0, 100.0, value=reinv_val_ui, key=f"ui_{s_id}_reinv_w", step=5.0)
 
-if mc_curves is not None:
-    fig_mc = go.Figure()
-    for i in range(min(50, len(mc_curves))):
-        fig_mc.add_trace(go.Scatter(y=mc_curves[i], mode='lines', line=dict(color='rgba(255, 255, 255, 0.1)', width=1), hoverinfo='skip'))
-    real_curve = [capital_inicial] + [capital_inicial + sum([t['Ganancia_$'] for t in t_log if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']][:k+1]) for k in range(len([t for t in t_log if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']]))]
-    fig_mc.add_trace(go.Scatter(y=real_curve, mode='lines', name='Histórico Real', line=dict(color='gold', width=3)))
-    fig_mc.update_layout(title='Proyección Estocástica de Equidad (500 Realidades Alternativas)', template='plotly_dark', height=300, margin=dict(l=10, r=10, t=30, b=10), showlegend=False, yaxis_title='Capital ($)')
-    c_mc2.plotly_chart(fig_mc, use_container_width=True)
+    c_ps1, c_ps2 = st.columns(2)
+    ps_buy_pct = c_ps1.number_input("🟢 % Inversión Compra (Pine Script)", min_value=0, max_value=100, value=int(reinv_val_ui), step=1, key=f"ui_{s_id}_ps_buy")
+    ps_sell_pct = c_ps2.number_input("🔴 % Desinversión Venta (Pine Script)", min_value=1, max_value=100, value=100, step=1, key=f"ui_{s_id}_ps_sell")
 
-with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expanded=False):
-    st.info("Traducción Matemática Idéntica. Ejecución Cuántica con Cero Repainting Activa.")
-    st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct, comision_pct, df_strat.index[0]), language="pine")
+    st.session_state[f'champion_{s_id}']['ado'] = ado_ui
+    st.session_state[f'champion_{s_id}']['reinv'] = ps_buy_pct 
 
-st.markdown("---")
-st.info("🖱️ **TIP GRÁFICO:** Si las velas se ven aplanadas, haz **Doble Clic** dentro del gráfico.")
-fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
-fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio", increasing_line_color='cyan', decreasing_line_color='magenta'), row=1, col=1)
-fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='Río Center (EMA 50)', line=dict(color='yellow', width=1, dash='dot')), row=1, col=1)
-fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='Macro Trend (EMA 200)', line=dict(color='purple', width=2)), row=1, col=1)
-fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['BBU'], mode='lines', name='Squeeze Top (BBU)', line=dict(color='rgba(128,128,128,0.5)', width=1)), row=1, col=1)
-fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['BBL'], mode='lines', name='Squeeze Bot (BBL)', line=dict(color='rgba(128,128,128,0.5)', width=1)), row=1, col=1)
+    c_btn1, c_btn2 = c_ia3.columns(2)
+    if c_btn1.button(f"🚀 FORJAR RÁPIDO ({global_epochs*250})", type="primary", key=f"btn_opt_{s_id}"):
+        st.session_state['abort_opt'] = False
+        st.session_state['global_queue'] = [s_id]
+        st.session_state['run_global'] = True
+        st.rerun()
 
-if not dftr.empty:
-    ents = dftr[dftr['Tipo'] == 'ENTRY']
-    fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white'))), row=1, col=1)
-    wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
-    fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white'))), row=1, col=1)
-    loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
-    fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+    if c_btn2.button(f"🌌 ACTIVAR FORJA PROFUNDA", type="secondary", key=f"btn_deep_{s_id}"):
+        st.session_state['abort_opt'] = False
+        st.session_state['deep_opt_state'] = {'s_id': s_id, 'target_epochs': deep_epochs_target, 'current_epoch': 0, 'paused': False, 'start_time': time.time()}
+        st.rerun()
 
-fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
-y_min_force = df_strat['Low'].min() * 0.98
-y_max_force = df_strat['High'].max() * 1.02
-fig.update_xaxes(fixedrange=False)
-fig.update_yaxes(fixedrange=False, side="right", range=[y_min_force, y_max_force], row=1, col=1)
-fig.update_yaxes(fixedrange=False, side="right", row=2, col=1)
-fig.update_layout(template='plotly_dark', height=800, xaxis_rangeslider_visible=False, dragmode='pan', hovermode='x unified', margin=dict(l=10, r=50, t=30, b=10))
-st.plotly_chart(fig, use_container_width=True, key=f"chart_{s_id}", config={'scrollZoom': True, 'displayModeBar': True, 'modeBarButtonsToRemove': ['lasso2d', 'select2d']})
+    df_strat, eq_curve, t_log, total_comms = run_backtest_eval(s_id, capital_inicial, comision_pct)
+    df_strat['Total_Portfolio'] = eq_curve
+    ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
+    buy_hold_ret = ((df_strat['Close'].iloc[-1] - df_strat['Open'].iloc[0]) / df_strat['Open'].iloc[0]) * 100
+    alpha_pct = ret_pct - buy_hold_ret
+
+    dftr = pd.DataFrame(t_log)
+    tt, wr, pf_val = 0, 0.0, 0.0
+    if not dftr.empty:
+        exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
+        tt = len(exs)
+        if tt > 0:
+            ws = len(exs[exs['Tipo'].isin(['TP', 'DYN_WIN'])])
+            wr = (ws / tt) * 100
+            gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum(); gll = abs(exs[exs['Ganancia_$'] < 0]['Ganancia_$'].sum())
+            pf_val = gpp / gll if gll > 0 else float('inf')
+
+    ado_val = tt / dias_reales if dias_reales > 0 else 0.0
+    mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
+
+    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
+    c1.metric("Net Profit", f"${eq_curve[-1]-capital_inicial:,.2f}", f"{ret_pct:.2f}%")
+    c2.metric("ALPHA", f"{alpha_pct:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
+    c3.metric("Trades", f"{tt}", f"ADO: {ado_val:.2f}")
+    c4.metric("Win Rate", f"{wr:.1f}%")
+    c5.metric("Profit Factor", f"{pf_val:.2f}x")
+    c6.metric("Drawdown", f"{mdd:.2f}%", delta_color="inverse")
+    c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
+
+    # --- EJECUCIÓN DEL TEST DE MONTE CARLO ---
+    mc_curves, risk_of_ruin = simular_monte_carlo(t_log, capital_inicial, 500)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_mc1, c_mc2 = st.columns([1, 4])
+
+    c_mc1.markdown("### 🎲 Test de Estrés (Monte Carlo)")
+    if risk_of_ruin > 10.0:
+        c_mc1.error(f"⚠️ RIESGO DE RUINA: {risk_of_ruin:.1f}%")
+        c_mc1.caption("La IA es frágil ante malas rachas. Se recomienda re-forjar.")
+    elif risk_of_ruin > 0.0:
+        c_mc1.warning(f"⚠️ RIESGO DE RUINA: {risk_of_ruin:.1f}%")
+        c_mc1.caption("Riesgo moderado. Gestionar tamaño de posición.")
+    else:
+        c_mc1.success(f"🛡️ RIESGO DE RUINA: {risk_of_ruin:.1f}%")
+        c_mc1.caption("Mutante Anti-Frágil. Listo para la guerra.")
+
+    if mc_curves is not None:
+        fig_mc = go.Figure()
+        for i in range(min(50, len(mc_curves))):
+            fig_mc.add_trace(go.Scatter(y=mc_curves[i], mode='lines', line=dict(color='rgba(255, 255, 255, 0.1)', width=1), hoverinfo='skip'))
+        real_curve = [capital_inicial] + [capital_inicial + sum([t['Ganancia_$'] for t in t_log if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']][:k+1]) for k in range(len([t for t in t_log if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']]))]
+        fig_mc.add_trace(go.Scatter(y=real_curve, mode='lines', name='Histórico Real', line=dict(color='gold', width=3)))
+        fig_mc.update_layout(title='Proyección Estocástica de Equidad (500 Realidades Alternativas)', template='plotly_dark', height=300, margin=dict(l=10, r=10, t=30, b=10), showlegend=False, yaxis_title='Capital ($)')
+        c_mc2.plotly_chart(fig_mc, use_container_width=True)
+
+    with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expanded=False):
+        st.info("Traducción Matemática Idéntica. Ejecución Cuántica con Cero Repainting Activa.")
+        st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct, comision_pct, df_strat.index[0]), language="pine")
+
+    st.markdown("---")
+    st.info("🖱️ **TIP GRÁFICO:** Si las velas se ven aplanadas, haz **Doble Clic** dentro del gráfico.")
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+    fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio", increasing_line_color='cyan', decreasing_line_color='magenta'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='Río Center (EMA 50)', line=dict(color='yellow', width=1, dash='dot')), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_200'], mode='lines', name='Macro Trend (EMA 200)', line=dict(color='purple', width=2)), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['BBU'], mode='lines', name='Squeeze Top (BBU)', line=dict(color='rgba(128,128,128,0.5)', width=1)), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['BBL'], mode='lines', name='Squeeze Bot (BBL)', line=dict(color='rgba(128,128,128,0.5)', width=1)), row=1, col=1)
+
+    if not dftr.empty:
+        ents = dftr[dftr['Tipo'] == 'ENTRY']
+        fig.add_trace(go.Scatter(x=ents['Fecha'], y=ents['Precio'], mode='markers', name='COMPRA', marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+        wins = dftr[dftr['Tipo'].isin(['TP', 'DYN_WIN'])]
+        fig.add_trace(go.Scatter(x=wins['Fecha'], y=wins['Precio'], mode='markers', name='WIN', marker=dict(symbol='triangle-down', color='#00FF00', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+        loss = dftr[dftr['Tipo'].isin(['SL', 'DYN_LOSS'])]
+        fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white'))), row=1, col=1)
+
+    fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
+    y_min_force = df_strat['Low'].min() * 0.98
+    y_max_force = df_strat['High'].max() * 1.02
+    fig.update_xaxes(fixedrange=False)
+    fig.update_yaxes(fixedrange=False, side="right", range=[y_min_force, y_max_force], row=1, col=1)
+    fig.update_yaxes(fixedrange=False, side="right", row=2, col=1)
+    fig.update_layout(template='plotly_dark', height=800, xaxis_rangeslider_visible=False, dragmode='pan', hovermode='x unified', margin=dict(l=10, r=50, t=30, b=10))
+    st.plotly_chart(fig, use_container_width=True, key=f"chart_{s_id}", config={'scrollZoom': True, 'displayModeBar': True, 'modeBarButtonsToRemove': ['lasso2d', 'select2d']})
