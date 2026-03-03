@@ -24,10 +24,10 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V212: SINCRONIZACIÓN CUÁNTICA DE LATENCIA (PYTHON = TRADINGVIEW) 🔥
-if st.session_state.get('app_version') != 'V212':
+# 🔥 V213: LIMPIEZA MATEMÁTICA ABSOLUTA 🔥
+if st.session_state.get('app_version') != 'V213':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V212'
+    st.session_state['app_version'] = 'V213'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS BASE
@@ -150,13 +150,12 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
     tp_p = 0.0; sl_p = 0.0
     wins = 0
     
-    bars_in_trade = 0 # 🔥 LA VARIABLE MAESTRA DE SINCRONIZACIÓN 🔥
+    bars_in_trade = 0 
     
     for i in range(len(h_arr)):
         if en_pos:
             bars_in_trade += 1
             
-            # 🔥 TradingView 'just_entered' logic: TP/SL solo se activan a partir de la siguiente vela 🔥
             if bars_in_trade > 1:
                 if l_arr[i] <= sl_p:
                     exec_p = sl_p * slip_out
@@ -178,7 +177,6 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                     if peak > 0: dd = (peak - cap_act) / peak * 100.0; max_dd = max(max_dd, dd)
                     continue
 
-            # Dyn Exit Evaluated dynamically on close (or matching condition)
             score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
             if s_c[i] or (score < th_sell):
                 exit_price = (o_arr[i+1] if i+1 < len(o_arr) else c_arr[i]) * slip_out
@@ -204,13 +202,12 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in
                 
-                # 🔥 Cálculo exacto de Nivel como lo pide el bloque V188 🔥
                 current_atr = atr_arr[i]
                 tp_p = p_ent + (current_atr * atr_tp_mult)
                 sl_p = p_ent - (current_atr * atr_sl_mult)
                 
                 en_pos = True
-                bars_in_trade = 0 # Reiniciamos el contador intrabar
+                bars_in_trade = 0 
                 
     pf = g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0)
     wr = (wins / num_trades) * 100.0 if num_trades > 0 else 0.0
@@ -233,7 +230,6 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
         if en_pos:
             bars_in_trade += 1
             
-            # Sincronización Intrabar Visual
             if bars_in_trade > 1:
                 if l_arr[i] <= sl_p:
                     exec_p = sl_p * slip_out
@@ -261,7 +257,6 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
             comm_in = invest_amt * com_pct; total_comms += comm_in; pos_size = invest_amt - comm_in
             p_ent = o_arr[i+1] * slip_in
             
-            # Anclaje V188 Sync
             tp_act = atr_arr[i] * float(df_sim['Active_TP'].values[i])
             sl_act = atr_arr[i] * float(df_sim['Active_SL'].values[i])
             tp_p = p_ent + tp_act
@@ -298,7 +293,7 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
 # ==========================================
 # 🌍 5. SIDEBAR E INFRAESTRUCTURA UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V212</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V213</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -375,7 +370,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V212.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V213.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = get_safe_vault(s_id)
@@ -390,7 +385,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 6. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V212)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V213)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -503,9 +498,6 @@ if df_global.empty: st.error(status_api); st.stop()
 dias_reales = max((df_global.index[-1] - df_global.index[0]).days, 1)
 st.sidebar.info(f"📊 Matrix Data: **{len(df_global):,} velas** ({dias_reales} días Evaluados)")
 
-# ==========================================
-# 🧠 7. MATRICES DE LÓGICA Y OPTIMIZACIÓN
-# ==========================================
 a_c = df_global['Close'].values; a_o = df_global['Open'].values; a_h = df_global['High'].values; a_l = df_global['Low'].values
 a_rsi = df_global['RSI'].values; a_rsi_ma = df_global['RSI_MA'].values; a_adx = df_global['ADX'].values
 a_macd = df_global['MACD'].values; a_macd_sig = df_global['MACD_Sig'].values
@@ -539,6 +531,7 @@ a_rsi_s1 = npshift(a_rsi, 1, 50.0); a_rsi_s5 = npshift(a_rsi, 5, 50.0)
 a_wt1_s1 = npshift(a_wt1, 1, 0.0); a_wt2_s1 = npshift(a_wt2, 1, 0.0)
 a_macd_s1 = npshift(a_macd, 1, 0.0)
 
+# 🔥 V213 FIX: LIMPIEZA DE SINTAXIS (CERO AND/OR EN NUMPY) 🔥
 def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     n_len = len(a_c); s_dict = {}
     
@@ -597,7 +590,9 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     is_magenta = (buy_score >= 70) | retro_peak
     is_magenta_sell = (sell_score >= 70) | retro_peak_sell
-    cond_pink_whale_buy = is_magenta and is_whale_icon
+    
+    # Reparación del error de la V212 (Uso de '&' estricto)
+    cond_pink_whale_buy = is_magenta & is_whale_icon
 
     wt_cross_up = (a_wt1 > a_wt2) & (a_wt1_s1 <= a_wt2_s1); wt_cross_dn = (a_wt1 < a_wt2) & (a_wt1_s1 >= a_wt2_s1)
     wt_oversold = a_wt1 < -60; wt_overbought = a_wt1 > 60
@@ -687,6 +682,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     dna_b_trigger = best_dna.get('b_trigger', random.choice(todas_las_armas_b))
                     dna_b_confirm = best_dna.get('b_confirm', random.choice(todas_las_armas_b))
                     dna_b_op = best_dna.get('b_op', '&')
+                    
                     dna_s_trigger = best_dna.get('s_trigger', random.choice(todas_las_armas_s))
                     dna_s_confirm = best_dna.get('s_confirm', random.choice(todas_las_armas_s))
                     dna_s_op = best_dna.get('s_op', '&')
@@ -804,7 +800,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 m_mask[:split_idx], v_mask[:split_idx]
             )
 
-            # 🔥 EVALUADOR "PURE MONEY" (Sincronizado y Sin Ilusiones) 🔥
+            # 🔥 PURE MONEY FITNESS V213 🔥
             if nt >= 5: 
                 ado_actual = nt / max(1, dias_entrenamiento)
                 ado_target_safe = max(0.1, target_ado)
@@ -854,7 +850,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V212: {s_id}"
+            title = f"GENESIS LAB V213: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
@@ -1201,37 +1197,27 @@ float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
 float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
 
-    # 🔥 EL BLOQUE V188 RESTAURADO ÍNTEGRAMENTE 🔥
     ps_exec = """
 var float locked_atr = na
 var float tp_price = na
 var float sl_price = na
 
-// 1. DETECCIÓN DE ENTRADA REAL (Sincronizado con Python 'p_ent = o_arr[i+1]')
-// Usamos ta.change(strategy.position_size) para detectar la VELA EXACTA donde se ejecutó la compra
 bool just_entered = ta.change(strategy.position_size) > 0
 
-// Orden de entrada
 if signal_buy and strategy.position_size == 0 and window
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
 
-// 2. ANCLAJE MATEMÁTICO INQUEBRANTABLE
 if just_entered
-    // strategy.position_avg_price es el precio real al que entró el broker (incluye slippage)
-    locked_atr := atr[1] // ATR de la vela anterior (la que generó la señal)
+    locked_atr := atr[1] 
     tp_price := strategy.position_avg_price + (locked_atr * atr_tp_mult)
     sl_price := strategy.position_avg_price - (locked_atr * atr_sl_mult)
 
-// 3. MANTENIMIENTO DE ÓRDENES TP/SL
 if strategy.position_size > 0
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_message=wt_exit_long)
 
-// 4. SALIDA DINÁMICA (Inteligencia Artificial)
-// Pine Script ejecutará esto al CIERRE de la vela si se cumple la señal, igual que Python
 if signal_sell and strategy.position_size > 0
     strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
 
-// 5. PURGA DE MEMORIA
 if strategy.position_size == 0
     locked_atr := na
     tp_price := na
