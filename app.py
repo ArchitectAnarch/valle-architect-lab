@@ -300,8 +300,7 @@ def get_safe_vault(s_id):
             if os.path.exists(f"champ_{s_id}.json"):
                 with open(f"champ_{s_id}.json", "r") as f:
                     data = json.load(f)
-                    if data and isinstance(data, dict):
-                        vault = data
+                    if data and isinstance(data, dict): vault = data
         except: pass
     if not vault or not isinstance(vault, dict):
         vault = get_default_dna()
@@ -481,8 +480,8 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         a_c = df['Close'].values
         a_o = df['Open'].values
             
-        df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
-        df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
+        df['EMA_200'] = df['Close'].ewm(span=200, min_periods=1, adjust=False).mean()
+        df['EMA_50'] = df['Close'].ewm(span=50, min_periods=1, adjust=False).mean()
         df['Vol_MA_20'] = df['Volume'].rolling(window=20).mean()
         df['Vol_MA_100'] = df['Volume'].rolling(window=100).mean()
         
@@ -536,26 +535,27 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['Stoch_D'] = df['Stoch_K'].rolling(3).mean()
 
         ap = (df['High'] + df['Low'] + df['Close']) / 3.0
-        esa = ap.ewm(span=10, adjust=False).mean()
-        d_wt = (ap - esa).abs().ewm(span=10, adjust=False).mean()
-        df['WT1'] = ((ap - esa) / (0.015 * np.where(d_wt == 0, 1, d_wt))).ewm(span=21, adjust=False).mean()
-        df['WT2'] = df['WT1'].rolling(4).mean()
+        esa = ap.ewm(span=10, min_periods=1, adjust=False).mean()
+        d_wt = (ap - esa).abs().ewm(span=10, min_periods=1, adjust=False).mean()
+        df['WT1'] = ((ap - esa) / (0.015 * np.where(d_wt == 0, 1, d_wt))).ewm(span=21, min_periods=1, adjust=False).mean()
+        df['WT2'] = df['WT1'].rolling(4, min_periods=1).mean()
         
-        df['Basis'] = df['Close'].rolling(20).mean()
-        dev = df['Close'].rolling(20).std(ddof=0)
+        df['Basis'] = df['Close'].rolling(20, min_periods=1).mean()
+        dev = df['Close'].rolling(20, min_periods=1).std(ddof=0)
         df['BBU'] = df['Basis'] + (2.0 * dev)
         df['BBL'] = df['Basis'] - (2.0 * dev)
         df['BB_Width'] = (df['BBU'] - df['BBL']) / np.where(df['Basis'] == 0, 1, df['Basis'])
-        df['BB_Width_Avg'] = df['BB_Width'].rolling(20).mean()
+        df['BB_Width_Avg'] = df['BB_Width'].rolling(20, min_periods=1).mean()
         df['BB_Delta'] = df['BB_Width'] - df['BB_Width'].shift(1).fillna(0)
-        df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10).mean()
+        df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10, min_periods=1).mean()
         
-        df['KC_Upper'] = df['Basis'] + (df['ATR'] * 1.5)
-        df['KC_Lower'] = df['Basis'] - (df['ATR'] * 1.5)
+        kc_basis = df['Close'].rolling(20, min_periods=1).mean()
+        df['KC_Upper'] = kc_basis + (df['ATR'] * 1.5)
+        df['KC_Lower'] = kc_basis - (df['ATR'] * 1.5)
         df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
         df['Z_Score'] = np.where(dev == 0, 0, (df['Close'] - df['Basis']) / dev)
-        df['RSI_BB_Basis'] = df['RSI'].rolling(14).mean()
-        df['RSI_BB_Dev'] = df['RSI'].rolling(14).std(ddof=0) * 2.0
+        df['RSI_BB_Basis'] = df['RSI'].rolling(14, min_periods=1).mean()
+        df['RSI_BB_Dev'] = df['RSI'].rolling(14, min_periods=1).std(ddof=0) * 2.0
         
         df['Vela_Verde'] = df['Close'] > df['Open']
         df['Vela_Roja'] = df['Close'] < df['Open']
@@ -733,8 +733,8 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     pre_dump = ((a_l < a_bbl) | (rsi_vel < -5)) & flash_vol & a_vr
     dump_memory = pre_dump | npshift_bool(pre_dump, 1) | npshift_bool(pre_dump, 2)
 
-    retro_peak = (rsi_v < 30) & (a_c < a_bbl)
-    retro_peak_sell = (rsi_v > 70) & (a_c > a_bbu)
+    retro_peak = (a_rsi < 30) & (a_c < a_bbl)
+    retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
     support_buy = is_grav_sup & a_rcu
     support_sell = is_grav_res & a_rcd
