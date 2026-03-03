@@ -23,8 +23,8 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V239: CACHÉ FORZADO + PRECISIÓN DECIMAL EXACTA + CÓDIGO COMPLETO 🔥
-APP_VERSION = 'V239'
+# 🔥 V240: PINE SCRIPT DESCOMPRIMIDO (CERO PUNTOS Y COMAS) 🔥
+APP_VERSION = 'V240'
 if st.session_state.get('app_version') != APP_VERSION:
     st.cache_data.clear()
     for key in list(st.session_state.keys()):
@@ -128,7 +128,7 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
-                # 🔥 V239: TRUNCADO A 5 DECIMALES PARA SINCRONÍA DE TICK 🔥
+                # TRUNCADO A 5 DECIMALES PARA SINCRONÍA DE TICK
                 current_atr = atr_arr[i]
                 base_p = c_arr[i] 
                 tp_p = np.round(base_p + (current_atr * atr_tp_mult), 5)
@@ -177,9 +177,9 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
                 hit_tp = h_arr[i] >= tp_p
                 
                 if hit_sl and hit_tp:
-                    if c_arr[i] <= o_arr[i]: # Red
+                    if c_arr[i] <= o_arr[i]: 
                         exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'TP'
-                    else: # Green
+                    else: 
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'SL'
                 elif hit_sl:
                     exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'SL'
@@ -284,7 +284,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V239</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V240</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); st.session_state.clear(); gc.collect(); st.rerun()
 
@@ -331,7 +331,7 @@ def rma_pine(s, length):
             else: out[i] = alpha * s[i] + (1.0 - alpha) * out[i-1]
     return out
 
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V239)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V240)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -685,7 +685,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             title = f"🌌 DEEP FORGE: {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V239: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
+            title = f"GENESIS LAB V240: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
 
         html_str = f"""
         <style>
@@ -736,7 +736,11 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     return df_strat, eq_curve, t_log, total_comms
 
 def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj):
-    v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0); v_adx = vault.get('adx_th', 25.0); v_wf = vault.get('whale_f', 2.5)
+    v_hb = vault.get('hitbox', 1.5)
+    v_tw = vault.get('therm_w', 4.0)
+    v_adx = vault.get('adx_th', 25.0)
+    v_wf = vault.get('whale_f', 2.5)
+    
     json_buy = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {buy_pct}, "limit_price": {{{{close}}}}, "side": "🟢 COMPRA"}}'
     json_sell = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {sell_pct}, "limit_price": {{{{close}}}}, "side": "🔴 VENTA"}}'
 
@@ -756,51 +760,98 @@ therm_wall   = {v_tw}
 adx_trend    = {v_adx}
 whale_factor = {v_wf}
 """
+    # 🔥 PINE SCRIPT DESCOMPRIMIDO: CERO PUNTOS Y COMAS 🔥
     ps_indicators = """
-vol_ma_20 = ta.sma(volume, 20); vol_ma_100 = ta.sma(volume, 100); ema50  = ta.ema(close, 50); ema200 = ta.ema(close, 200)
-rsi_v = ta.rsi(close, 14); atr = ta.atr(14)
-body_size = math.abs(close - open); lower_wick = math.min(open, close) - low; upper_wick = high - math.max(open, close)
+vol_ma_20 = ta.sma(volume, 20)
+vol_ma_100 = ta.sma(volume, 100)
+ema50  = ta.ema(close, 50)
+ema200 = ta.ema(close, 200)
+rsi_v = ta.rsi(close, 14)
+atr = ta.atr(14)
+body_size = math.abs(close - open)
+lower_wick = math.min(open, close) - low
+upper_wick = high - math.max(open, close)
 is_falling_knife = (open[1] - close[1]) > (atr[1] * 1.5)
 [di_plus, di_minus, adx] = ta.dmi(14, 14)
-rvol = volume / (vol_ma_100 == 0 ? 1 : vol_ma_100); high_vol = volume > vol_ma_20
-ap = hlc3; esa = ta.ema(ap, 10); d_wt = ta.ema(math.abs(ap - esa), 10)
-wt1 = ta.ema((ap - esa) / (0.015 * (d_wt == 0 ? 1 : d_wt)), 21); wt2 = ta.sma(wt1, 4)
-basis = ta.sma(close, 20); stdev20 = ta.stdev(close, 20); dev = 2.0 * stdev20; bbu = basis + dev; bbl = basis - dev
-bb_width = basis == 0 ? 1 : (bbu - bbl) / basis; bb_width_avg = ta.sma(bb_width, 20); bb_delta = bb_width - nz(bb_width[1], 0); bb_delta_avg = ta.sma(bb_delta, 10)
-kc_u = ta.sma(close, 20) + (atr * 1.5); kc_l = ta.sma(close, 20) - (atr * 1.5); squeeze_on = (bbu < kc_u) and (bbl > kc_l)
-z_score = stdev20 == 0 ? 0 : (close - basis) / stdev20; rsi_bb_basis = ta.sma(rsi_v, 14); rsi_bb_dev = ta.stdev(rsi_v, 14) * 2.0
-vela_verde = close > open; vela_roja = close < open; rsi_ma = ta.sma(rsi_v, 14)
-rsi_cross_up = (rsi_v > rsi_ma) and (nz(rsi_v[1]) <= nz(rsi_ma[1])); rsi_cross_dn = (rsi_v < rsi_ma) and (nz(rsi_v[1]) >= nz(rsi_ma[1]))
-macro_bull = close >= ema200; trinity_safe = macro_bull and not is_falling_knife
-[macdLine, signalLine, _] = ta.macd(close, 12, 26, 9); stoch_k = ta.sma(ta.stoch(close, high, low, 14), 3); stoch_d = ta.sma(stoch_k, 3)
-chop_v = 100 * math.log10(math.sum(ta.tr, 14) / (ta.highest(high, 14) - ta.lowest(low, 14))) / math.log10(14); gaussian_clean = chop_v < 61.8
+rvol = volume / (vol_ma_100 == 0 ? 1 : vol_ma_100)
+high_vol = volume > vol_ma_20
+ap = hlc3
+esa = ta.ema(ap, 10)
+d_wt = ta.ema(math.abs(ap - esa), 10)
+wt1 = ta.ema((ap - esa) / (0.015 * (d_wt == 0 ? 1 : d_wt)), 21)
+wt2 = ta.sma(wt1, 4)
+basis = ta.sma(close, 20)
+stdev20 = ta.stdev(close, 20)
+dev = 2.0 * stdev20
+bbu = basis + dev
+bbl = basis - dev
+bb_width = basis == 0 ? 1 : (bbu - bbl) / basis
+bb_width_avg = ta.sma(bb_width, 20)
+bb_delta = bb_width - nz(bb_width[1], 0)
+bb_delta_avg = ta.sma(bb_delta, 10)
+kc_u = ta.sma(close, 20) + (atr * 1.5)
+kc_l = ta.sma(close, 20) - (atr * 1.5)
+squeeze_on = (bbu < kc_u) and (bbl > kc_l)
+z_score = stdev20 == 0 ? 0 : (close - basis) / stdev20
+rsi_bb_basis = ta.sma(rsi_v, 14)
+rsi_bb_dev = ta.stdev(rsi_v, 14) * 2.0
+vela_verde = close > open
+vela_roja = close < open
+rsi_ma = ta.sma(rsi_v, 14)
+rsi_cross_up = (rsi_v > rsi_ma) and (nz(rsi_v[1]) <= nz(rsi_ma[1]))
+rsi_cross_dn = (rsi_v < rsi_ma) and (nz(rsi_v[1]) >= nz(rsi_ma[1]))
+macro_bull = close >= ema200
+trinity_safe = macro_bull and not is_falling_knife
+[macdLine, signalLine, _] = ta.macd(close, 12, 26, 9)
+stoch_k = ta.sma(ta.stoch(close, high, low, 14), 3)
+stoch_d = ta.sma(stoch_k, 3)
+chop_v = 100 * math.log10(math.sum(ta.tr, 14) / (ta.highest(high, 14) - ta.lowest(low, 14))) / math.log10(14)
+gaussian_clean = chop_v < 61.8
 
-local_high = ta.highest(high[1], 30); local_low = ta.lowest(low[1], 30); swing_range = local_high - local_low
-fib_618_b = local_high - (swing_range * 0.618); fib_618_s = local_low + (swing_range * 0.618)
+local_high = ta.highest(high[1], 30)
+local_low = ta.lowest(low[1], 30)
+swing_range = local_high - local_low
+fib_618_b = local_high - (swing_range * 0.618)
+fib_618_s = local_low + (swing_range * 0.618)
 pa_engulfing_buy = vela_verde and nz(vela_roja[1]) and close > nz(open[1]) and open < nz(close[1])
 pa_engulfing_sell = vela_roja and nz(vela_verde[1]) and close < nz(open[1]) and open > nz(close[1])
-pa_pinbar_buy = lower_wick > body_size * 2.5 and upper_wick < body_size; pa_pinbar_sell = upper_wick > body_size * 2.5 and lower_wick < body_size
+pa_pinbar_buy = lower_wick > body_size * 2.5 and upper_wick < body_size
+pa_pinbar_sell = upper_wick > body_size * 2.5 and lower_wick < body_size
 pa_3_soldiers = vela_verde and nz(vela_verde[1]) and nz(vela_verde[2]) and close > nz(close[1]) and nz(close[1]) > nz(close[2])
 pa_3_crows = vela_roja and nz(vela_roja[1]) and nz(vela_roja[2]) and close < nz(close[1]) and nz(close[1]) < nz(close[2])
 
-low_30 = ta.lowest(low[1], 30); low_100 = ta.lowest(low[1], 100); low_300 = ta.lowest(low[1], 300)
-a_tsup = math.max(nz(low_30, 0), nz(low_100, 0), nz(low_300, 0))
-high_30 = ta.highest(high[1], 30); high_100 = ta.highest(high[1], 100); high_300 = ta.highest(high[1], 300)
-a_tres = math.min(nz(high_30, 99999), nz(high_100, 99999), nz(high_300, 99999))
-a_dsup = close == 0 ? 0 : math.abs(close - a_tsup) / close * 100; a_dres = close == 0 ? 0 : math.abs(close - a_tres) / close * 100
+low_30 = ta.lowest(low[1], 30)
+low_100 = ta.lowest(low[1], 100)
+low_300 = ta.lowest(low[1], 300)
+a_tsup = math.max(nz(low_30, 0), math.max(nz(low_100, 0), nz(low_300, 0)))
+high_30 = ta.highest(high[1], 30)
+high_100 = ta.highest(high[1], 100)
+high_300 = ta.highest(high[1], 300)
+a_tres = math.min(nz(high_30, 99999), math.min(nz(high_100, 99999), nz(high_300, 99999)))
+a_dsup = close == 0 ? 0 : math.abs(close - a_tsup) / close * 100
+a_dres = close == 0 ? 0 : math.abs(close - a_tres) / close * 100
 sr_val = atr * 2.0
 
-ceil_w = 0; floor_w = 0
-ceil_w += (nz(high_30) > close and nz(high_30) <= close + sr_val) ? 1 : 0; ceil_w += (nz(low_30) > close and nz(low_30) <= close + sr_val) ? 1 : 0
-ceil_w += (nz(high_100) > close and nz(high_100) <= close + sr_val) ? 3 : 0; ceil_w += (nz(low_100) > close and nz(low_100) <= close + sr_val) ? 3 : 0
-ceil_w += (nz(high_300) > close and nz(high_300) <= close + sr_val) ? 5 : 0; ceil_w += (nz(low_300) > close and nz(low_300) <= close + sr_val) ? 5 : 0
+ceil_w = 0
+floor_w = 0
+ceil_w += (nz(high_30) > close and nz(high_30) <= close + sr_val) ? 1 : 0
+ceil_w += (nz(low_30) > close and nz(low_30) <= close + sr_val) ? 1 : 0
+ceil_w += (nz(high_100) > close and nz(high_100) <= close + sr_val) ? 3 : 0
+ceil_w += (nz(low_100) > close and nz(low_100) <= close + sr_val) ? 3 : 0
+ceil_w += (nz(high_300) > close and nz(high_300) <= close + sr_val) ? 5 : 0
+ceil_w += (nz(low_300) > close and nz(low_300) <= close + sr_val) ? 5 : 0
 
-floor_w += (nz(high_30) < close and nz(high_30) >= close - sr_val) ? 1 : 0; floor_w += (nz(low_30) < close and nz(low_30) >= close - sr_val) ? 1 : 0
-floor_w += (nz(high_100) < close and nz(high_100) >= close - sr_val) ? 3 : 0; floor_w += (nz(low_100) < close and nz(low_100) >= close - sr_val) ? 3 : 0
-floor_w += (nz(high_300) < close and nz(high_300) >= close - sr_val) ? 5 : 0; floor_w += (nz(low_300) < close and nz(low_300) >= close - sr_val) ? 5 : 0
+floor_w += (nz(high_30) < close and nz(high_30) >= close - sr_val) ? 1 : 0
+floor_w += (nz(low_30) < close and nz(low_30) >= close - sr_val) ? 1 : 0
+floor_w += (nz(high_100) < close and nz(high_100) >= close - sr_val) ? 3 : 0
+floor_w += (nz(low_100) < close and nz(low_100) >= close - sr_val) ? 3 : 0
+floor_w += (nz(high_300) < close and nz(high_300) >= close - sr_val) ? 5 : 0
+floor_w += (nz(low_300) < close and nz(low_300) >= close - sr_val) ? 5 : 0
 
-is_abyss = floor_w == 0; is_hard_wall = ceil_w >= therm_wall
-neon_up = squeeze_on and (close >= bbu * 0.999) and vela_verde; neon_dn = squeeze_on and (close <= bbl * 1.001) and vela_roja
+is_abyss = floor_w == 0
+is_hard_wall = ceil_w >= therm_wall
+neon_up = squeeze_on and (close >= bbu * 0.999) and vela_verde
+neon_dn = squeeze_on and (close <= bbl * 1.001) and vela_roja
 defcon_level = 5
 if neon_up or neon_dn
     defcon_level := 4
@@ -811,82 +862,149 @@ if neon_up or neon_dn
             if bb_delta > (bb_delta_avg * 1.5) and adx > (adx_trend + 5) and rvol > 1.2
                 defcon_level := 1
 
-cond_defcon_buy = defcon_level <= 2 and neon_up; cond_defcon_sell = defcon_level <= 2 and neon_dn
-cond_therm_buy_bounce = (floor_w >= therm_wall) and rsi_cross_up and not is_hard_wall; cond_therm_buy_vacuum = (ceil_w <= 3) and neon_up and not is_abyss
-cond_therm_sell_wall = (ceil_w >= therm_wall) and rsi_cross_dn; cond_therm_sell_panic = is_abyss and vela_roja
-tol = atr * 0.5; is_grav_sup = a_dsup < hitbox_pct; is_grav_res = a_dres < hitbox_pct
-cross_up_res = (close > a_tres) and (nz(close[1]) <= nz(a_tres[1])); cross_dn_sup = (close < a_tsup) and (nz(close[1]) >= nz(a_tsup[1]))
+cond_defcon_buy = defcon_level <= 2 and neon_up
+cond_defcon_sell = defcon_level <= 2 and neon_dn
+cond_therm_buy_bounce = (floor_w >= therm_wall) and rsi_cross_up and not is_hard_wall
+cond_therm_buy_vacuum = (ceil_w <= 3) and neon_up and not is_abyss
+cond_therm_sell_wall = (ceil_w >= therm_wall) and rsi_cross_dn
+cond_therm_sell_panic = is_abyss and vela_roja
+tol = atr * 0.5
+is_grav_sup = a_dsup < hitbox_pct
+is_grav_res = a_dres < hitbox_pct
+cross_up_res = (close > a_tres) and (nz(close[1]) <= nz(a_tres[1]))
+cross_dn_sup = (close < a_tsup) and (nz(close[1]) >= nz(a_tsup[1]))
 cond_lock_buy_bounce = is_grav_sup and (low <= a_tsup + tol) and (close > a_tsup) and vela_verde
 cond_lock_buy_break = is_grav_res and cross_up_res and high_vol and vela_verde
 cond_lock_sell_reject = is_grav_res and (high >= a_tres - tol) and (close < a_tres) and vela_roja
 cond_lock_sell_breakd = is_grav_sup and cross_dn_sup and vela_roja
 
 flash_vol = (rvol > whale_factor * 0.8) and (body_size > atr * 0.3)
-whale_buy = flash_vol and vela_verde; whale_sell = flash_vol and vela_roja
+whale_buy = flash_vol and vela_verde
+whale_sell = flash_vol and vela_roja
 whale_memory = whale_buy or nz(whale_buy[1]) or nz(whale_buy[2]) or whale_sell or nz(whale_sell[1]) or nz(whale_sell[2])
 is_whale_icon = whale_buy and not nz(whale_buy[1])
 
 rsi_vel = rsi_v - nz(rsi_v[1])
-pre_pump = (high > bbu or rsi_vel > 5) and flash_vol and vela_verde; pump_memory = pre_pump or nz(pre_pump[1]) or nz(pre_pump[2])
-pre_dump = (low < bbl or rsi_vel < -5) and flash_vol and vela_roja; dump_memory = pre_dump or nz(pre_dump[1]) or nz(pre_dump[2])
+pre_pump = (high > bbu or rsi_vel > 5) and flash_vol and vela_verde
+pump_memory = pre_pump or nz(pre_pump[1]) or nz(pre_pump[2])
+pre_dump = (low < bbl or rsi_vel < -5) and flash_vol and vela_roja
+dump_memory = pre_dump or nz(pre_dump[1]) or nz(pre_dump[2])
 
-retro_peak = (rsi_v < 30) and (close < bbl); retro_peak_sell = (rsi_v > 70) and (close > bbu)
+retro_peak = (rsi_v < 30) and (close < bbl)
+retro_peak_sell = (rsi_v > 70) and (close > bbu)
 k_break_up = (rsi_v > (rsi_bb_basis + rsi_bb_dev)) and (nz(rsi_v[1]) <= (nz(rsi_bb_basis[1]) + nz(rsi_bb_dev[1])))
-support_buy = is_grav_sup and rsi_cross_up; support_sell = is_grav_res and rsi_cross_dn
+support_buy = is_grav_sup and rsi_cross_up
+support_sell = is_grav_res and rsi_cross_dn
 div_bull = nz(low[1]) < nz(low[5]) and nz(rsi_v[1]) > nz(rsi_v[5]) and (rsi_v < 35)
 div_bear = nz(high[1]) > nz(high[5]) and nz(rsi_v[1]) < nz(rsi_v[5]) and (rsi_v > 65)
 
 base_mask = retro_peak or k_break_up or support_buy or div_bull
 buy_score = 0.0
 buy_score := (base_mask and retro_peak) ? 50.0 : (base_mask and not retro_peak) ? 30.0 : buy_score
-buy_score += is_grav_sup ? 25.0 : 0.0; buy_score += whale_memory ? 20.0 : 0.0; buy_score += pump_memory ? 15.0 : 0.0; buy_score += div_bull ? 15.0 : 0.0; buy_score += (k_break_up and not retro_peak) ? 15.0 : 0.0; buy_score += (z_score < -2.0) ? 15.0 : 0.0; buy_score := buy_score > 99 ? 99.0 : buy_score
+buy_score += is_grav_sup ? 25.0 : 0.0
+buy_score += whale_memory ? 20.0 : 0.0
+buy_score += pump_memory ? 15.0 : 0.0
+buy_score += div_bull ? 15.0 : 0.0
+buy_score += (k_break_up and not retro_peak) ? 15.0 : 0.0
+buy_score += (z_score < -2.0) ? 15.0 : 0.0
+buy_score := buy_score > 99 ? 99.0 : buy_score
 
 base_mask_s = retro_peak_sell or rsi_cross_dn or support_sell or div_bear
 sell_score = 0.0
 sell_score := (base_mask_s and retro_peak_sell) ? 50.0 : (base_mask_s and not retro_peak_sell) ? 30.0 : sell_score
-sell_score += is_grav_res ? 25.0 : 0.0; sell_score += whale_memory ? 20.0 : 0.0; sell_score += dump_memory ? 15.0 : 0.0; sell_score += div_bear ? 15.0 : 0.0; sell_score += (rsi_cross_dn and not retro_peak_sell) ? 15.0 : 0.0; sell_score += (z_score > 2.0) ? 15.0 : 0.0; sell_score := sell_score > 99 ? 99.0 : sell_score
+sell_score += is_grav_res ? 25.0 : 0.0
+sell_score += whale_memory ? 20.0 : 0.0
+sell_score += dump_memory ? 15.0 : 0.0
+sell_score += div_bear ? 15.0 : 0.0
+sell_score += (rsi_cross_dn and not retro_peak_sell) ? 15.0 : 0.0
+sell_score += (z_score > 2.0) ? 15.0 : 0.0
+sell_score := sell_score > 99 ? 99.0 : sell_score
 
-is_magenta = (buy_score >= 70) or retro_peak; is_magenta_sell = (sell_score >= 70) or retro_peak_sell
+is_magenta = (buy_score >= 70) or retro_peak
+is_magenta_sell = (sell_score >= 70) or retro_peak_sell
 cond_pink_whale_buy = is_magenta and is_whale_icon
-wt_cross_up = (wt1 > wt2) and (nz(wt1[1]) <= nz(wt2[1])); wt_cross_dn = (wt1 < wt2) and (nz(wt1[1]) >= nz(wt2[1]))
-wt_oversold = wt1 < -60; wt_overbought = wt1 > 60
+wt_cross_up = (wt1 > wt2) and (nz(wt1[1]) <= nz(wt2[1]))
+wt_cross_dn = (wt1 < wt2) and (nz(wt1[1]) >= nz(wt2[1]))
+wt_oversold = wt1 < -60
+wt_overbought = wt1 > 60
 
-ping_b = (adx < adx_trend) and (close < bbl) and vela_verde; ping_s = (close > bbu) or (rsi_v > 70)
-squeeze_b = neon_up; squeeze_s = (close < ema50)
-therm_b = cond_therm_buy_bounce; therm_s = cond_therm_sell_wall
-climax_b = cond_pink_whale_buy; climax_s = (rsi_v > 80)
-lock_b = cond_lock_buy_bounce; lock_s = cond_lock_sell_reject
-defcon_b = cond_defcon_buy; defcon_s = cond_defcon_sell
-jugg_b = macro_bull and (close > ema50) and nz(close[1]) < nz(ema50[1]) and vela_verde and not is_falling_knife; jugg_s = (close < ema50)
-trinity_b = macro_bull and (rsi_v < 35) and vela_verde and not is_falling_knife; trinity_s = (rsi_v > 75) or (close < ema200)
-lev_b = macro_bull and rsi_cross_up and (rsi_v < 45); lev_s = (close < ema200)
-commander_b = cond_pink_whale_buy or cond_lock_buy_bounce; commander_s = (close < ema50)
+ping_b = (adx < adx_trend) and (close < bbl) and vela_verde
+ping_s = (close > bbu) or (rsi_v > 70)
+squeeze_b = neon_up
+squeeze_s = (close < ema50)
+therm_b = cond_therm_buy_bounce
+therm_s = cond_therm_sell_wall
+climax_b = cond_pink_whale_buy
+climax_s = (rsi_v > 80)
+lock_b = cond_lock_buy_bounce
+lock_s = cond_lock_sell_reject
+defcon_b = cond_defcon_buy
+defcon_s = cond_defcon_sell
+jugg_b = macro_bull and (close > ema50) and nz(close[1]) < nz(ema50[1]) and vela_verde and not is_falling_knife
+jugg_s = (close < ema50)
+trinity_b = macro_bull and (rsi_v < 35) and vela_verde and not is_falling_knife
+trinity_s = (rsi_v > 75) or (close < ema200)
+lev_b = macro_bull and rsi_cross_up and (rsi_v < 45)
+lev_s = (close < ema200)
+commander_b = cond_pink_whale_buy or cond_lock_buy_bounce
+commander_s = (close < ema50)
 
-r_Pink_Whale_Buy = cond_pink_whale_buy; r_Lock_Bounce = cond_lock_buy_bounce; r_Lock_Break = cond_lock_buy_break; r_Neon_Up = neon_up; r_Defcon_Buy = cond_defcon_buy; r_Therm_Bounce = cond_therm_buy_bounce; r_Therm_Vacuum = cond_therm_buy_vacuum; r_Nuclear_Buy = is_magenta and (wt_oversold or wt_cross_up); r_Early_Buy = is_magenta; r_Rebound_Buy = rsi_cross_up and not is_magenta
-r_Lock_Reject = cond_lock_sell_reject; r_Lock_Breakd = cond_lock_sell_breakd; r_Neon_Dn = neon_dn; r_Defcon_Sell = cond_defcon_sell; r_Therm_Wall_Sell = cond_therm_sell_wall; r_Therm_Panic_Sell = cond_therm_sell_panic; r_Nuclear_Sell = (rsi_v > 70) and (wt_overbought or wt_cross_dn); r_Early_Sell = (rsi_v > 70) and vela_roja
+r_Pink_Whale_Buy = cond_pink_whale_buy
+r_Lock_Bounce = cond_lock_buy_bounce
+r_Lock_Break = cond_lock_buy_break
+r_Neon_Up = neon_up
+r_Defcon_Buy = cond_defcon_buy
+r_Therm_Bounce = cond_therm_buy_bounce
+r_Therm_Vacuum = cond_therm_buy_vacuum
+r_Nuclear_Buy = is_magenta and (wt_oversold or wt_cross_up)
+r_Early_Buy = is_magenta
+r_Rebound_Buy = rsi_cross_up and not is_magenta
+r_Lock_Reject = cond_lock_sell_reject
+r_Lock_Breakd = cond_lock_sell_breakd
+r_Neon_Dn = neon_dn
+r_Defcon_Sell = cond_defcon_sell
+r_Therm_Wall_Sell = cond_therm_sell_wall
+r_Therm_Panic_Sell = cond_therm_sell_panic
+r_Nuclear_Sell = (rsi_v > 70) and (wt_overbought or wt_cross_dn)
+r_Early_Sell = (rsi_v > 70) and vela_roja
 
-wyc_spring_buy = (low < a_tsup) and (close > a_tsup) and high_vol; wyc_upthrust_sell = (high > a_tres) and (close < a_tres) and high_vol
-vsa_accum_buy = (body_size < atr * 0.5) and (lower_wick > body_size * 1.5) and high_vol and vela_roja; vsa_dist_sell = (body_size < atr * 0.5) and (upper_wick > body_size * 1.5) and high_vol and vela_verde
-fibo_618_buy = (low < fib_618_b) and (close > fib_618_b); fib_618_sell = (high > fib_618_s) and (close < fib_618_s)
-macd_impulse_buy = (macdLine > signalLine) and (macdLine > 0) and (macdLine > nz(macdLine[1])); macd_exhaust_sell = (macdLine < signalLine) and (macdLine > 0) and (macdLine < nz(macdLine[1]))
-stoch_os_buy = (stoch_k < 20) and (stoch_k > stoch_d); stoch_ob_sell = (stoch_k > 80) and (stoch_k < stoch_d)
+wyc_spring_buy = (low < a_tsup) and (close > a_tsup) and high_vol
+wyc_upthrust_sell = (high > a_tres) and (close < a_tres) and high_vol
+vsa_accum_buy = (body_size < atr * 0.5) and (lower_wick > body_size * 1.5) and high_vol and vela_roja
+vsa_dist_sell = (body_size < atr * 0.5) and (upper_wick > body_size * 1.5) and high_vol and vela_verde
+fibo_618_buy = (low < fib_618_b) and (close > fib_618_b)
+fibo_618_sell = (high > fib_618_s) and (close < fib_618_s)
+macd_impulse_buy = (macdLine > signalLine) and (macdLine > 0) and (macdLine > nz(macdLine[1]))
+macd_exhaust_sell = (macdLine < signalLine) and (macdLine > 0) and (macdLine < nz(macdLine[1]))
+stoch_os_buy = (stoch_k < 20) and (stoch_k > stoch_d)
+stoch_ob_sell = (stoch_k > 80) and (stoch_k < stoch_d)
 """
     m_cond = "macro_bull" if vault.get('macro') == "Bull Only" else "not macro_bull" if vault.get('macro') == "Bear Only" else "high_vol" if vault.get('macro') == "Organic_Vol" else "squeeze_on" if vault.get('macro') == "Organic_Squeeze" else "trinity_safe" if vault.get('macro') == "Organic_Safe" else "gaussian_clean" if vault.get('macro') == "Organic_Gaussian_Clean" else "true"
     v_cond = "(adx >= adx_trend)" if vault.get('vol') == "Trend" else "(adx < adx_trend)" if vault.get('vol') == "Range" else "pump_memory" if vault.get('vol') == "Organic_Pump" else "dump_memory" if vault.get('vol') == "Organic_Dump" else "gaussian_clean" if vault.get('vol') == "Organic_Gaussian_Clean" else "true"
 
     t_b, op_b, c_b = vault.get('b_trigger', ''), vault.get('b_op', '&'), vault.get('b_confirm', '')
-    str_op_b = "and" if op_b == '&' else "or"; b_cond = f"({pine_map.get(t_b, 'false')} {str_op_b} {pine_map.get(c_b, 'false')})" if t_b and c_b else "false"
+    str_op_b = "and" if op_b == '&' else "or"
+    b_cond = f"({pine_map.get(t_b, 'false')} {str_op_b} {pine_map.get(c_b, 'false')})" if t_b and c_b else "false"
     
     t_s, op_s, c_s = vault.get('s_trigger', ''), vault.get('s_op', '&'), vault.get('s_confirm', '')
-    str_op_s = "and" if op_s == '&' else "or"; s_cond = f"({pine_map.get(t_s, 'false')} {str_op_s} {pine_map.get(c_s, 'false')})" if t_s and c_s else "false"
+    str_op_s = "and" if op_s == '&' else "or"
+    s_cond = f"({pine_map.get(t_s, 'false')} {str_op_s} {pine_map.get(c_s, 'false')})" if t_s and c_s else "false"
     
+    # 🔥 PINE SCRIPT DESCOMPRIMIDO: CERO PUNTOS Y COMAS 🔥
     ps_logic = f"""
-float w_rsi = {vault.get('w_rsi',0.0):.4f}; float w_z = {vault.get('w_z',0.0):.4f}; float w_adx = {vault.get('w_adx',0.0):.4f}
+float w_rsi = {vault.get('w_rsi',0.0):.4f}
+float w_z = {vault.get('w_z',0.0):.4f}
+float w_adx = {vault.get('w_adx',0.0):.4f}
+
 float math_score = (rsi_v * w_rsi) + (z_score * w_z) + (adx * w_adx)
+
 bool raw_buy = ({b_cond}) or (math_score > {vault.get('th_buy',99.0):.2f})
 bool signal_buy = raw_buy and {m_cond} and {v_cond}
+
 bool signal_sell = ({s_cond}) or (math_score < {vault.get('th_sell',-99.0):.2f})
-float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}; float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
+
+float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
+float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
 
     ps_exec = """
@@ -896,7 +1014,7 @@ var float sl_price = na
 
 if signal_buy and strategy.position_size == 0 and window
     locked_atr := atr
-    // 🔥 V239: TRUNCADO DECIMAL A 5 DIGITOS (Sincronía con Python y Coinbase) 🔥
+    // 🔥 V240: TRUNCADO DECIMAL (Sincronía con Python y Coinbase) 🔥
     tp_price := math.round(close + (locked_atr * atr_tp_mult), 5)
     sl_price := math.round(close - (locked_atr * atr_sl_mult), 5)
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
