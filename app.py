@@ -24,13 +24,13 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V217: ESPEJO CUÁNTICO DEFINITIVO (COMPILACIÓN PERFECTA) 🔥
-if st.session_state.get('app_version') != 'V217':
+# 🔥 V218: SINCRONIZACIÓN MILIMÉTRICA Y PRECISIÓN FLOAT 🔥
+if st.session_state.get('app_version') != 'V218':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V217'
+    st.session_state['app_version'] = 'V218'
 
 # ==========================================
-# 🧠 1. FUNCIONES MATEMÁTICAS BASE
+# 🧠 1. FUNCIONES MATEMÁTICAS 
 # ==========================================
 def npshift(arr, num, fill_value=np.nan):
     result = np.empty_like(arr)
@@ -47,7 +47,7 @@ def npshift_bool(arr, num, fill_value=False):
     return result
 
 # ==========================================
-# ⚙️ 2. NÚCLEO C++ (EMULACIÓN 1:1 TRADINGVIEW)
+# ⚙️ 2. NÚCLEO C++ (EMULACIÓN 1:1 DE TRADINGVIEW)
 # ==========================================
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
@@ -63,50 +63,52 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
     bars_in_trade = 0
     
     for i in range(len(h_arr)):
+        just_closed_dyn = False
+        
         if en_pos:
             bars_in_trade += 1
+            cierra = False
             
-            # 🔥 EVALUACIÓN INTRABAR (Idéntico a Pine Script: Solo activo desde la 2da vela)
+            # 🔥 EVALUACIÓN INTRABAR (Activo a partir de la vela 2)
             if bars_in_trade > 1: 
                 if l_arr[i] <= sl_p:
                     exec_p = sl_p * slip_out
                     ret = (exec_p - p_ent) / p_ent
                     gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
                     cap_act += profit
-                    g_loss += abs(profit); num_trades += 1; en_pos = False
+                    g_loss += abs(profit); num_trades += 1; en_pos = False; cierra = True
                     if cap_act > peak: peak = cap_act
                     if peak > 0: dd = (peak - cap_act) / peak * 100.0; max_dd = max(max_dd, dd)
-                    continue 
                 
                 elif h_arr[i] >= tp_p:
                     exec_p = tp_p * slip_out
                     ret = (exec_p - p_ent) / p_ent
                     gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
                     cap_act += profit
-                    g_profit += profit; num_trades += 1; en_pos = False
+                    g_profit += profit; num_trades += 1; en_pos = False; cierra = True
                     if profit > 0: wins += 1
                     if cap_act > peak: peak = cap_act
                     if peak > 0: dd = (peak - cap_act) / peak * 100.0; max_dd = max(max_dd, dd)
-                    continue 
 
-            # 🔥 EVALUACIÓN DE CIERRE DINÁMICO (strategy.close emulado)
-            score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
-            if s_c[i] or (score < th_sell):
-                # Se vende a la apertura de la vela de mañana, sufriendo los gaps del mercado
-                exit_price = (o_arr[i+1] if i+1 < len(o_arr) else c_arr[i]) * slip_out
-                ret = (exit_price - p_ent) / p_ent; gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
-                cap_act += profit
-                if profit > 0: 
-                    g_profit += profit; wins += 1
-                else: 
-                    g_loss += abs(profit)
-                num_trades += 1; en_pos = False
+            # 🔥 EVALUACIÓN DE CIERRE DINÁMICO (Pine Script: strategy.close)
+            if not cierra:
+                score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
+                if s_c[i] or (score < th_sell):
+                    exit_price = (o_arr[i+1] if i+1 < len(o_arr) else c_arr[i]) * slip_out 
+                    ret = (exit_price - p_ent) / p_ent; gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
+                    cap_act += profit
+                    if profit > 0: 
+                        g_profit += profit; wins += 1
+                    else: 
+                        g_loss += abs(profit)
+                    num_trades += 1; en_pos = False
+                    # Bloqueamos la entrada en la misma vela, idéntico a TradingView
+                    just_closed_dyn = True
             
-            if cap_act > peak: peak = cap_act
-            if peak > 0: dd = (peak - cap_act) / peak * 100.0; max_dd = max(max_dd, dd)
             if cap_act <= 0: break
             
-        if not en_pos and i+1 < len(h_arr):
+        # 🔥 EVALUACIÓN DE ENTRADA (Bloqueado si se hizo Dyn_Exit este mismo tick)
+        if not en_pos and not just_closed_dyn and i+1 < len(h_arr):
             score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
             if (b_c[i] or (score > th_buy)) and m_mask[i] and v_mask[i]:
                 if invest_pct > 0: invest_amt = cap_act * (invest_pct / 100.0) 
@@ -114,7 +116,7 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 if invest_amt > cap_act: invest_amt = cap_act 
                 
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
-                p_ent = o_arr[i+1] * slip_in
+                p_ent = o_arr[i+1] * slip_in 
                 
                 current_atr = atr_arr[i] 
                 tp_p = p_ent + (current_atr * atr_tp_mult)
@@ -142,6 +144,8 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
 
     for i in range(n):
         cierra = False
+        just_closed_dyn = False
+        
         if en_pos:
             bars_in_trade += 1
             if bars_in_trade > 1:
@@ -163,8 +167,9 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
                 cap_act += profit
                 if cap_act <= 0: cap_act = 0
                 registro_trades.append({'Fecha': f_arr[i+1] if i+1 < n else f_arr[i], 'Tipo': 'DYN_WIN' if profit>0 else 'DYN_LOSS', 'Precio': exit_price, 'Ganancia_$': profit}); en_pos, cierra = False, True
+                just_closed_dyn = True
         
-        if not en_pos and not cierra and buy_arr[i] and i+1 < n and cap_act > 0:
+        if not en_pos and not just_closed_dyn and buy_arr[i] and i+1 < n and cap_act > 0:
             if invest_pct > 0: invest_amt = cap_act * (invest_pct / 100.0)
             else: invest_amt = cap_ini
             if invest_amt > cap_act: invest_amt = cap_act
@@ -293,7 +298,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V217</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V218</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -370,7 +375,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V217.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V218.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = get_safe_vault(s_id)
@@ -385,7 +390,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V217)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V218)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -423,7 +428,8 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         df['Vol_MA_100'] = df['Volume'].rolling(window=100, min_periods=1).mean()
         df['RVol'] = df['Volume'] / df['Vol_MA_100'].replace(0, 1)
         df['High_Vol'] = df['Volume'] > df['Vol_MA_20']
-        df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14).fillna(df['High']-df['Low']).replace(0, 0.001)
+        tr = df[['High', 'Low']].max(axis=1) - df[['High', 'Low']].min(axis=1)
+        df['ATR'] = tr.ewm(alpha=1/14, min_periods=1, adjust=False).mean().fillna(df['High']-df['Low']).replace(0, 0.001)
         df['RSI'] = ta.rsi(df['Close'], length=14).fillna(50.0)
         df['RSI_MA'] = df['RSI'].rolling(14, min_periods=1).mean()
         df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
@@ -517,7 +523,6 @@ a_sqz_on = df_global['Squeeze_On'].values; a_bb_delta = df_global['BB_Delta'].va
 a_zscore = df_global['Z_Score'].values; a_rsi_bb_b = df_global['RSI_BB_Basis'].values; a_rsi_bb_d = df_global['RSI_BB_Dev'].values
 a_lw = df_global['lower_wick'].values; a_uw = df_global['upper_wick'].values; a_bs = df_global['body_size'].values
 a_mb = df_global['Macro_Bull'].values; a_fk = df_global['is_falling_knife'].values
-a_pp_slope = df_global['PP_Slope'].fillna(0).values
 
 a_pa_eng_b = df_global['PA_Engulfing_Buy'].values; a_pa_eng_s = df_global['PA_Engulfing_Sell'].values
 a_pa_pin_b = df_global['PA_Pinbar_Buy'].values; a_pa_pin_s = df_global['PA_Pinbar_Sell'].values
@@ -643,7 +648,9 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     return s_dict
 
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None):
+    
     vault = get_safe_vault(s_id)
+    
     best_fit_live = vault.get('fit', -float('inf'))
     best_net_live = vault.get('net', -float('inf'))
     best_pf_live = vault.get('pf', 0.0)
@@ -658,6 +665,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
     chunks = max(1, iters // chunk_size)
     start_time = time.time()
     n_len = len(a_c)
+
     split_idx = n_len
     dias_entrenamiento = max(1, dias_reales)
 
@@ -670,6 +678,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             break
 
         for _ in range(chunk_size): 
+            
             if best_dna is not None: 
                 rand_val = random.random()
                 
@@ -677,6 +686,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     dna_b_trigger = best_dna.get('b_trigger', random.choice(todas_las_armas_b))
                     dna_b_confirm = best_dna.get('b_confirm', random.choice(todas_las_armas_b))
                     dna_b_op = best_dna.get('b_op', '&')
+                    
                     dna_s_trigger = best_dna.get('s_trigger', random.choice(todas_las_armas_s))
                     dna_s_confirm = best_dna.get('s_confirm', random.choice(todas_las_armas_s))
                     dna_s_op = best_dna.get('s_op', '&')
@@ -698,13 +708,14 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                         elif target_env == 'th': r_therm = random.choice([3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
                         elif target_env == 'adx': r_adx = random.choice([15.0, 20.0, 25.0, 30.0, 35.0])
 
-                    r_w_rsi = best_dna.get('w_rsi', 0.0) + random.gauss(0, 0.1)
-                    r_w_z = best_dna.get('w_z', 0.0) + random.gauss(0, 0.5) 
-                    r_w_adx = best_dna.get('w_adx', 0.0) + random.gauss(0, 0.1)
-                    r_th_b = best_dna.get('th_buy', 50.0) + random.gauss(0, 2.0)
-                    r_th_s = best_dna.get('th_sell', -50.0) + random.gauss(0, 2.0)
-                    r_atr_tp = max(0.1, best_dna.get('atr_tp', 2.0) + random.gauss(0, 0.2))
-                    r_atr_sl = max(0.1, best_dna.get('atr_sl', 1.0) + random.gauss(0, 0.2))
+                    # 🔥 V218 FIX: REDONDEO DE GENES AL MISMO DECIMAL DE TRADINGVIEW 🔥
+                    r_w_rsi = round(best_dna.get('w_rsi', 0.0) + random.gauss(0, 0.1), 4)
+                    r_w_z = round(best_dna.get('w_z', 0.0) + random.gauss(0, 0.5), 4) 
+                    r_w_adx = round(best_dna.get('w_adx', 0.0) + random.gauss(0, 0.1), 4)
+                    r_th_b = round(best_dna.get('th_buy', 50.0) + random.gauss(0, 2.0), 2)
+                    r_th_s = round(best_dna.get('th_sell', -50.0) + random.gauss(0, 2.0), 2)
+                    r_atr_tp = max(0.1, round(best_dna.get('atr_tp', 2.0) + random.gauss(0, 0.2), 2))
+                    r_atr_sl = max(0.1, round(best_dna.get('atr_sl', 1.0) + random.gauss(0, 0.2), 2))
                     
                     r_w_z = max(-10.0, min(10.0, r_w_z))
                     r_th_b = max(0.0, min(100.0, r_th_b))
@@ -725,13 +736,13 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     r_adx = best_dna.get('adx_th', 25.0)
                     r_whale = best_dna.get('whale_f', 2.5)
 
-                    r_w_rsi = best_dna.get('w_rsi', 0.0)
-                    r_w_z = best_dna.get('w_z', 0.0) 
-                    r_w_adx = best_dna.get('w_adx', 0.0) 
-                    r_th_b = best_dna.get('th_buy', 50.0) 
-                    r_th_s = best_dna.get('th_sell', -50.0) 
-                    r_atr_tp = best_dna.get('atr_tp', 2.0) 
-                    r_atr_sl = best_dna.get('atr_sl', 1.0) 
+                    r_w_rsi = round(best_dna.get('w_rsi', 0.0), 4)
+                    r_w_z = round(best_dna.get('w_z', 0.0), 4)
+                    r_w_adx = round(best_dna.get('w_adx', 0.0), 4)
+                    r_th_b = round(best_dna.get('th_buy', 50.0), 2)
+                    r_th_s = round(best_dna.get('th_sell', -50.0), 2)
+                    r_atr_tp = round(best_dna.get('atr_tp', 2.0), 2)
+                    r_atr_sl = round(best_dna.get('atr_sl', 1.0), 2)
 
                 else:
                     dna_b_trigger = random.choice(todas_las_armas_b)
@@ -748,9 +759,13 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     r_adx = random.choice([15.0, 20.0, 25.0, 30.0, 35.0])
                     r_whale = random.choice([1.5, 2.0, 2.5, 3.0, 3.5, 4.0])
                     
-                    r_w_rsi = random.uniform(-2.0, 2.0); r_w_z = random.uniform(-10.0, 10.0); r_w_adx = random.uniform(-2.0, 2.0)
-                    r_th_b = random.uniform(0.0, 100.0); r_th_s = random.uniform(-100.0, 0.0)
-                    r_atr_tp = round(random.uniform(0.5, 15.0), 2); r_atr_sl = round(random.uniform(1.0, 10.0), 2)
+                    r_w_rsi = round(random.uniform(-2.0, 2.0), 4)
+                    r_w_z = round(random.uniform(-10.0, 10.0), 4)
+                    r_w_adx = round(random.uniform(-2.0, 2.0), 4)
+                    r_th_b = round(random.uniform(0.0, 100.0), 2)
+                    r_th_s = round(random.uniform(-100.0, 0.0), 2)
+                    r_atr_tp = round(random.uniform(0.5, 15.0), 2)
+                    r_atr_sl = round(random.uniform(1.0, 10.0), 2)
             else: 
                 r_hitbox = random.choice([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]); r_therm = random.choice([3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
                 r_adx = random.choice([15.0, 20.0, 25.0, 30.0, 35.0]); r_whale = random.choice([1.5, 2.0, 2.5, 3.0, 3.5, 4.0])
@@ -758,9 +773,13 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 dna_s_trigger = random.choice(todas_las_armas_s); dna_s_confirm = random.choice(todas_las_armas_s); dna_s_op = random.choice(['&', '|'])
                 dna_macro = random.choice(["All-Weather", "Bull Only", "Bear Only", "Ignore", "Organic_Vol", "Organic_Squeeze", "Organic_Safe", "Organic_Gaussian_Clean"])
                 dna_vol = random.choice(["All-Weather", "Trend", "Range", "Ignore", "Organic_Pump", "Organic_Dump", "Organic_Gaussian_Clean"])
-                r_w_rsi = random.uniform(-2.0, 2.0); r_w_z = random.uniform(-10.0, 10.0); r_w_adx = random.uniform(-2.0, 2.0)
-                r_th_b = random.uniform(0.0, 100.0); r_th_s = random.uniform(-100.0, 0.0)
-                r_atr_tp = round(random.uniform(0.5, 15.0), 2); r_atr_sl = round(random.uniform(1.0, 10.0), 2)
+                r_w_rsi = round(random.uniform(-2.0, 2.0), 4)
+                r_w_z = round(random.uniform(-10.0, 10.0), 4)
+                r_w_adx = round(random.uniform(-2.0, 2.0), 4)
+                r_th_b = round(random.uniform(0.0, 100.0), 2)
+                r_th_s = round(random.uniform(-100.0, 0.0), 2)
+                r_atr_tp = round(random.uniform(0.5, 15.0), 2)
+                r_atr_sl = round(random.uniform(1.0, 10.0), 2)
 
             s_dict = calcular_señales_numpy(r_hitbox, r_therm, r_adx, r_whale)
 
@@ -846,7 +865,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V217: {s_id}"
+            title = f"GENESIS LAB V218: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
@@ -872,7 +891,18 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     s_dict = calcular_señales_numpy(vault.get('hitbox',1.5), vault.get('therm_w',4.0), vault.get('adx_th',25.0), vault.get('whale_f',2.5))
     
     n_len = len(a_c)
-    f_tp = np.full(n_len, float(vault.get('atr_tp', 0.0))); f_sl = np.full(n_len, float(vault.get('atr_sl', 0.0)))
+    
+    # 🔥 Sincronizando visualización con los floats exactos de PineScript 🔥
+    w_rsi = round(float(vault.get('w_rsi', 0.0)), 4)
+    w_z = round(float(vault.get('w_z', 0.0)), 4)
+    w_adx = round(float(vault.get('w_adx', 0.0)), 4)
+    th_buy = round(float(vault.get('th_buy', 999.0)), 2)
+    th_sell = round(float(vault.get('th_sell', -999.0)), 2)
+    atr_tp = round(float(vault.get('atr_tp', 0.0)), 2)
+    atr_sl = round(float(vault.get('atr_sl', 0.0)), 2)
+    
+    f_tp = np.full(n_len, atr_tp)
+    f_sl = np.full(n_len, atr_sl)
     f_buy = np.zeros(n_len, dtype=bool); f_sell = np.zeros(n_len, dtype=bool)
     default_f = np.zeros(n_len, dtype=bool)
     ones_mask = np.ones(n_len, dtype=bool)
@@ -900,11 +930,11 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     if op_s == '&': f_sell_tactical = s_dict.get(t_s, default_f) & s_dict.get(c_s, default_f) if t_s and c_s else default_f
     else: f_sell_tactical = s_dict.get(t_s, default_f) | s_dict.get(c_s, default_f) if t_s and c_s else default_f
     
-    score_arr = (a_rsi * vault.get('w_rsi', 0.0)) + (a_zscore * vault.get('w_z', 0.0)) + (a_adx * vault.get('w_adx', 0.0))
+    score_arr = (a_rsi * w_rsi) + (a_zscore * w_z) + (a_adx * w_adx)
     
-    f_buy = f_buy_tactical | (score_arr > vault.get('th_buy', 999.0))
+    f_buy = f_buy_tactical | (score_arr > th_buy)
     f_buy &= (m_mask & v_mask)
-    f_sell = f_sell_tactical | (score_arr < vault.get('th_sell', -999.0))
+    f_sell = f_sell_tactical | (score_arr < th_sell)
 
     df_strat = df_global.copy()
     df_strat['Signal_Buy'], df_strat['Signal_Sell'] = f_buy, f_sell
@@ -1193,7 +1223,6 @@ float atr_tp_mult = {vault.get('atr_tp',2.0):.2f}
 float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
 
-    # 🔥 V217: EL BLOQUE V188 RESTAURADO ÍNTEGRAMENTE SIN ERRORES DE SINTAXIS 🔥
     ps_exec = """
 var float locked_atr = na
 var float tp_price = na
@@ -1216,7 +1245,6 @@ if just_entered
 
 // 3. MANTENIMIENTO DE ÓRDENES TP/SL
 if strategy.position_size > 0
-    // TradingView alert_profit y alert_loss son los que disparan el webhook de salida en strategy.exit
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, comment_profit="TP_Hit", comment_loss="SL_Hit", alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
 // 4. SALIDA DINÁMICA (Inteligencia Artificial)
