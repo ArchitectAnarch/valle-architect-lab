@@ -23,10 +23,10 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V234: PROTOCOLO DE SINCRONÍA ABSOLUTA (PRECIOS ABSOLUTOS ANTI-MINTICK) 🔥
-if st.session_state.get('app_version') != 'V234':
+# 🔥 V235: EMULADOR INTRABARRA Y DESTRUCCIÓN DE LA BARRA CIEGA 🔥
+if st.session_state.get('app_version') != 'V235':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V234'
+    st.session_state['app_version'] = 'V235'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS BASE
@@ -56,7 +56,7 @@ def npshift_bool(arr, num, fill_value=False):
     return result
 
 # ==========================================
-# ⚙️ 2. NÚCLEO C++ (MÁQUINA DE ESTADOS BLINDADA)
+# ⚙️ 2. NÚCLEO C++ (MÁQUINA DE ESTADOS CLON TRADINGVIEW)
 # ==========================================
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
@@ -66,26 +66,19 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
     cap_act = cap_ini
     en_pos = False
     pending_dyn_exit = False
-    p_ent = 0.0
-    pos_size = 0.0
-    invest_amt = 0.0
-    g_profit = 0.0
-    g_loss = 0.0
-    num_trades = 0
-    max_dd = 0.0
-    peak = cap_ini
+    p_ent = 0.0; pos_size = 0.0; invest_amt = 0.0
+    g_profit = 0.0; g_loss = 0.0
+    num_trades = 0; max_dd = 0.0; peak = cap_ini
     
     slip_in = 1.0 + (slippage_pct / 100.0)
     slip_out = 1.0 - (slippage_pct / 100.0)
-    tp_p = 0.0
-    sl_p = 0.0
-    wins = 0
-    bars_in_trade = 0
+    tp_p = 0.0; sl_p = 0.0
+    wins = 0; bars_in_trade = 0
     
     for i in range(len(h_arr)):
         cierra = False
         
-        # 1. EVALUAR SALIDA DINÁMICA (SOLO SI ESTAMOS EN POSICIÓN)
+        # 1. EVALUAR SALIDA DINÁMICA (OPEN DEL BAR ACTUAL)
         if pending_dyn_exit and en_pos:
             exit_price = o_arr[i] * slip_out
             ret = (exit_price - p_ent) / p_ent
@@ -98,24 +91,39 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
             else: 
                 g_loss += abs(profit)
             num_trades += 1
-            en_pos = False
-            pending_dyn_exit = False
-            cierra = True
+            en_pos = False; cierra = True
             if cap_act > peak: peak = cap_act
             if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
-        else:
-            pending_dyn_exit = False # Purgar cualquier fantasma
             
-        # EVALUACIÓN INTRABAR TP/SL
+        pending_dyn_exit = False 
+        
+        # 2. EVALUACIÓN INTRABAR TP/SL (RESOLUCIÓN DE COLISIÓN TV)
         if en_pos and not cierra:
             bars_in_trade += 1
-            # TV evalúa TP/SL activo en la vela posterior a la entrada real
-            if bars_in_trade > 1: 
-                if l_arr[i] <= sl_p:
-                    exec_p = sl_p if o_arr[i] > sl_p else o_arr[i] # Manejo de Gaps
-                    exec_p = exec_p * slip_out
+            if bars_in_trade >= 1: 
+                hit_sl = l_arr[i] <= sl_p
+                hit_tp = h_arr[i] >= tp_p
+                
+                if hit_sl and hit_tp:
+                    # Emulación OHLC TradingView
+                    if c_arr[i] < o_arr[i]: # Vela roja, subió primero a TP, luego bajó a SL
+                        exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
+                        ret = (exec_p - p_ent) / p_ent
+                    else: # Vela verde, bajó primero a SL, luego subió a TP
+                        exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
+                        ret = (exec_p - p_ent) / p_ent
+                elif hit_sl:
+                    exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
                     ret = (exec_p - p_ent) / p_ent
-                    gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
+                elif hit_tp:
+                    exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
+                    ret = (exec_p - p_ent) / p_ent
+                
+                if hit_sl or hit_tp:
+                    exec_p = exec_p * slip_out
+                    gross = pos_size * (1.0 + ret)
+                    net = gross - (gross * com_pct)
+                    profit = net - invest_amt
                     cap_act += profit
                     if profit > 0: wins += 1; g_profit += profit
                     else: g_loss += abs(profit)
@@ -123,19 +131,7 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                     if cap_act > peak: peak = cap_act
                     if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
 
-                elif h_arr[i] >= tp_p:
-                    exec_p = tp_p if o_arr[i] < tp_p else o_arr[i] # Manejo de Gaps
-                    exec_p = exec_p * slip_out
-                    ret = (exec_p - p_ent) / p_ent
-                    gross = pos_size * (1.0 + ret); net = gross - (gross * com_pct); profit = net - invest_amt
-                    cap_act += profit
-                    if profit > 0: wins += 1; g_profit += profit
-                    else: g_loss += abs(profit)
-                    num_trades += 1; en_pos = False; cierra = True
-                    if cap_act > peak: peak = cap_act
-                    if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
-
-        # 2. EVALUACIÓN DE SEÑAL DINÁMICA (ESTRICTAMENTE DENTRO DEL TRADE)
+        # 3. EVALUACIÓN DE SEÑAL DE SALIDA DINÁMICA
         if en_pos and not cierra:
             score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
             if s_c[i] or (score < th_sell):
@@ -143,8 +139,9 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 
         if cap_act <= 0: break
         
-        # 3. EVALUACIÓN DE ENTRADA (BLOQUEADA SI HAY CIERRE O SALIDA PENDIENTE)
-        if not en_pos and not cierra and not pending_dyn_exit and i+1 < len(h_arr):
+        # 4. EVALUACIÓN DE ENTRADA (CERO CEGUERA TEMPORAL)
+        # Eliminamos "not cierra" para permitir re-entradas en la misma barra donde cerramos una operación
+        if not en_pos and not pending_dyn_exit and i+1 < len(h_arr):
             score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
             if (b_c[i] or (score > th_buy)) and m_mask[i] and v_mask[i]:
                 if invest_pct > 0: invest_amt = cap_act * (invest_pct / 100.0) 
@@ -155,7 +152,7 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
-                # 🔥 V234: TP/SL ANCLADOS AL CIERRE DE SEÑAL PARA PRECISIÓN ABSOLUTA 🔥
+                # TP/SL ANCLADOS ABSOLUTOS
                 current_atr = atr_arr[i]
                 base_p = c_arr[i] 
                 tp_p = base_p + (current_atr * atr_tp_mult)
@@ -169,122 +166,93 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
     return (cap_act - cap_ini), pf, num_trades, max_dd, wr
 
 # ==========================================
-# 📊 SIMULADOR VISUAL (Sincronizado V234)
+# 📊 SIMULADOR VISUAL (Sincronizado V235)
 # ==========================================
 def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     registro_trades = []
     n = len(df_sim)
     curva = np.full(n, cap_ini, dtype=float)
-    h_arr = df_sim['High'].values
-    l_arr = df_sim['Low'].values
-    c_arr = df_sim['Close'].values
-    o_arr = df_sim['Open'].values
-    atr_arr = df_sim['ATR'].values
-    buy_arr = df_sim['Signal_Buy'].values
-    sell_arr = df_sim['Signal_Sell'].values
-    tp_arr = df_sim['Active_TP'].values
-    sl_arr = df_sim['Active_SL'].values
-    f_arr = df_sim.index
+    h_arr = df_sim['High'].values; l_arr = df_sim['Low'].values
+    c_arr = df_sim['Close'].values; o_arr = df_sim['Open'].values
+    atr_arr = df_sim['ATR'].values; buy_arr = df_sim['Signal_Buy'].values; sell_arr = df_sim['Signal_Sell'].values
+    tp_arr = df_sim['Active_TP'].values; sl_arr = df_sim['Active_SL'].values; f_arr = df_sim.index
     
-    en_pos = False
-    pending_dyn_exit = False
-    p_ent = 0.0
-    tp_p = 0.0
-    sl_p = 0.0
-    cap_act = cap_ini
-    pos_size = 0.0
-    invest_amt = 0.0
-    total_comms = 0.0
-    bars_in_trade = 0
-    
-    slip_in = 1.0 + (slippage_pct/100.0)
-    slip_out = 1.0 - (slippage_pct/100.0)
+    en_pos = False; pending_dyn_exit = False
+    p_ent = 0.0; tp_p = 0.0; sl_p = 0.0; cap_act = cap_ini
+    pos_size = 0.0; invest_amt = 0.0; total_comms = 0.0; bars_in_trade = 0
+    slip_in = 1.0 + (slippage_pct/100.0); slip_out = 1.0 - (slippage_pct/100.0)
 
     for i in range(n):
         cierra = False
         
-        # 1. EVALUAR SALIDA DINÁMICA (SOLO SI ESTAMOS EN POSICIÓN)
         if pending_dyn_exit and en_pos:
             exit_price = o_arr[i] * slip_out
             ret = (exit_price - p_ent) / p_ent
-            gross = pos_size * (1 + ret)
-            comm_out = gross * com_pct
-            total_comms += comm_out
-            net = gross - comm_out
-            profit = net - invest_amt
-            cap_act += profit
+            gross = pos_size * (1 + ret); comm_out = gross * com_pct; total_comms += comm_out; net = gross - comm_out
+            profit = net - invest_amt; cap_act += profit
             if cap_act <= 0: cap_act = 0
             registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'DYN_WIN' if profit>0 else 'DYN_LOSS', 'Precio': exit_price, 'Ganancia_$': profit})
-            en_pos = False
-            pending_dyn_exit = False
-            cierra = True
-        else:
-            pending_dyn_exit = False
+            en_pos = False; cierra = True
+            
+        pending_dyn_exit = False
             
         if en_pos and not cierra:
             bars_in_trade += 1
-            if bars_in_trade > 1:
-                if l_arr[i] <= sl_p:
+            if bars_in_trade >= 1:
+                hit_sl = l_arr[i] <= sl_p
+                hit_tp = h_arr[i] >= tp_p
+                
+                if hit_sl and hit_tp:
+                    if c_arr[i] < o_arr[i]: # Red
+                        exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
+                        ret = (exec_p - p_ent) / p_ent
+                        p_type = 'TP'
+                    else: # Green
+                        exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
+                        ret = (exec_p - p_ent) / p_ent
+                        p_type = 'SL'
+                elif hit_sl:
                     exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
-                    exec_p = exec_p * slip_out
                     ret = (exec_p - p_ent) / p_ent
+                    p_type = 'SL'
+                elif hit_tp:
+                    exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
+                    ret = (exec_p - p_ent) / p_ent
+                    p_type = 'TP'
+                    
+                if hit_sl or hit_tp:
+                    exec_p = exec_p * slip_out
                     gross = pos_size * (1 + ret)
-                    comm_out = gross * com_pct
-                    total_comms += comm_out
-                    net = gross - comm_out
-                    profit = net - invest_amt
+                    comm_out = gross * com_pct; total_comms += comm_out
+                    net = gross - comm_out; profit = net - invest_amt
                     cap_act += profit
                     if cap_act <= 0: cap_act = 0
-                    registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'SL', 'Precio': exec_p, 'Ganancia_$': profit})
-                    en_pos = False
-                    cierra = True
-                    
-                elif h_arr[i] >= tp_p:
-                    exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
-                    exec_p = exec_p * slip_out
-                    ret = (exec_p - p_ent) / p_ent
-                    gross = pos_size * (1 + ret)
-                    comm_out = gross * com_pct
-                    total_comms += comm_out
-                    net = gross - comm_out
-                    profit = net - invest_amt
-                    cap_act += profit
-                    registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'TP', 'Precio': exec_p, 'Ganancia_$': profit})
-                    en_pos = False
-                    cierra = True
+                    registro_trades.append({'Fecha': f_arr[i], 'Tipo': p_type, 'Precio': exec_p, 'Ganancia_$': profit})
+                    en_pos = False; cierra = True
             
-        # 2. EVALUACIÓN DE SEÑAL DINÁMICA (ESTRICTAMENTE DENTRO DEL TRADE)
         if en_pos and not cierra:
-            if sell_arr[i]:
-                pending_dyn_exit = True
+            if sell_arr[i]: pending_dyn_exit = True
         
-        # 3. EVALUACIÓN DE ENTRADA (BLOQUEADA SI HAY CIERRE O SALIDA PENDIENTE)
-        if not en_pos and not cierra and not pending_dyn_exit and i+1 < n and cap_act > 0:
+        # Zero Blind-Bar Entry
+        if not en_pos and not pending_dyn_exit and i+1 < n and cap_act > 0:
             if buy_arr[i]:
                 if invest_pct > 0: invest_amt = cap_act * (invest_pct / 100.0)
                 else: invest_amt = cap_ini
                 if invest_amt > cap_act: invest_amt = cap_act
-                comm_in = invest_amt * com_pct
-                total_comms += comm_in
-                pos_size = invest_amt - comm_in
+                comm_in = invest_amt * com_pct; total_comms += comm_in; pos_size = invest_amt - comm_in
                 
                 p_ent = o_arr[i+1] * slip_in
-                
-                # 🔥 V234: TP/SL ANCLADOS ABSOLUTOS 🔥
                 base_p = c_arr[i]
                 tp_act = atr_arr[i] * float(tp_arr[i])
                 sl_act = atr_arr[i] * float(sl_arr[i])
                 tp_p = base_p + tp_act
                 sl_p = base_p - sl_act
                 
-                en_pos = True
-                bars_in_trade = 0
+                en_pos = True; bars_in_trade = 0
                 registro_trades.append({'Fecha': f_arr[i+1], 'Tipo': 'ENTRY', 'Precio': p_ent, 'Ganancia_$': 0})
         
-        if en_pos and cap_act > 0: 
-            curva[i] = cap_act + (pos_size * ((c_arr[i] - p_ent) / p_ent))
-        else: 
-            curva[i] = cap_act
+        if en_pos and cap_act > 0: curva[i] = cap_act + (pos_size * ((c_arr[i] - p_ent) / p_ent))
+        else: curva[i] = cap_act
             
     return curva.tolist(), 0.0, cap_act, registro_trades, en_pos, total_comms
 
@@ -357,7 +325,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V234</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V235</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -435,7 +403,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V234.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V235.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = get_safe_vault(s_id)
@@ -466,7 +434,7 @@ def rma_pine(s, length):
                 out[i] = alpha * s[i] + (1.0 - alpha) * out[i-1]
     return out
 
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V234)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V235)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -765,8 +733,8 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     pre_dump = ((a_l < a_bbl) | (rsi_vel < -5)) & flash_vol & a_vr
     dump_memory = pre_dump | npshift_bool(pre_dump, 1) | npshift_bool(pre_dump, 2)
 
-    retro_peak = (a_rsi < 30) & (a_c < a_bbl)
-    retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
+    retro_peak = (rsi_v < 30) & (a_c < a_bbl)
+    retro_peak_sell = (rsi_v > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
     support_buy = is_grav_sup & a_rcu
     support_sell = is_grav_res & a_rcd
@@ -1109,7 +1077,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V234: {s_id}"
+            title = f"GENESIS LAB V235: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
@@ -1501,12 +1469,10 @@ var float sl_price = na
 
 if signal_buy and strategy.position_size == 0 and window
     locked_atr := atr
-    // 🔥 V234: PRECIOS ABSOLUTOS ANCLADOS (Igual a Python) 🔥
     tp_price := close + (locked_atr * atr_tp_mult)
     sl_price := close - (locked_atr * atr_sl_mult)
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
 
-// Salida en la misma vela con Límites Flotantes Absolutos (Ignorando los Ticks de TV)
 if strategy.position_size > 0 or (signal_buy and strategy.position_size == 0 and window)
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
