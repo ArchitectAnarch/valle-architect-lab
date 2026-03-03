@@ -24,10 +24,10 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V228: DESTRUCTOR DE CACHÉ Y MATEMÁTICA ESTRICTA 🔥
-if st.session_state.get('app_version') != 'V228':
+# 🔥 V229: MÁQUINA DE ESTADOS INSTITUCIONAL (Cero Inmunidad) 🔥
+if st.session_state.get('app_version') != 'V229':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V228'
+    st.session_state['app_version'] = 'V229'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS BASE
@@ -57,7 +57,7 @@ def npshift_bool(arr, num, fill_value=False):
     return result
 
 # ==========================================
-# ⚙️ 2. NÚCLEO C++ (EMULACIÓN ESTRICTA DE PINE SCRIPT)
+# ⚙️ 2. NÚCLEO C++ (EMULACIÓN EVENT-LOOP DE TRADINGVIEW)
 # ==========================================
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
@@ -66,6 +66,8 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
     
     cap_act = cap_ini
     en_pos = False
+    pending_dyn_exit = False
+    
     p_ent = 0.0
     pos_size = 0.0
     invest_amt = 0.0
@@ -80,126 +82,109 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
     tp_p = 0.0
     sl_p = 0.0
     wins = 0
-    bars_in_trade = 0
     
     for i in range(len(h_arr)):
-        just_closed_dyn = False
-        cierra = False
         
-        if en_pos:
-            bars_in_trade += 1
+        # 1. EJECUTAR SALIDAS DINÁMICAS PENDIENTES (Ocurren en el Open de la vela)
+        if pending_dyn_exit:
+            exit_price = o_arr[i] * slip_out
+            ret = (exit_price - p_ent) / p_ent
+            gross = pos_size * (1.0 + ret)
+            net = gross - (gross * com_pct)
+            profit = net - invest_amt
+            cap_act += profit
             
-            # 🔥 EVALUACIÓN INTRABAR (Activa desde vela 1 = vela de entrada)
-            if bars_in_trade >= 1: 
-                if l_arr[i] <= sl_p:
-                    # GAP CHECK
-                    exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
-                    exec_p = exec_p * slip_out
-                    ret = (exec_p - p_ent) / p_ent
-                    gross = pos_size * (1.0 + ret)
-                    net = gross - (gross * com_pct)
-                    profit = net - invest_amt
-                    cap_act += profit
-                    
-                    if profit > 0:
-                        wins += 1
-                        g_profit += profit
-                    else:
-                        g_loss += abs(profit)
-                    
-                    num_trades += 1
-                    en_pos = False
-                    cierra = True
-                    
-                    if cap_act > peak: peak = cap_act
-                    if peak > 0: 
-                        dd = (peak - cap_act) / peak * 100.0
-                        if dd > max_dd: max_dd = dd
-
-                elif h_arr[i] >= tp_p:
-                    # GAP CHECK
-                    exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
-                    exec_p = exec_p * slip_out
-                    ret = (exec_p - p_ent) / p_ent
-                    gross = pos_size * (1.0 + ret)
-                    net = gross - (gross * com_pct)
-                    profit = net - invest_amt
-                    cap_act += profit
-                    
-                    if profit > 0:
-                        wins += 1
-                        g_profit += profit
-                    else:
-                        g_loss += abs(profit)
-                    
-                    num_trades += 1
-                    en_pos = False
-                    cierra = True
-                    
-                    if cap_act > peak: peak = cap_act
-                    if peak > 0: 
-                        dd = (peak - cap_act) / peak * 100.0
-                        if dd > max_dd: max_dd = dd
-
-            # 🔥 EVALUACIÓN DE CIERRE DINÁMICO (Dyn_Exit en Open i+1)
-            if not cierra:
-                score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
-                if s_c[i] or (score < th_sell):
-                    if i + 1 < len(o_arr):
-                        exit_price = o_arr[i+1] * slip_out 
-                    else:
-                        exit_price = c_arr[i] * slip_out
-                        
-                    ret = (exit_price - p_ent) / p_ent
-                    gross = pos_size * (1.0 + ret)
-                    net = gross - (gross * com_pct)
-                    profit = net - invest_amt
-                    cap_act += profit
-                    
-                    if profit > 0: 
-                        g_profit += profit
-                        wins += 1
-                    else: 
-                        g_loss += abs(profit)
-                        
-                    num_trades += 1
-                    en_pos = False
-                    just_closed_dyn = True
-                    
-                    if cap_act > peak: peak = cap_act
-                    if peak > 0: 
-                        dd = (peak - cap_act) / peak * 100.0
-                        if dd > max_dd: max_dd = dd
+            if profit > 0: 
+                wins += 1; g_profit += profit
+            else: 
+                g_loss += abs(profit)
+                
+            num_trades += 1
+            en_pos = False
+            pending_dyn_exit = False
             
-            if cap_act <= 0: break
+            if cap_act > peak: peak = cap_act
+            if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
             
-        # 🔥 EVALUACIÓN DE ENTRADA 🔥
-        if not en_pos and not just_closed_dyn and i+1 < len(h_arr):
-            score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
-            if (b_c[i] or (score > th_buy)) and m_mask[i] and v_mask[i]:
-                if invest_pct > 0: 
-                    invest_amt = cap_act * (invest_pct / 100.0) 
-                else: 
-                    invest_amt = cap_ini
-                    
-                if invest_amt > cap_act: 
-                    invest_amt = cap_act 
+        # 2. EJECUTAR ENTRADAS PENDIENTES (Solo si no cerramos algo en este mismo tick)
+        elif not en_pos and i > 0:
+            score_prev = (rsi_arr[i-1] * w_rsi) + (z_arr[i-1] * w_z) + (adx_arr[i-1] * w_adx)
+            if (b_c[i-1] or (score_prev > th_buy)) and m_mask[i-1] and v_mask[i-1]:
+                
+                if invest_pct > 0: invest_amt = cap_act * (invest_pct / 100.0) 
+                else: invest_amt = cap_ini
+                if invest_amt > cap_act: invest_amt = cap_act 
                 
                 comm_in = invest_amt * com_pct
                 pos_size = invest_amt - comm_in 
-                p_ent = o_arr[i+1] * slip_in 
+                p_ent = o_arr[i] * slip_in 
                 
-                current_atr = atr_arr[i] 
+                # Anclamos los niveles con el ATR de la vela de la señal (i-1)
+                current_atr = atr_arr[i-1] 
                 tp_p = p_ent + (current_atr * atr_tp_mult)
                 sl_p = p_ent - (current_atr * atr_sl_mult)
                 en_pos = True
-                bars_in_trade = 0
+
+        # 3. EVALUACIÓN INTRABAR (Inmediata, incluyendo la vela en la que acabamos de entrar)
+        if en_pos:
+            cierra = False
+            if l_arr[i] <= sl_p:
+                exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
+                exec_p = exec_p * slip_out
+                ret = (exec_p - p_ent) / p_ent
+                gross = pos_size * (1.0 + ret)
+                net = gross - (gross * com_pct)
+                profit = net - invest_amt
+                cap_act += profit
+                
+                if profit > 0:
+                    wins += 1; g_profit += profit
+                else:
+                    g_loss += abs(profit)
+                
+                num_trades += 1
+                en_pos = False
+                cierra = True
+                
+                if cap_act > peak: peak = cap_act
+                if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
+
+            elif h_arr[i] >= tp_p:
+                exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
+                exec_p = exec_p * slip_out
+                ret = (exec_p - p_ent) / p_ent
+                gross = pos_size * (1.0 + ret)
+                net = gross - (gross * com_pct)
+                profit = net - invest_amt
+                cap_act += profit
+                
+                if profit > 0:
+                    wins += 1; g_profit += profit
+                else:
+                    g_loss += abs(profit)
+                
+                num_trades += 1
+                en_pos = False
+                cierra = True
+                
+                if cap_act > peak: peak = cap_act
+                if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
+
+            # 4. EVALUACIÓN DE SEÑAL DE SALIDA (Al cierre de la vela)
+            if not cierra:
+                score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
+                if s_c[i] or (score < th_sell):
+                    pending_dyn_exit = True
+                    
+        if cap_act <= 0: break
                 
     pf = g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0)
     wr = (wins / num_trades) * 100.0 if num_trades > 0 else 0.0
     return (cap_act - cap_ini), pf, num_trades, max_dd, wr
 
-# SIMULADOR VISUAL (Sincronizado >= 1)
+# ==========================================
+# 📊 SIMULADOR VISUAL (Renderizado Exacto)
+# ==========================================
 def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     registro_trades = []
     n = len(df_sim)
@@ -216,6 +201,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     f_arr = df_sim.index
     
     en_pos = False
+    pending_dyn_exit = False
     p_ent = 0.0
     tp_p = 0.0
     sl_p = 0.0
@@ -223,54 +209,48 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     pos_size = 0.0
     invest_amt = 0.0
     total_comms = 0.0
-    bars_in_trade = 0
     
     slip_in = 1.0 + (slippage_pct/100.0)
     slip_out = 1.0 - (slippage_pct/100.0)
 
     for i in range(n):
-        cierra = False
-        just_closed_dyn = False
-        
-        if en_pos:
-            bars_in_trade += 1
-            if bars_in_trade >= 1:
-                if l_arr[i] <= sl_p:
-                    exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
-                    exec_p = exec_p * slip_out
-                    ret = (exec_p - p_ent) / p_ent
-                    gross = pos_size * (1 + ret)
-                    comm_out = gross * com_pct
-                    total_comms += comm_out
-                    net = gross - comm_out
-                    profit = net - invest_amt
-                    cap_act += profit
-                    if cap_act <= 0: cap_act = 0
-                    registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'SL', 'Precio': exec_p, 'Ganancia_$': profit})
-                    en_pos = False
-                    cierra = True
-                    
-                elif h_arr[i] >= tp_p:
-                    exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
-                    exec_p = exec_p * slip_out
-                    ret = (exec_p - p_ent) / p_ent
-                    gross = pos_size * (1 + ret)
-                    comm_out = gross * com_pct
-                    total_comms += comm_out
-                    net = gross - comm_out
-                    profit = net - invest_amt
-                    cap_act += profit
-                    registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'TP', 'Precio': exec_p, 'Ganancia_$': profit})
-                    en_pos = False
-                    cierra = True
+        if pending_dyn_exit:
+            exit_price = o_arr[i] * slip_out
+            ret = (exit_price - p_ent) / p_ent
+            gross = pos_size * (1 + ret)
+            comm_out = gross * com_pct
+            total_comms += comm_out
+            net = gross - comm_out
+            profit = net - invest_amt
+            cap_act += profit
+            if cap_act <= 0: cap_act = 0
+            registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'DYN_WIN' if profit>0 else 'DYN_LOSS', 'Precio': exit_price, 'Ganancia_$': profit})
+            en_pos = False
+            pending_dyn_exit = False
             
-            if not cierra and sell_arr[i]:
-                if i + 1 < n:
-                    exit_price = o_arr[i+1] * slip_out
-                else:
-                    exit_price = c_arr[i] * slip_out
-                    
-                ret = (exit_price - p_ent) / p_ent
+        elif not en_pos and i > 0:
+            if buy_arr[i-1]:
+                invest_amt = cap_act * (invest_pct / 100.0) if invest_pct > 0 else cap_ini
+                if invest_amt > cap_act: invest_amt = cap_act
+                comm_in = invest_amt * com_pct
+                total_comms += comm_in
+                pos_size = invest_amt - comm_in
+                
+                p_ent = o_arr[i] * slip_in
+                tp_act = atr_arr[i-1] * float(tp_arr[i-1])
+                sl_act = atr_arr[i-1] * float(sl_arr[i-1])
+                tp_p = p_ent + tp_act
+                sl_p = p_ent - sl_act
+                
+                en_pos = True
+                registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'ENTRY', 'Precio': p_ent, 'Ganancia_$': 0})
+                
+        if en_pos:
+            cierra = False
+            if l_arr[i] <= sl_p:
+                exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
+                exec_p = exec_p * slip_out
+                ret = (exec_p - p_ent) / p_ent
                 gross = pos_size * (1 + ret)
                 comm_out = gross * com_pct
                 total_comms += comm_out
@@ -278,32 +258,29 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
                 profit = net - invest_amt
                 cap_act += profit
                 if cap_act <= 0: cap_act = 0
-                registro_trades.append({'Fecha': f_arr[i+1] if i+1 < n else f_arr[i], 'Tipo': 'DYN_WIN' if profit>0 else 'DYN_LOSS', 'Precio': exit_price, 'Ganancia_$': profit})
+                registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'SL', 'Precio': exec_p, 'Ganancia_$': profit})
                 en_pos = False
-                just_closed_dyn = True
-        
-        if not en_pos and not just_closed_dyn and buy_arr[i] and i+1 < n and cap_act > 0:
-            if invest_pct > 0: invest_amt = cap_act * (invest_pct / 100.0)
-            else: invest_amt = cap_ini
-            if invest_amt > cap_act: invest_amt = cap_act
-            comm_in = invest_amt * com_pct
-            total_comms += comm_in
-            pos_size = invest_amt - comm_in
-            
-            p_ent = o_arr[i+1] * slip_in
-            tp_act = atr_arr[i] * float(df_sim['Active_TP'].values[i])
-            sl_act = atr_arr[i] * float(df_sim['Active_SL'].values[i])
-            tp_p = p_ent + tp_act
-            sl_p = p_ent - sl_act
-            
-            en_pos = True
-            bars_in_trade = 0
-            registro_trades.append({'Fecha': f_arr[i+1], 'Tipo': 'ENTRY', 'Precio': p_ent, 'Ganancia_$': 0})
-        
-        if en_pos and cap_act > 0: 
-            curva[i] = cap_act + (pos_size * ((c_arr[i] - p_ent) / p_ent))
-        else: 
-            curva[i] = cap_act
+                cierra = True
+                
+            elif h_arr[i] >= tp_p:
+                exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
+                exec_p = exec_p * slip_out
+                ret = (exec_p - p_ent) / p_ent
+                gross = pos_size * (1 + ret)
+                comm_out = gross * com_pct
+                total_comms += comm_out
+                net = gross - comm_out
+                profit = net - invest_amt
+                cap_act += profit
+                registro_trades.append({'Fecha': f_arr[i], 'Tipo': 'TP', 'Precio': exec_p, 'Ganancia_$': profit})
+                en_pos = False
+                cierra = True
+                
+            if not cierra and sell_arr[i]:
+                pending_dyn_exit = True
+                
+        if en_pos and cap_act > 0: curva[i] = cap_act + (pos_size * ((c_arr[i] - p_ent) / p_ent))
+        else: curva[i] = cap_act
             
     return curva.tolist(), 0.0, cap_act, registro_trades, en_pos, total_comms
 
@@ -375,7 +352,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V228</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V229</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -453,7 +430,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V228.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V229.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = get_safe_vault(s_id)
@@ -468,8 +445,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-# 🔥 V228 FIX: SE AÑADE 'version_key' AL DECORADOR PARA DESTRUIR EL CACHÉ VIEJO 🔥
-@st.cache_data(ttl=3600, show_spinner="📡 Forzando Recálculo de Matriz (V228)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V229)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -524,7 +500,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['ADX'] = ta.adx(df['High'], df['Low'], df['Close'], length=14).iloc[:, 0].fillna(0.0)
         df['CHOP'] = ta.chop(df['High'], df['Low'], df['Close'], length=14).fillna(50.0)
         
-        # 🔥 V228 FIX: MACD y Signal calculados idénticos a TradingView (min_periods=1) 🔥
         macd_fast = df['Close'].ewm(span=12, min_periods=1, adjust=False).mean()
         macd_slow = df['Close'].ewm(span=26, min_periods=1, adjust=False).mean()
         df['MACD'] = macd_fast - macd_slow
@@ -594,7 +569,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
     except Exception as e: 
         return pd.DataFrame(), f"❌ ERROR FATAL GENERAL: {str(e)}"
 
-# 🔥 Llamada a cargar_matriz con la VERSIÓN incluida para FORZAR DESTRUCCIÓN DEL CACHÉ VIEJO 🔥
 df_global, status_api = cargar_matriz(exchange_sel, ticker, start_date, end_date, iv_download, utc_offset, is_micro, st.session_state['app_version'])
 if df_global.empty: 
     st.error(status_api)
@@ -1078,7 +1052,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V228: {s_id}"
+            title = f"GENESIS LAB V229: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
