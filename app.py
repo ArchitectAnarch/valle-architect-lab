@@ -24,10 +24,10 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V207: SINCRONIZADOR DE INTERFAZ 🔥
-if st.session_state.get('app_version') != 'V207':
+# 🔥 V208: RELEASE CANDIDATE (CÓDIGO LIMPIO Y PINE SCRIPT INSTITUCIONAL) 🔥
+if st.session_state.get('app_version') != 'V208':
     st.session_state.clear()
-    st.session_state['app_version'] = 'V207'
+    st.session_state['app_version'] = 'V208'
 
 # ==========================================
 # 🧠 1. FUNCIONES MATEMÁTICAS (SIEMPRE ARRIBA)
@@ -272,7 +272,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR E INFRAESTRUCTURA UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V207</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V208</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear()
     keys_to_keep = ['app_version', 'ai_algos']
@@ -349,7 +349,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
             st.rerun()
 
 def generar_reporte_universal(cap_ini, com_pct):
-    res_str = f"📋 **REPORTE GENESIS LAB V207.0**\n\n"
+    res_str = f"📋 **REPORTE GENESIS LAB V208.0**\n\n"
     res_str += f"⏱️ Temporalidad: {intervalo_sel} | 📊 Ticker: {ticker}\n\n"
     for s_id in estrategias:
         v = get_safe_vault(s_id)
@@ -364,7 +364,7 @@ if st.sidebar.button("📊 GENERAR REPORTE", use_container_width=True, key="btn_
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL 🛑
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V207)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V208)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -448,7 +448,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro):
         df['PA_Engulfing_Buy'] = (df['Vela_Verde']) & (df['Vela_Roja'].shift(1)) & (df['Close'] > df['Open'].shift(1)) & (df['Open'] < df['Close'].shift(1))
         df['PA_Engulfing_Sell'] = (df['Vela_Roja']) & (df['Vela_Verde'].shift(1)) & (df['Close'] < df['Open'].shift(1)) & (df['Open'] > df['Close'].shift(1))
         df['PA_Pinbar_Buy'] = (df['lower_wick'] > df['body_size'] * 2.5) & (df['upper_wick'] < df['body_size'])
-        df['PA_Pinbar_Sell'] = (df['upper_wick'] > df['body_size'] * 2.5) & (df['lower_wick'] < df['body_size'])
+        df['PA_Pinbar_Sell'] = (df['upper_wick'] > body_size * 2.5) & (df['lower_wick'] < df['body_size'])
         df['PA_3_Soldiers'] = (df['Vela_Verde']) & (df['Vela_Verde'].shift(1)) & (df['Vela_Verde'].shift(2)) & (df['Close'] > df['Close'].shift(1)) & (df['Close'].shift(1) > df['Close'].shift(2))
         df['PA_3_Crows'] = (df['Vela_Roja']) & (df['Vela_Roja'].shift(1)) & (df['Vela_Roja'].shift(2)) & (df['Close'] < df['Close'].shift(1)) & (df['Close'].shift(1) < df['Close'].shift(2))
 
@@ -556,10 +556,8 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     retro_peak = (a_rsi < 30) & (a_c < a_bbl); retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
-    
     support_buy = is_grav_sup & a_rcu
     support_sell = is_grav_res & a_rcd
-    
     div_bull = (a_l_s1 < a_l_s5) & (a_rsi_s1 > a_rsi_s5) & (a_rsi < 35)
     div_bear = (a_h_s1 > a_h_s5) & (a_rsi_s1 < a_rsi_s5) & (a_rsi > 65)
 
@@ -571,7 +569,8 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     sell_score = np.where(base_mask_s & retro_peak_sell, 50.0, np.where(base_mask_s & ~retro_peak_sell, 30.0, sell_score))
     sell_score += np.where(is_grav_res, 25.0, 0.0); sell_score += np.where(whale_memory, 20.0, 0.0); sell_score += np.where(dump_memory, 15.0, 0.0); sell_score += np.where(div_bear, 15.0, 0.0); sell_score += np.where(a_rcd & ~retro_peak_sell, 15.0, 0.0); sell_score += np.where(a_zscore > 2.0, 15.0, 0.0)
 
-    is_magenta = (buy_score >= 70) | retro_peak; is_magenta_sell = (sell_score >= 70) | retro_peak_sell
+    is_magenta = (buy_score >= 70) | retro_peak
+    is_magenta_sell = (sell_score >= 70) | retro_peak_sell
     cond_pink_whale_buy = is_magenta & is_whale_icon
 
     wt_cross_up = (a_wt1 > a_wt2) & (a_wt1_s1 <= a_wt2_s1); wt_cross_dn = (a_wt1 < a_wt2) & (a_wt1_s1 >= a_wt2_s1)
@@ -757,7 +756,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 m_mask[:split_idx], v_mask[:split_idx]
             )
 
-            # 🔥 LÁTIGO INSTITUCIONAL 🔥
             if nt >= 5: 
                 ado_actual = nt / max(1, dias_entrenamiento)
                 ado_target_safe = max(0.1, target_ado)
@@ -808,7 +806,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         else:
             pct_done = int(((c + 1) / chunks) * 100)
             combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V207: {s_id}"
+            title = f"GENESIS LAB V208: {s_id}"
             subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"
             color = "#00FFFF"
 
@@ -872,10 +870,7 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     df_strat['Signal_Buy'], df_strat['Signal_Sell'] = f_buy, f_sell
     df_strat['Active_TP'], df_strat['Active_SL'] = f_tp, f_sl
     
-    # 🔥 AQUI SE DEVUELVEN EXACTAMENTE LAS 6 VARIABLES ESPERADAS 🔥
     eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.0)
-    
-    # Y se pasan al flujo principal
     return df_strat, eq_curve, t_log, total_comms
 
 def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj):
@@ -1159,39 +1154,27 @@ float atr_sl_mult = {vault.get('atr_sl',1.0):.2f}
 """
 
     ps_exec = """
-var float locked_atr = na
 var float tp_price = na
 var float sl_price = na
 
-// Orden de entrada
+// 1. CONDICIONES DE ENTRADA
 if signal_buy and strategy.position_size == 0 and window
+    // Calculamos los niveles ANTES de entrar para que TV sepa dónde poner las órdenes intrabar
+    tp_price := close + (atr * atr_tp_mult)
+    sl_price := close - (atr * atr_sl_mult)
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
 
-// 1. DETECCIÓN DE ENTRADA REAL (Sincronizado con Python)
-bool just_entered = ta.change(strategy.position_size) > 0
-
-// 2. ANCLAJE MATEMÁTICO INQUEBRANTABLE (Variables Globales)
-if just_entered
-    locked_atr := atr[1] 
-    tp_price := strategy.position_avg_price + (locked_atr * atr_tp_mult)
-    sl_price := strategy.position_avg_price - (locked_atr * atr_sl_mult)
-
-// 3. SALIDA ESTRICTA: SI TOCA SL O TP DURANTE LA VELA, FUERZA EL CIERRE A MERCADO
-bool hit_sl = low <= sl_price
-bool hit_tp = high >= tp_price
-
-// Damos prioridad al SL (pesimismo matemático igual que en Python 'if l_arr[i] <= sl_p')
+// 2. ÓRDENES DE SALIDA INTRABAR (Sincronizadas con Python)
 if strategy.position_size > 0
-    if hit_sl
-        strategy.close("In", comment="SL_Hit", alert_message=wt_exit_long)
-    else if hit_tp
-        strategy.close("In", comment="TP_Hit", alert_message=wt_exit_long)
-    else if signal_sell
+    // TradingView dejará órdenes puestas en el broker a estos precios exactos
+    strategy.exit("Out", "In", limit=tp_price, stop=sl_price, comment_profit="TP_Hit", comment_loss="SL_Hit", alert_profit=wt_exit_long, alert_loss=wt_exit_long)
+    
+    // 3. SALIDA DINÁMICA (Si ocurre antes de tocar TP o SL)
+    if signal_sell
         strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
 
-// 4. PURGA DE MEMORIA
+// 4. PURGA DE NIVELES (Para limpiar la memoria en el gráfico)
 if strategy.position_size == 0
-    locked_atr := na
     tp_price := na
     sl_price := na
 
@@ -1306,7 +1289,7 @@ if len(tab_names) > 0:
     st.session_state[f'champion_{s_id}']['reinv'] = ps_buy_pct 
 
     c_btn1, c_btn2 = c_ia3.columns(2)
-    if c_btn1.button(f"🚀 FORJAR RÁPIDO ({global_epochs*3}k)", type="primary", key=f"btn_opt_{s_id}"):
+    if c_btn1.button(f"🚀 FORJAR RÁPIDO ({global_epochs*250})", type="primary", key=f"btn_opt_{s_id}"):
         st.session_state['abort_opt'] = False
         st.session_state['global_queue'] = [s_id]
         st.session_state['run_global'] = True
