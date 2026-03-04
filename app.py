@@ -23,8 +23,8 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V245: EL DESPERTAR - CORRECCIÓN DE BUG ADO, COMISIONES % TV Y EMA CLON 🔥
-APP_VERSION = 'V245'
+# 🔥 V246: RESTAURACIÓN IA PURA + CERO LAG PINE SCRIPT + FIX COMISIONES TV 🔥
+APP_VERSION = 'V246'
 if st.session_state.get('app_version') != APP_VERSION:
     st.cache_data.clear()
     for key in list(st.session_state.keys()):
@@ -33,7 +33,7 @@ if st.session_state.get('app_version') != APP_VERSION:
     st.rerun()
 
 # ==========================================
-# 🧠 1. FUNCIONES MATEMÁTICAS CLON DE PINE SCRIPT
+# 🧠 1. FUNCIONES MATEMÁTICAS BASE
 # ==========================================
 def npshift(arr, num, fill_value=np.nan):
     result = np.empty_like(arr)
@@ -49,17 +49,6 @@ def npshift_bool(arr, num, fill_value=False):
     else: result[:] = arr
     return result
 
-def rma_pine(arr, length):
-    alpha = 1.0 / length; out = np.full_like(arr, np.nan, dtype=float)
-    sum_val = 0.0; count = 0
-    for i in range(len(arr)):
-        if not np.isnan(arr[i]):
-            if count < length:
-                sum_val += arr[i]; count += 1
-                if count == length: out[i] = sum_val / length
-            else: out[i] = alpha * arr[i] + (1.0 - alpha) * out[i-1]
-    return out
-
 def ema_pine(arr, length):
     alpha = 2.0 / (length + 1); out = np.full_like(arr, np.nan, dtype=float)
     sum_val = 0.0; count = 0
@@ -72,7 +61,7 @@ def ema_pine(arr, length):
     return out
 
 # ==========================================
-# ⚙️ 2. NÚCLEO C++ (MÁQUINA DE ESTADOS)
+# ⚙️ 2. NÚCLEO C++ (MÁQUINA DE ESTADOS SINCRONIZADA)
 # ==========================================
 @njit(fastmath=True)
 def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr, rsi_arr, z_arr, adx_arr, 
@@ -102,7 +91,7 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
             
         pending_dyn_exit = False 
         
-        # 2. EVALUACIÓN INTRABAR TP/SL
+        # 2. EVALUACIÓN INTRABAR (CERO LAG, IGUAL A PINE SCRIPT V246)
         if en_pos and not cierra:
             bars_in_trade += 1
             if bars_in_trade >= 1: 
@@ -133,14 +122,14 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                     if cap_act > peak: peak = cap_act
                     if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
 
-        # 3. SEÑAL DE SALIDA DINÁMICA
+        # 3. SEÑAL DINÁMICA DE SALIDA
         if en_pos and not cierra:
             score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
             if s_c[i] or (score < th_sell): pending_dyn_exit = True
                 
         if cap_act <= 0: break
         
-        # 4. EVALUACIÓN DE ENTRADA
+        # 4. ENTRADA DE COMPRA CON CÁLCULO ESTRICTO DE 5 DECIMALES
         if not en_pos and not pending_dyn_exit and i+1 < len(h_arr):
             score = (rsi_arr[i] * w_rsi) + (z_arr[i] * w_z) + (adx_arr[i] * w_adx)
             if (b_c[i] or (score > th_buy)) and m_mask[i] and v_mask[i]:
@@ -150,9 +139,11 @@ def simular_crecimiento_exponencial_ia_core(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
+                # Anclado a c_arr[i] para sincronía matemática con el "close" de la señal de Pine Script
                 current_atr = atr_arr[i]
-                tp_p = np.round(p_ent + (current_atr * atr_tp_mult), 5)
-                sl_p = np.round(p_ent - (current_atr * atr_sl_mult), 5)
+                base_p = c_arr[i] 
+                tp_p = np.round(base_p + (current_atr * atr_tp_mult), 5)
+                sl_p = np.round(base_p - (current_atr * atr_sl_mult), 5)
                 
                 en_pos = True; bars_in_trade = 0
                 
@@ -221,8 +212,9 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
                 comm_in = invest_amt * com_pct; total_comms += comm_in; pos_size = invest_amt - comm_in
                 
                 p_ent = o_arr[i+1] * slip_in
-                tp_p = np.round(p_ent + (atr_arr[i] * float(tp_arr[i])), 5)
-                sl_p = np.round(p_ent - (atr_arr[i] * float(sl_arr[i])), 5)
+                base_p = c_arr[i]
+                tp_p = np.round(base_p + (atr_arr[i] * float(tp_arr[i])), 5)
+                sl_p = np.round(base_p - (atr_arr[i] * float(sl_arr[i])), 5)
                 
                 en_pos = True; bars_in_trade = 0
                 registro_trades.append({'Fecha': f_arr[i+1], 'Tipo': 'ENTRY', 'Precio': p_ent, 'Ganancia_$': 0})
@@ -300,7 +292,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V245</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V246</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); st.session_state.clear(); gc.collect(); st.rerun()
 
@@ -353,7 +345,17 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V245)...")
+def rma_pine_local(s, length):
+    alpha = 1.0 / length; out = np.full_like(s, np.nan); sum_val = 0.0; count = 0
+    for i in range(len(s)):
+        if not np.isnan(s[i]):
+            if count < length:
+                sum_val += s[i]; count += 1
+                if count == length: out[i] = sum_val / length
+            else: out[i] = alpha * s[i] + (1.0 - alpha) * out[i-1]
+    return out
+
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V246)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -364,12 +366,11 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         all_ohlcv, current_ts, error_count = [], start_ts, 0
         while current_ts < end_ts:
             try: 
-                ohlcv = ex_class.fetch_ohlcv(sym, iv_down, since=current_ts, limit=1000); error_count = 0 
+                # 🔥 V246: Límite 300 para no bloquear IP de CCXT en periodos de 1H y 4H 🔥
+                ohlcv = ex_class.fetch_ohlcv(sym, iv_down, since=current_ts, limit=300); error_count = 0 
             except Exception as e: 
                 error_count += 1
-                if error_count >= 3: 
-                    # 🔥 V245: IMPRESIÓN DEL ERROR REAL DE CCXT PARA DEBUGGEAR SÍMBOLOS ROTOS
-                    return pd.DataFrame(), f"❌ ERROR Exchange {exchange_id}: {str(e)} (Verifica que el símbolo {sym} sea correcto)"
+                if error_count >= 3: return pd.DataFrame(), f"❌ ERROR CCXT ({exchange_id}): El servidor bloqueó la petición o el símbolo es incorrecto. Detalle: {str(e)}"
                 time.sleep(2); continue
             if not ohlcv or len(ohlcv) == 0: break
             if all_ohlcv and ohlcv[0][0] <= all_ohlcv[-1][0]:
@@ -382,11 +383,10 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms'); df.set_index('timestamp', inplace=True)
         df.index = df.index + timedelta(hours=offset); df = df[~df.index.duplicated(keep='first')]
-        if len(df) < 50: return pd.DataFrame(), f"❌ Solo {len(df)} velas."
+        if len(df) < 50: return pd.DataFrame(), f"❌ Solo {len(df)} velas. Intenta ampliar el rango de fechas."
             
         a_h, a_l, a_c, a_o = df['High'].values, df['Low'].values, df['Close'].values, df['Open'].values
         
-        # 🔥 V245: EMAS SINCRONIZADAS EXACTAMENTE CON PINE SCRIPT (Clon en C++ nativo) 🔥
         df['EMA_200'] = ema_pine(a_c, 200)
         df['EMA_50'] = ema_pine(a_c, 50)
         df['Vol_MA_20'] = df['Volume'].rolling(window=20).mean()
@@ -396,20 +396,20 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         
         tr = np.zeros_like(a_c); tr[0] = a_h[0] - a_l[0]
         for i in range(1, len(a_c)): tr[i] = max(a_h[i] - a_l[i], abs(a_h[i] - a_c[i-1]), abs(a_l[i] - a_c[i-1]))
-        df['ATR'] = rma_pine(tr, 14); df['ATR'] = df['ATR'].fillna(df['High']-df['Low'])
+        df['ATR'] = rma_pine_local(tr, 14); df['ATR'] = df['ATR'].fillna(df['High']-df['Low'])
         
         delta = np.zeros_like(a_c); delta[1:] = a_c[1:] - a_c[:-1]
         u = np.where(delta > 0, delta, 0.0); d = np.where(delta < 0, -delta, 0.0)
-        rs_u = rma_pine(u, 14); rs_d = rma_pine(d, 14); rs = rs_u / np.where(rs_d == 0, 1e-10, rs_d)
+        rs_u = rma_pine_local(u, 14); rs_d = rma_pine_local(d, 14); rs = rs_u / np.where(rs_d == 0, 1e-10, rs_d)
         df['RSI'] = np.where(rs_d == 0, 100.0, 100.0 - (100.0 / (1.0 + rs))); df['RSI_MA'] = df['RSI'].rolling(14).mean()
         
         upm = np.zeros_like(a_h); upm[1:] = a_h[1:] - a_h[:-1]
         downm = np.zeros_like(a_l); downm[1:] = a_l[:-1] - a_l[1:]
         plusDM = np.where((upm > downm) & (upm > 0), upm, 0.0)
         minusDM = np.where((downm > upm) & (downm > 0), downm, 0.0)
-        trur = rma_pine(tr, 14); plus = 100 * rma_pine(plusDM, 14) / trur; minus = 100 * rma_pine(minusDM, 14) / trur
+        trur = rma_pine_local(tr, 14); plus = 100 * rma_pine_local(plusDM, 14) / trur; minus = 100 * rma_pine_local(minusDM, 14) / trur
         sum_dm = plus + minus; dx = 100 * np.abs(plus - minus) / np.where(sum_dm == 0, 1, sum_dm)
-        df['ADX'] = rma_pine(dx, 14)
+        df['ADX'] = rma_pine_local(dx, 14)
         
         sum_tr = pd.Series(tr).rolling(14).sum()
         hh_14, ll_14 = df['High'].rolling(14).max(), df['Low'].rolling(14).min()
@@ -611,7 +611,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             f_buy_tactical.fill(False)
             f_sell_tactical.fill(False)
             
-            # 🔥 V245: IA SIN RESTRICCIONES (ADN DE ESCUADRONES MULTIPLES) 🔥
+            # 🔥 V246: RESTAURACIÓN DE LA IA ADAPTATIVA (Múltiples equipos, combinaciones extremas) 🔥
             dna_b_team = random.sample(todas_las_armas_b, random.randint(3, 12))
             dna_s_team = random.sample(todas_las_armas_s, random.randint(3, 12))
             
@@ -648,7 +648,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 m_mask[:split_idx], v_mask[:split_idx]
             )
 
-            # 🔥 V245: FITNESS ORIGINAL V178 RESTAURADO Y BUG ADO RESUELTO 🔥
+            # 🔥 V246: RESTAURACIÓN DE LA FUNCIÓN DE FITNESS V178 ORIGINAL Y CORRECCIÓN DE BUG ADO 🔥
             ado_actual = nt / max(1, dias_entrenamiento)
             fit_score = -float('inf') 
             
@@ -693,7 +693,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             title = f"🌌 DEEP FORGE: {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V245: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
+            title = f"GENESIS LAB V246: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
 
         html_str = f"""
         <style>
@@ -747,7 +747,7 @@ def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_
     json_buy = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {buy_pct}, "limit_price": {{{{close}}}}, "side": "🟢 COMPRA"}}'
     json_sell = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {sell_pct}, "limit_price": {{{{close}}}}, "side": "🔴 VENTA"}}'
 
-    # 🔥 V245: COMISIÓN ESTRICTA POR PORCENTAJE (EVITA CÁLCULO CATASTRÓFICO EN TV) 🔥
+    # 🔥 V246: COMISIÓN ESTRICTA POR PORCENTAJE (SELLANDO LA FUGA DE $5000 DÓLARES EN TV) 🔥
     ps_base = f"""//@version=5
 strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value={buy_pct}, commission_type=strategy.commission.percent, commission_value={com_pct*100}, slippage=0)
 wt_enter_long = input.text_area(defval='{json_buy}', title="🟢 WT: Mensaje Enter Long")
@@ -923,7 +923,6 @@ buy_score += pump_memory ? 15.0 : 0.0
 buy_score += div_bull ? 15.0 : 0.0
 buy_score += (k_break_up and not retro_peak) ? 15.0 : 0.0
 buy_score += (z_score < -2.0) ? 15.0 : 0.0
-buy_score := buy_score > 99 ? 99.0 : buy_score
 
 base_mask_s = retro_peak_sell or rsi_cross_dn or support_sell or div_bear
 sell_score = 0.0
@@ -934,7 +933,6 @@ sell_score += dump_memory ? 15.0 : 0.0
 sell_score += div_bear ? 15.0 : 0.0
 sell_score += (rsi_cross_dn and not retro_peak_sell) ? 15.0 : 0.0
 sell_score += (z_score > 2.0) ? 15.0 : 0.0
-sell_score := sell_score > 99 ? 99.0 : sell_score
 
 is_magenta = (buy_score >= 70) or retro_peak
 is_magenta_sell = (sell_score >= 70) or retro_peak_sell
@@ -1023,18 +1021,18 @@ var float locked_atr = na
 var float tp_price = na
 var float sl_price = na
 
+// 1. Detectar señal y "congelar" la volatilidad matemática 
 if signal_buy and strategy.position_size == 0 and window
     locked_atr := atr
+    
+    // 🔥 V246: TP/SL SE CALCULA SIMULTANEAMENTE CON LA ENTRADA (CERO LAG) 🔥
+    tp_price := math.round(close + (locked_atr * atr_tp_mult), 5)
+    sl_price := math.round(close - (locked_atr * atr_sl_mult), 5)
+    
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
 
-bool just_entered = ta.change(strategy.position_size) > 0
-
-if just_entered
-    // 🔥 V245: SINCRONÍA EXACTA CON PYTHON (Anclado al precio real de llenado y 5 decimales) 🔥
-    tp_price := math.round(strategy.position_avg_price + (locked_atr[1] * atr_tp_mult), 5)
-    sl_price := math.round(strategy.position_avg_price - (locked_atr[1] * atr_sl_mult), 5)
-
-if strategy.position_size > 0
+// 2. Órdenes dinámicas de Limits y Stops activas EN EL MISMO TICK que nace la operación
+if strategy.position_size > 0 or (signal_buy and strategy.position_size == 0 and window)
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
 if signal_sell and strategy.position_size > 0
@@ -1102,7 +1100,7 @@ if deep_state and not deep_state.get('paused', False) and deep_state.get('curren
     st.rerun()
 
 # ==========================================
-# 🛑 8. PANEL DE RENDERIZADO VISUAL
+# 🛑 8. PANEL DE RENDERIZADO VISUAL Y SALÓN DE LA FAMA
 # ==========================================
 st.title("🛡️ GENESIS LAB - The Omni-Brain")
 
@@ -1117,11 +1115,11 @@ with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Ne
     
     leaderboard_data.sort(key=lambda x: x['Neto_Num'], reverse=True)
     
-    # 🔥 V245: BOTONES DE ACCESO RÁPIDO AL SALÓN DE LA FAMA 🔥
+    # 🔥 V246: BOTONES DE ACCESO RÁPIDO AL SALÓN DE LA FAMA 🔥
     for rank, item in enumerate(leaderboard_data):
         col1, col2 = st.columns([4, 1])
         col1.markdown(f"**#{rank+1} | {item['Mutante']}** -> Profit: `{item['Rentabilidad']}` | WR: `{item['WinRate']}` | Estado: {item['Estado']}")
-        if col2.button("👉 DESPLEGAR", key=f"btn_load_{item['Mutante']}"):
+        if col2.button("👉 CARGAR SCRIPT", key=f"btn_load_{item['Mutante']}"):
             st.session_state['selected_mutant'] = item['Mutante']
             st.rerun()
     st.markdown("---")
@@ -1151,15 +1149,15 @@ if len(tab_names) > 0:
         st.markdown(f"**🌍 Clima Macro:** `{vault.get('macro', '')}` | **🌪️ Clima Volatilidad:** `{vault.get('vol', '')}`")
         st.markdown(f"**🎛️ Pesos del Perceptrón:** RSI: `{vault.get('w_rsi',0):.2f}` | Z-Score: `{vault.get('w_z',0):.2f}` | ADX: `{vault.get('w_adx',0):.2f}`")
         st.markdown(f"**📏 Gatillos Sensibles:** Buy > `{vault.get('th_buy',0):.2f}` | Sell < `{vault.get('th_sell',0):.2f}`")
-        st.markdown(f"**🎯 Camaleón ATR:** TP: `{vault.get('atr_tp',0):.2f}x` | SL: `{vault.get('atr_sl',0):.2f}x`")
+        st.markdown(f"**🎯 Camaleón ATR (Toma de Ganancias):** TP: `{vault.get('atr_tp',0):.2f}x` | SL: `{vault.get('atr_sl',0):.2f}x`")
 
     c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
     
     ado_val_ui = float(vault.get('ado', 4.0)) if vault.get('ado') is not None else 4.0
     reinv_val_ui = float(vault.get('reinv', 20.0)) if vault.get('reinv') is not None else 20.0
 
-    ado_ui = c_ia1.slider("🎯 Target ADO", 0.0, 100.0, value=ado_val_ui, key=f"ui_{s_id}_ado_w", step=0.5)
-    reinv_ui = c_ia2.slider("💵 Reinversión %", 0.0, 100.0, value=reinv_val_ui, key=f"ui_{s_id}_reinv_w", step=5.0)
+    ado_ui = c_ia1.slider("🎯 Target ADO (IA Override)", 0.0, 100.0, value=ado_val_ui, key=f"ui_{s_id}_ado_w", step=0.5)
+    reinv_ui = c_ia2.slider("💵 Reinversión % (IA Override)", 0.0, 100.0, value=reinv_val_ui, key=f"ui_{s_id}_reinv_w", step=5.0)
 
     c_ps1, c_ps2 = st.columns(2)
     ps_buy_pct = c_ps1.number_input("🟢 % Inversión Compra (Pine Script)", min_value=0, max_value=100, value=int(reinv_val_ui), step=1, key=f"ui_{s_id}_ps_buy")
