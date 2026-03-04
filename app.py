@@ -23,8 +23,8 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V251: FIX FATAL ERROR, EMA PINE CLON Y FITNESS DE NET PROFIT 🔥
-APP_VERSION = 'V251'
+# 🔥 V252: DIAGRAMA RADAR + FITNESS ANTI-CENTAVOS + FIX PINE SCRIPT CERO LAG 🔥
+APP_VERSION = 'V252'
 if st.session_state.get('app_version') != APP_VERSION:
     st.cache_data.clear()
     for key in list(st.session_state.keys()):
@@ -60,7 +60,6 @@ def rma_pine(arr, length):
             else: out[i] = alpha * arr[i] + (1.0 - alpha) * out[i-1]
     return out
 
-# 🔥 CLON PERFECTO DEL MOTOR EMA DE TRADINGVIEW C++ 🔥
 def ema_pine(arr, length):
     alpha = 2.0 / (length + 1); out = np.full_like(arr, np.nan, dtype=float)
     sum_val = 0.0; count = 0
@@ -108,13 +107,17 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
                     if c_arr[i] <= o_arr[i]: 
-                        exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
+                        exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
+                        ret = (exec_p - p_ent) / p_ent
                     else: 
-                        exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
+                        exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
+                        ret = (exec_p - p_ent) / p_ent
                 elif hit_sl:
-                    exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
+                    exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
+                    ret = (exec_p - p_ent) / p_ent
                 elif hit_tp:
-                    exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
+                    exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
+                    ret = (exec_p - p_ent) / p_ent
                 
                 if hit_sl or hit_tp:
                     exec_p = exec_p * slip_out
@@ -135,10 +138,10 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
             if f_buy[i]:
                 invest_amt = cap_act * (invest_pct / 100.0) if invest_pct > 0 else cap_ini
                 if invest_amt > cap_act: invest_amt = cap_act 
-                
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
+                # ANCLADO ESTRICTO AL CLOSE DE LA SEÑAL (CERO LAG PINE SCRIPT)
                 base_p = c_arr[i] 
                 tp_p = round(base_p + (atr_arr[i] * atr_tp_mult), 5)
                 sl_p = round(base_p - (atr_arr[i] * atr_sl_mult), 5)
@@ -150,7 +153,7 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
     return (cap_act - cap_ini), pf, num_trades, max_dd, wr
 
 # ==========================================
-# 📊 SIMULADOR VISUAL
+# 📊 SIMULADOR VISUAL & MONTE CARLO
 # ==========================================
 def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
     registro_trades = []; n = len(df_sim); curva = np.full(n, cap_ini, dtype=float)
@@ -240,6 +243,27 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
     risk_of_ruin = (ruined_count / num_simulations) * 100.0
     return mc_curves, risk_of_ruin
 
+# 🔥 CREADOR DEL DIAGRAMA DE TELARAÑA (RADAR) 🔥
+def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
+    fig = go.Figure()
+    norm_wr = min(wr, 100)
+    norm_pf = min(pf * 20, 100) # Un PF de 5.0 es el maximo escaleable (100)
+    norm_ado = min((ado / max(0.1, target_ado)) * 100, 100) 
+    norm_ret = min(max(ret_pct / 10, 0), 100) # Cada 10% = 1 punto en el radar (max 1000% visual)
+    norm_alpha = min(max(alpha_pct / 10, 0), 100)
+    
+    fig.add_trace(go.Scatterpolar(
+        r=[norm_wr, norm_pf, norm_ado, norm_ret, norm_alpha, norm_wr],
+        theta=['Win Rate', 'Profit Factor', 'ADO', 'Rentabilidad', 'Alpha', 'Win Rate'],
+        fill='toself', name='Perfil de Depredador IA', line_color='#00FF00'
+    ))
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 100], color='gray')),
+        showlegend=False, template='plotly_dark', height=350, margin=dict(l=30, r=30, t=30, b=30),
+        title=dict(text="🧬 Escáner de Equilibrio Genético", x=0.5, font=dict(color="cyan"))
+    )
+    return fig
+
 # ==========================================
 # 🧬 3. DICCIONARIOS Y GUARDIANES
 # ==========================================
@@ -327,7 +351,6 @@ target_strats = st.sidebar.multiselect("🎯 Mutantes a Forjar:", estrategias, d
 if st.sidebar.button(f"🧠 DEEP MINE GLOBAL", type="primary", use_container_width=True, key="btn_global"):
     st.session_state['global_queue'] = target_strats.copy(); st.session_state['abort_opt'] = False; st.session_state['run_global'] = True; st.rerun()
 
-# 🔥 V251: Combinación profunda al crear mutante y ID seguro 🔥
 if st.sidebar.button("🤖 CREAR NUEVO MUTANTE IA", type="secondary", use_container_width=True, key="btn_mutant"):
     new_id = f"AI_MUTANT_{int(time.time())}_{random.randint(10, 99)}"
     if new_id not in st.session_state['ai_algos']:
@@ -396,7 +419,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
             
         a_h, a_l, a_c, a_o = df['High'].values, df['Low'].values, df['Close'].values, df['Open'].values
         
-        # 🔥 V251: EMAS CLONADAS AL CÓDIGO C++ DE TRADINGVIEW 🔥
         df['EMA_200'] = ema_pine(a_c, 200)
         df['EMA_50'] = ema_pine(a_c, 50)
         df['Vol_MA_20'] = df['Volume'].rolling(window=20).mean()
@@ -425,10 +447,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         hh_14, ll_14 = df['High'].rolling(14).max(), df['Low'].rolling(14).min()
         df['CHOP'] = 100 * np.log10(sum_tr / (hh_14 - ll_14)) / np.log10(14)
         
-        # 🔥 V251: MACD CLONADO A PINE SCRIPT 🔥
-        macd_fast = ema_pine(a_c, 12)
-        macd_slow = ema_pine(a_c, 26)
-        df['MACD'] = macd_fast - macd_slow
+        df['MACD'] = ema_pine(a_c, 12) - ema_pine(a_c, 26)
         df['MACD_Sig'] = ema_pine(df['MACD'].values, 9)
         
         stoch = 100 * (df['Close'] - df['Low'].rolling(14).min()) / (df['High'].rolling(14).max() - df['Low'].rolling(14).min())
@@ -452,14 +471,14 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['RSI_BB_Basis'] = df['RSI'].rolling(14).mean(); df['RSI_BB_Dev'] = df['RSI'].rolling(14).std(ddof=0) * 2.0
         
         df['Vela_Verde'], df['Vela_Roja'] = df['Close'] > df['Open'], df['Close'] < df['Open']
-        df['body_size'] = abs(df['Close'] - df['Open']) 
+        df['body_size'] = np.abs(df['Close'] - df['Open']) 
         df['upper_wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
         df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
         df['is_falling_knife'] = (df['Open'].shift(1) - df['Close'].shift(1)) > (df['ATR'].shift(1) * 1.5)
         
         df['PA_Engulfing_Buy'] = (df['Vela_Verde']) & (df['Vela_Roja'].shift(1)) & (df['Close'] > df['Open'].shift(1)) & (df['Open'] < df['Close'].shift(1))
         df['PA_Engulfing_Sell'] = (df['Vela_Roja']) & (df['Vela_Verde'].shift(1)) & (df['Close'] < df['Open'].shift(1)) & (df['Open'] > df['Close'].shift(1))
-        # 🔥 V251: Corrección sintaxis body_size 🔥
+        # 🔥 Corrección de body_size 🔥
         df['PA_Pinbar_Buy'] = (df['lower_wick'] > df['body_size'] * 2.5) & (df['upper_wick'] < df['body_size'])
         df['PA_Pinbar_Sell'] = (df['upper_wick'] > df['body_size'] * 2.5) & (df['lower_wick'] < df['body_size'])
         df['PA_3_Soldiers'] = (df['Vela_Verde']) & (df['Vela_Verde'].shift(1)) & (df['Vela_Verde'].shift(2)) & (df['Close'] > df['Close'].shift(1)) & (df['Close'].shift(1) > df['Close'].shift(2))
@@ -609,6 +628,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
     vault = get_safe_vault(s_id)
     best_fit_live, best_net_live, best_pf_live, best_nt_live = vault.get('fit', -float('inf')), vault.get('net', -float('inf')), vault.get('pf', 0.0), vault.get('nt', 0)
     
+    # 🔥 V252: VELOCIDAD MAXIMA. 1000 Iteraciones en la sombra.
     iters = 3000 * epochs
     chunk_size = 1000
     chunks = max(1, iters // chunk_size)
@@ -628,8 +648,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             f_buy_tactical.fill(False)
             f_sell_tactical.fill(False)
             
-            dna_b_team = random.sample(todas_las_armas_b, random.randint(3, 12))
-            dna_s_team = random.sample(todas_las_armas_s, random.randint(3, 12))
+            dna_b_team = random.sample(todas_las_armas_b, random.randint(3, 7))
+            dna_s_team = random.sample(todas_las_armas_s, random.randint(3, 7))
             
             dna_macro = random.choice(["All-Weather", "Bull Only", "Bear Only", "Ignore", "Organic_Vol", "Organic_Squeeze", "Organic_Safe", "Organic_Gaussian_Clean"])
             dna_vol = random.choice(["All-Weather", "Trend", "Range", "Ignore", "Organic_Pump", "Organic_Dump", "Organic_Gaussian_Clean"])
@@ -665,20 +685,27 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0
             )
 
-            # 🔥 V251: ECUACIÓN DEL CREADOR (NET PROFIT COMO REY ABSOLUTO) 🔥
+            # 🔥 V252: FITNESS ANTI-CENTAVOS (Net Profit Total como Soberano) 🔥
             ado_actual = nt / max(1, dias_entrenamiento)
             fit_score = -float('inf') 
             
-            if nt >= 3 and net > 0: 
-                ado_target_safe = max(0.1, target_ado)
-                
-                # Bono sumativo masivo. Si net es gigante, domina. Si empatan, decide ADO y PF.
-                bonus_pf = min(pf, 5.0) * 100
-                bonus_ado = min(ado_actual, ado_target_safe) * 200
-                
-                fit_score = net + bonus_pf + bonus_ado - (mdd * 2)
+            if nt >= 10 and net > 0: 
+                avg_trade = net / nt
+                # Destruir estrategias que ganan centavos a costa de falsas señales
+                if avg_trade < (cap_ini * 0.002): 
+                    fit_score = net - 1000.0
+                else:
+                    ado_target_safe = max(0.1, target_ado)
+                    ado_ratio = ado_actual / ado_target_safe
+                    ado_multiplier = min(1.5, max(0.3, ado_ratio))
+                    
+                    wr_multiplier = max(0.5, wr / 40.0) 
+                    dd_penalty = np.exp(mdd / 30.0) 
+                    
+                    # Net Profit es lo principal, el resto solo empuja
+                    fit_score = (net * min(pf, 5.0) * wr_multiplier * ado_multiplier) / dd_penalty
             elif nt > 0:
-                fit_score = net - mdd - (abs(ado_actual - max(0.1, target_ado)) * 5)
+                fit_score = net - mdd - 500.0
             else:
                 fit_score = net - 1000.0 
 
@@ -704,7 +731,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             title = f"🌌 DEEP FORGE: {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V251: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
+            title = f"GENESIS LAB V252: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
 
         html_str = f"""
         <style>
@@ -1031,17 +1058,15 @@ var float locked_atr = na
 var float tp_price = na
 var float sl_price = na
 
+// 🔥 V252: CERO LAG DE ENTRADA. El Stop/Limit entra a la fila ANTES DE QUE LA VELA CIERRE 🔥
 if signal_buy and strategy.position_size == 0 and window
     locked_atr := atr
-    // 🔥 V251: TP/SL se calculan en el mismo tick de la señal para evitar desfase TV/Python 🔥
     tp_price := math.round(close + (locked_atr * atr_tp_mult), 5)
     sl_price := math.round(close - (locked_atr * atr_sl_mult), 5)
-    
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
-    // El escudo de salida se lanza preventivamente
-    strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
+    // El Limit y Stop ya esperan en el libro de órdenes al momento del Entry.
+    strategy.exit("TP/SL_First", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
-// La orden de salida persiste si estamos en posición
 if strategy.position_size > 0
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
@@ -1057,6 +1082,28 @@ plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.
 plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
 """
     return ps_base + ps_indicators + ps_logic + ps_exec
+
+# ==========================================
+# 🛑 RADAR CHART CREATOR 🔥
+# ==========================================
+def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
+    fig = go.Figure()
+    norm_wr = min(wr, 100)
+    norm_pf = min(pf * 20, 100) 
+    norm_ado = min((ado / max(0.1, target_ado)) * 100, 100) 
+    norm_ret = min(max(ret_pct / 20, 0), 100) 
+    norm_alpha = min(max(alpha_pct / 20, 0), 100)
+    
+    fig.add_trace(go.Scatterpolar(
+        r=[norm_wr, norm_pf, norm_ado, norm_ret, norm_alpha, norm_wr],
+        theta=['Win Rate', 'Profit Factor', 'ADO (Trades/Día)', 'Rentabilidad Total', 'Alpha (vs Hold)', 'Win Rate'],
+        fill='toself', name='Perfil de Depredador IA', line_color='#00FFFF', fillcolor='rgba(0, 255, 255, 0.2)'
+    ))
+    fig.update_layout(
+        polar=dict(radialaxis=dict(visible=True, range=[0, 100], color='gray', gridcolor='rgba(255, 255, 255, 0.1)')),
+        showlegend=False, template='plotly_dark', height=350, margin=dict(l=30, r=30, t=30, b=30)
+    )
+    return fig
 
 # ==========================================
 # 🛑 7. BUCLES DE EJECUCIÓN GLOBALES Y PROFUNDOS
@@ -1125,11 +1172,11 @@ with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Ne
     
     leaderboard_data.sort(key=lambda x: x['Neto_Num'], reverse=True)
     
-    # 🔥 V251: DEDUPLICACIÓN DE LLAVES DE STREAMLIT PARA EL SALÓN DE LA FAMA 🔥
     for rank, item in enumerate(leaderboard_data):
         col1, col2 = st.columns([4, 1])
         col1.markdown(f"**#{rank+1} | {item['Mutante']}** -> Profit: `{item['Rentabilidad']}` | WR: `{item['WinRate']}` | Estado: {item['Estado']}")
-        if col2.button("👉 CARGAR SCRIPT", key=f"btn_load_script_{item['Mutante']}_{rank}"):
+        # 🔥 V252: LLAVE DEDUPLICADA DEL BOTÓN CARGAR SCRIPT 🔥
+        if col2.button("👉 CARGAR SCRIPT", key=f"btn_load_{item['Mutante']}_rk{rank}"):
             st.session_state['selected_mutant'] = item['Mutante']
             st.rerun()
     st.markdown("---")
@@ -1209,14 +1256,24 @@ if len(tab_names) > 0:
     ado_val = tt / dias_reales if dias_reales > 0 else 0.0
     mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
 
-    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-    c1.metric("Net Profit", f"${eq_curve[-1]-capital_inicial:,.2f}", f"{ret_pct:.2f}%")
-    c2.metric("ALPHA", f"{alpha_pct:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
-    c3.metric("Trades", f"{tt}", f"ADO: {ado_val:.2f}")
-    c4.metric("Win Rate", f"{wr:.1f}%")
-    c5.metric("Profit Factor", f"{pf_val:.2f}x")
-    c6.metric("Drawdown", f"{mdd:.2f}%", delta_color="inverse")
-    c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
+    # 🔥 V252: RENDERIZACIÓN DEL DIAGRAMA RADAR 🔥
+    col_kpi, col_radar = st.columns([3, 2])
+    
+    with col_kpi:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Net Profit", f"${eq_curve[-1]-capital_inicial:,.2f}", f"{ret_pct:.2f}%")
+        c2.metric("ALPHA", f"{alpha_pct:.2f}%", delta_color="normal" if alpha_pct > 0 else "inverse")
+        c3.metric("Trades", f"{tt}", f"ADO: {ado_val:.2f}")
+        c4.metric("Win Rate", f"{wr:.1f}%")
+        
+        c5, c6, c7, c8 = st.columns(4)
+        c5.metric("Profit Factor", f"{pf_val:.2f}x")
+        c6.metric("Drawdown", f"{mdd:.2f}%", delta_color="inverse")
+        c7.metric("Comisiones", f"${total_comms:,.2f}", delta_color="inverse")
+        c8.metric("Hold Return", f"{buy_hold_ret:.2f}%")
+        
+    with col_radar:
+        st.plotly_chart(generar_radar(wr, pf_val, ado_val, ret_pct, alpha_pct, ado_val_ui), use_container_width=True)
 
     # --- EJECUCIÓN DEL TEST DE MONTE CARLO ---
     mc_curves, risk_of_ruin = simular_monte_carlo(t_log, capital_inicial, 500)
