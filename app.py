@@ -23,8 +23,8 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V254: EUREKA! FIX DEL BUG "NA" EN TP/SL QUE CEGABA A TRADINGVIEW 🔥
-APP_VERSION = 'V254'
+# 🔥 V255: LÓGICA DE COLISIÓN TV INYECTADA + TEXTOS REALES EN RADAR 🔥
+APP_VERSION = 'V255'
 if st.session_state.get('app_version') != APP_VERSION:
     st.cache_data.clear()
     for key in list(st.session_state.keys()):
@@ -100,20 +100,27 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
             
         pending_dyn_exit = False 
         
+        # 🔥 V255: REPLICA EXACTA DE LA REGLA "CLOSEST TO OPEN" DE TRADINGVIEW 🔥
         if en_pos and not cierra:
             bars_in_trade += 1
             if bars_in_trade >= 1: 
                 hit_sl = l_arr[i] <= sl_p
                 hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
-                    if c_arr[i] <= o_arr[i]: 
-                        exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
-                    else: 
-                        exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
+                    dist_sl = abs(sl_p - o_arr[i])
+                    dist_tp = abs(tp_p - o_arr[i])
+                    if dist_sl <= dist_tp:
+                        exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
+                        ret = (exec_p - p_ent) / p_ent
+                    else:
+                        exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
+                        ret = (exec_p - p_ent) / p_ent
                 elif hit_sl:
-                    exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
+                    exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
+                    ret = (exec_p - p_ent) / p_ent
                 elif hit_tp:
-                    exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
+                    exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
+                    ret = (exec_p - p_ent) / p_ent
                 
                 if hit_sl or hit_tp:
                     exec_p = exec_p * slip_out
@@ -138,7 +145,6 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
-                # 🔥 V254: SINCRONIZACIÓN EXACTA AL CIERRE PARA EVITAR LOS NULOS (NA) 🔥
                 base_p = c_arr[i] 
                 if is_calib:
                     tp_p = round(base_p * 1.002, 5)
@@ -180,15 +186,19 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
             en_pos = False; cierra = True
             
         pending_dyn_exit = False
+        
+        # 🔥 LÓGICA INTRABAR COLISIÓN ESPEJO DE TRADINGVIEW 🔥
         if en_pos and not cierra:
             bars_in_trade += 1
             if bars_in_trade >= 1:
                 hit_sl = l_arr[i] <= sl_p; hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
-                    if c_arr[i] <= o_arr[i]: 
-                        exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'TP'
-                    else: 
+                    dist_sl = abs(sl_p - o_arr[i])
+                    dist_tp = abs(tp_p - o_arr[i])
+                    if dist_sl <= dist_tp:
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'SL'
+                    else:
+                        exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'TP'
                 elif hit_sl:
                     exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'SL'
                 elif hit_tp:
@@ -249,38 +259,40 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
     risk_of_ruin = (ruined_count / num_simulations) * 100.0
     return mc_curves, risk_of_ruin
 
-# 🔥 CREADOR DEL DIAGRAMA DE TELARAÑA (RADAR) 🔥
+# 🔥 V255: CREADOR DEL DIAGRAMA RADAR CON TEXTOS REALES INYECTADOS 🔥
 def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
     fig = go.Figure()
     
-    # Escalas ajustadas a la lógica Cripto
-    norm_wr = min(wr * 2, 100) # 50% llena el radar (En trend-following 35% es normal)
-    norm_pf = min(pf * 25, 100) # 4.0x PF llena el radar
+    norm_wr = min(wr * 2, 100) 
+    norm_pf = min(pf * 25, 100) 
     norm_ado = min((ado / max(0.1, target_ado)) * 100, 100) 
-    norm_ret = min(max(ret_pct / 30, 0), 100) # 3000% llena el radar
+    norm_ret = min(max(ret_pct / 30, 0), 100) 
     norm_alpha = min(max(alpha_pct / 30, 0), 100)
     
     real_texts = [
-        f"{wr:.1f}% Win Rate", 
-        f"{pf:.2f}x Profit Factor", 
+        f"{wr:.1f}% WR", 
+        f"{pf:.2f}x PF", 
         f"{ado:.2f} ADO", 
         f"{ret_pct:.1f}% Neto", 
         f"{alpha_pct:.1f}% Alpha",
-        f"{wr:.1f}% Win Rate"
+        f"{wr:.1f}% WR"
     ]
     
     fig.add_trace(go.Scatterpolar(
         r=[norm_wr, norm_pf, norm_ado, norm_ret, norm_alpha, norm_wr],
         theta=['Win Rate', 'Profit Factor', 'Trades/Día (ADO)', 'Rentabilidad', 'Alpha (vs Hold)', 'Win Rate'],
-        fill='toself', name='Perfil de Depredador IA', line_color='#00FFFF', fillcolor='rgba(0, 255, 255, 0.3)',
-        text=real_texts, hoverinfo="text"
+        mode='lines+markers+text',
+        text=real_texts,
+        textposition="top center",
+        textfont=dict(color='white', size=11, family="Arial Black"),
+        fill='toself', name='Perfil de Depredador IA', line_color='#00FFFF', fillcolor='rgba(0, 255, 255, 0.2)'
     ))
     fig.update_layout(
         polar=dict(
             radialaxis=dict(visible=True, showticklabels=False, range=[0, 100], color='gray', gridcolor='rgba(255, 255, 255, 0.1)')
         ),
         showlegend=False, template='plotly_dark', height=350, margin=dict(l=40, r=40, t=30, b=30),
-        title=dict(text="🧬 Escáner de Equilibrio Genético", x=0.5, font=dict(color="cyan"))
+        title=dict(text="🧬 Escáner de Poder de la IA", x=0.5, font=dict(color="cyan"))
     )
     return fig
 
@@ -340,7 +352,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V254</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V255</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); st.session_state.clear(); gc.collect(); st.rerun()
 
@@ -363,7 +375,7 @@ start_date, end_date = st.sidebar.slider("📅 Scope", min_value=hoy - timedelta
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.15, step=0.05) / 100.0 
 
-# 🔥 V254: CHECKBOX DE MODO CALIBRADOR 🔥
+# 🔥 V255: CHECKBOX DE MODO CALIBRADOR 🔥
 st.sidebar.markdown("---")
 is_calib_mode = st.sidebar.checkbox("🛠️ ACTIVAR MODO CALIBRACIÓN (Trades Fijos en Python y TV para aislar variables)", value=False)
 if is_calib_mode:
@@ -410,7 +422,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V254)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V255)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -755,7 +767,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             title = f"🌌 DEEP FORGE: {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V254: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
+            title = f"GENESIS LAB V255: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
 
         html_str = f"""
         <style>
@@ -921,6 +933,7 @@ low_30 = ta.lowest(low[1], 30)
 low_100 = ta.lowest(low[1], 100)
 low_300 = ta.lowest(low[1], 300)
 a_tsup = math.max(nz(low_30, 0), math.max(nz(low_100, 0), nz(low_300, 0)))
+
 high_30 = ta.highest(high[1], 30)
 high_100 = ta.highest(high[1], 100)
 high_300 = ta.highest(high[1], 300)
@@ -1108,7 +1121,7 @@ var float sl_price = na
 
 if signal_buy and strategy.position_size == 0 and window
     locked_atr := atr
-    // 🔥 V254: CERO LAG DE ENTRADA (Ancla a close y dispara limit/stop al mismo tiempo SIN RESET) 🔥
+    // 🔥 V255: ANCLAJE EXACTO CON TRUNCADO PARA EVITAR LAG DE TRADINGVIEW 🔥
     tp_price := math.round(close + (locked_atr * atr_tp_mult), 5)
     sl_price := math.round(close - (locked_atr * atr_sl_mult), 5)
     
@@ -1231,7 +1244,7 @@ if len(tab_names) > 0:
             st.markdown(f"**🌍 Clima Macro:** `{vault.get('macro', '')}` | **🌪️ Clima Volatilidad:** `{vault.get('vol', '')}`")
             st.markdown(f"**🎛️ Pesos del Perceptrón:** RSI: `{vault.get('w_rsi',0):.2f}` | Z-Score: `{vault.get('w_z',0):.2f}` | ADX: `{vault.get('w_adx',0):.2f}`")
             st.markdown(f"**📏 Gatillos Sensibles:** Buy > `{vault.get('th_buy',0):.2f}` | Sell < `{vault.get('th_sell',0):.2f}`")
-            st.markdown(f"**🎯 Camaleón ATR:** TP: `{vault.get('atr_tp',0):.2f}x` | SL: `{vault.get('atr_sl',0):.2f}x`")
+            st.markdown(f"**🎯 Camaleón ATR (Toma de Ganancias):** TP: `{vault.get('atr_tp',0):.2f}x` | SL: `{vault.get('atr_sl',0):.2f}x`")
 
     c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
     
