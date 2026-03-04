@@ -23,8 +23,8 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V253: MODO CALIBRADOR + RADAR CORREGIDO + FITNESS EQUILIBRADO 🔥
-APP_VERSION = 'V253'
+# 🔥 V254: EUREKA! FIX DEL BUG "NA" EN TP/SL QUE CEGABA A TRADINGVIEW 🔥
+APP_VERSION = 'V254'
 if st.session_state.get('app_version') != APP_VERSION:
     st.cache_data.clear()
     for key in list(st.session_state.keys()):
@@ -76,7 +76,7 @@ def ema_pine(arr, length):
 # ==========================================
 @njit(fastmath=True)
 def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr, 
-    f_buy, f_sell, atr_tp_mult, atr_sl_mult, cap_ini, com_pct, invest_pct, slippage_pct, is_calib=False):
+    f_buy, f_sell, atr_tp_mult, atr_sl_mult, cap_ini, com_pct, invest_pct, slippage_pct, is_calib):
     
     cap_act = cap_ini; en_pos = False; pending_dyn_exit = False
     p_ent = 0.0; pos_size = 0.0; invest_amt = 0.0; g_profit = 0.0; g_loss = 0.0
@@ -138,12 +138,12 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
-                # MODO CALIBRADOR (TP Y SL MATEMÁTICOS DE 0.2%) vs IA (ATR MULTIPLIER)
+                # 🔥 V254: SINCRONIZACIÓN EXACTA AL CIERRE PARA EVITAR LOS NULOS (NA) 🔥
+                base_p = c_arr[i] 
                 if is_calib:
-                    tp_p = round(p_ent * 1.002, 5)
-                    sl_p = round(p_ent * 0.998, 5)
+                    tp_p = round(base_p * 1.002, 5)
+                    sl_p = round(base_p * 0.998, 5)
                 else:
-                    base_p = c_arr[i] 
                     tp_p = round(base_p + (atr_arr[i] * atr_tp_mult), 5)
                     sl_p = round(base_p - (atr_arr[i] * atr_sl_mult), 5)
                 
@@ -212,12 +212,12 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
                 comm_in = invest_amt * com_pct; total_comms += comm_in; pos_size = invest_amt - comm_in
                 
                 p_ent = o_arr[i+1] * slip_in
+                base_p = c_arr[i]
                 
                 if is_calib:
-                    tp_p = np.round(p_ent * 1.002, 5)
-                    sl_p = np.round(p_ent * 0.998, 5)
+                    tp_p = np.round(base_p * 1.002, 5)
+                    sl_p = np.round(base_p * 0.998, 5)
                 else:
-                    base_p = c_arr[i]
                     tp_p = np.round(base_p + (atr_arr[i] * float(tp_arr[i])), 5)
                     sl_p = np.round(base_p - (atr_arr[i] * float(sl_arr[i])), 5)
                 
@@ -249,18 +249,17 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
     risk_of_ruin = (ruined_count / num_simulations) * 100.0
     return mc_curves, risk_of_ruin
 
-# 🔥 V253: CREADOR DEL DIAGRAMA DE TELARAÑA (RADAR CORREGIDO) 🔥
+# 🔥 CREADOR DEL DIAGRAMA DE TELARAÑA (RADAR) 🔥
 def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
     fig = go.Figure()
     
-    # Escalas relativas para que el polígono tenga sentido visual
-    norm_wr = min(wr * 2, 100) # 50% es visualmente el máximo necesario en cripto (100)
+    # Escalas ajustadas a la lógica Cripto
+    norm_wr = min(wr * 2, 100) # 50% llena el radar (En trend-following 35% es normal)
     norm_pf = min(pf * 25, 100) # 4.0x PF llena el radar
     norm_ado = min((ado / max(0.1, target_ado)) * 100, 100) 
-    norm_ret = min(max(ret_pct / 10, 0), 100) # 1000% llena el radar
-    norm_alpha = min(max(alpha_pct / 10, 0), 100)
+    norm_ret = min(max(ret_pct / 30, 0), 100) # 3000% llena el radar
+    norm_alpha = min(max(alpha_pct / 30, 0), 100)
     
-    # TEXTOS EXACTOS para no confundir la visualización con la realidad
     real_texts = [
         f"{wr:.1f}% Win Rate", 
         f"{pf:.2f}x Profit Factor", 
@@ -301,7 +300,14 @@ estrategias = st.session_state['ai_algos']
 tab_id_map = {f"🤖 {ai_id}": ai_id for ai_id in estrategias}
 
 def get_default_dna():
-    return {'b_team': [random.choice(todas_las_armas_b)], 's_team': [random.choice(todas_las_armas_s)], 'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0, 'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0}
+    return {
+        'b_team': random.sample(todas_las_armas_b, random.randint(3, 7)), 
+        's_team': random.sample(todas_las_armas_s, random.randint(3, 7)), 
+        'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 
+        'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 
+        'net': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0, 'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 
+        'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0
+    }
 
 def get_safe_vault(s_id):
     vault = st.session_state.get(f'champion_{s_id}')
@@ -334,7 +340,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V253</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V254</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); st.session_state.clear(); gc.collect(); st.rerun()
 
@@ -357,11 +363,11 @@ start_date, end_date = st.sidebar.slider("📅 Scope", min_value=hoy - timedelta
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.15, step=0.05) / 100.0 
 
-# 🔥 V253: CHECKBOX DE MODO CALIBRADOR (EL CONTROL GROUP) 🔥
+# 🔥 V254: CHECKBOX DE MODO CALIBRADOR 🔥
 st.sidebar.markdown("---")
-is_calib_mode = st.sidebar.checkbox("🛠️ ACTIVAR MODO CALIBRACIÓN (100 Trades Fijos de 0.2%)", value=False)
+is_calib_mode = st.sidebar.checkbox("🛠️ ACTIVAR MODO CALIBRACIÓN (Trades Fijos en Python y TV para aislar variables)", value=False)
 if is_calib_mode:
-    st.sidebar.warning("Atención: La IA se apaga. Entrará en corto cada 50 barras exactas con TP 0.2% y SL 0.2%. Úsalo para alinear TradingView.")
+    st.sidebar.warning("Atención: La IA se apaga. Entrará en compra cada 50 barras exactas con TP y SL de 0.2%. Úsalo para certificar TradingView.")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 style='text-align: center; color: lime;'>🤖 CÁMARA DE MUTACIÓN</h3>", unsafe_allow_html=True)
@@ -404,7 +410,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V253)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V254)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -707,14 +713,12 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
             )
 
-            # 🔥 V253: FITNESS EQUILIBRADO EL REY ES EL PROFIT 🔥
             ado_actual = nt / max(1, dias_entrenamiento)
             fit_score = -float('inf') 
             
             if nt >= 3 and net > 0: 
                 ado_target_safe = max(0.1, target_ado)
                 ado_ratio = ado_actual / ado_target_safe
-                # Solo castiga levemente si el ADO es muy bajo, pero no mata al Profit
                 ado_mod = min(1.2, ado_ratio) if ado_ratio > 0.5 else max(0.2, ado_ratio)
                 
                 wr_mod = max(0.5, wr / 30.0) 
@@ -751,7 +755,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             title = f"🌌 DEEP FORGE: {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V253: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
+            title = f"GENESIS LAB V254: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
 
         html_str = f"""
         <style>
@@ -834,14 +838,10 @@ if signal_buy and strategy.position_size == 0 and window
     tp_price := math.round(close * 1.002, 5)
     sl_price := math.round(close * 0.998, 5)
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
-    strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
+    strategy.exit("TP/SL_First", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
 if strategy.position_size > 0
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
-
-if strategy.position_size == 0
-    tp_price := na
-    sl_price := na
 
 plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.belowbar, color=color.yellow, size=size.tiny)
 """
@@ -921,7 +921,6 @@ low_30 = ta.lowest(low[1], 30)
 low_100 = ta.lowest(low[1], 100)
 low_300 = ta.lowest(low[1], 300)
 a_tsup = math.max(nz(low_30, 0), math.max(nz(low_100, 0), nz(low_300, 0)))
-
 high_30 = ta.highest(high[1], 30)
 high_100 = ta.highest(high[1], 100)
 high_300 = ta.highest(high[1], 300)
@@ -1109,8 +1108,7 @@ var float sl_price = na
 
 if signal_buy and strategy.position_size == 0 and window
     locked_atr := atr
-    
-    // 🔥 V253: CERO LAG DE ENTRADA (Ancla a close y dispara limit/stop al mismo tiempo) 🔥
+    // 🔥 V254: CERO LAG DE ENTRADA (Ancla a close y dispara limit/stop al mismo tiempo SIN RESET) 🔥
     tp_price := math.round(close + (locked_atr * atr_tp_mult), 5)
     sl_price := math.round(close - (locked_atr * atr_sl_mult), 5)
     
@@ -1122,11 +1120,6 @@ if strategy.position_size > 0
 
 if signal_sell and strategy.position_size > 0
     strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
-
-if strategy.position_size == 0
-    locked_atr := na
-    tp_price := na
-    sl_price := na
 
 plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.belowbar, color=color.aqua, size=size.tiny)
 plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
@@ -1205,7 +1198,7 @@ with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Ne
     for rank, item in enumerate(leaderboard_data):
         col1, col2 = st.columns([4, 1])
         col1.markdown(f"**#{rank+1} | {item['Mutante']}** -> Profit: `{item['Rentabilidad']}` | WR: `{item['WinRate']}` | Estado: {item['Estado']}")
-        if col2.button("👉 CARGAR SCRIPT", key=f"btn_load_{item['Mutante']}_rk{rank}"):
+        if col2.button("👉 CARGAR SCRIPT", key=f"btn_load_script_{item['Mutante']}_{rank}"):
             st.session_state['selected_mutant'] = item['Mutante']
             st.rerun()
     st.markdown("---")
