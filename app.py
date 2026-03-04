@@ -23,8 +23,8 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V250: IA ULTRA-AGRESIVA + CERO LAG EN PINE SCRIPT + FIX DUPLICADOS 🔥
-APP_VERSION = 'V250'
+# 🔥 V251: FIX FATAL ERROR, EMA PINE CLON Y FITNESS DE NET PROFIT 🔥
+APP_VERSION = 'V251'
 if st.session_state.get('app_version') != APP_VERSION:
     st.cache_data.clear()
     for key in list(st.session_state.keys()):
@@ -60,6 +60,18 @@ def rma_pine(arr, length):
             else: out[i] = alpha * arr[i] + (1.0 - alpha) * out[i-1]
     return out
 
+# 🔥 CLON PERFECTO DEL MOTOR EMA DE TRADINGVIEW C++ 🔥
+def ema_pine(arr, length):
+    alpha = 2.0 / (length + 1); out = np.full_like(arr, np.nan, dtype=float)
+    sum_val = 0.0; count = 0
+    for i in range(len(arr)):
+        if not np.isnan(arr[i]):
+            if count < length:
+                sum_val += arr[i]; count += 1
+                if count == length: out[i] = sum_val / length
+            else: out[i] = alpha * arr[i] + (1.0 - alpha) * out[i-1]
+    return out
+
 # ==========================================
 # ⚙️ 2. NÚCLEO C++ (MÁQUINA DE ESTADOS ULTRA RÁPIDA)
 # ==========================================
@@ -76,7 +88,6 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
     for i in range(len(h_arr)):
         cierra = False
         
-        # SALIDA DINÁMICA
         if pending_dyn_exit and en_pos:
             exit_price = o_arr[i] * slip_out
             ret = (exit_price - p_ent) / p_ent
@@ -90,7 +101,6 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
             
         pending_dyn_exit = False 
         
-        # INTRABAR TP/SL
         if en_pos and not cierra:
             bars_in_trade += 1
             if bars_in_trade >= 1: 
@@ -116,13 +126,11 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                     if cap_act > peak: peak = cap_act
                     if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
 
-        # SEÑAL DE SALIDA
         if en_pos and not cierra:
             if f_sell[i]: pending_dyn_exit = True
                 
         if cap_act <= 0: break
         
-        # ENTRADA
         if not en_pos and not pending_dyn_exit and i+1 < len(h_arr):
             if f_buy[i]:
                 invest_amt = cap_act * (invest_pct / 100.0) if invest_pct > 0 else cap_ini
@@ -131,7 +139,6 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
-                # 🔥 V250: ANCLADO AL CLOSE DE LA SEÑAL CON 5 DECIMALES 🔥
                 base_p = c_arr[i] 
                 tp_p = round(base_p + (atr_arr[i] * atr_tp_mult), 5)
                 sl_p = round(base_p - (atr_arr[i] * atr_sl_mult), 5)
@@ -244,13 +251,19 @@ pine_map = {'Ping_Buy': 'ping_b', 'Ping_Sell': 'ping_s', 'Squeeze_Buy': 'squeeze
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
 
-# 🔥 V250: DEDUPLICACIÓN PARA EVITAR EL BUG STREAMLIT_DUPLICATE_KEY 🔥
 st.session_state['ai_algos'] = list(dict.fromkeys(st.session_state['ai_algos']))
 estrategias = st.session_state['ai_algos']
 tab_id_map = {f"🤖 {ai_id}": ai_id for ai_id in estrategias}
 
 def get_default_dna():
-    return {'b_team': [random.choice(todas_las_armas_b)], 's_team': [random.choice(todas_las_armas_s)], 'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0, 'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0}
+    return {
+        'b_team': random.sample(todas_las_armas_b, random.randint(3, 7)), 
+        's_team': random.sample(todas_las_armas_s, random.randint(3, 7)), 
+        'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 
+        'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 
+        'net': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0, 'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 
+        'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0
+    }
 
 def get_safe_vault(s_id):
     vault = st.session_state.get(f'champion_{s_id}')
@@ -283,7 +296,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V250</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V251</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); st.session_state.clear(); gc.collect(); st.rerun()
 
@@ -314,7 +327,7 @@ target_strats = st.sidebar.multiselect("🎯 Mutantes a Forjar:", estrategias, d
 if st.sidebar.button(f"🧠 DEEP MINE GLOBAL", type="primary", use_container_width=True, key="btn_global"):
     st.session_state['global_queue'] = target_strats.copy(); st.session_state['abort_opt'] = False; st.session_state['run_global'] = True; st.rerun()
 
-# 🔥 V250: ID ÚNICO CADA VEZ QUE SE CREA UN MUTANTE PARA PREVENIR ERRORES DE UI 🔥
+# 🔥 V251: Combinación profunda al crear mutante y ID seguro 🔥
 if st.sidebar.button("🤖 CREAR NUEVO MUTANTE IA", type="secondary", use_container_width=True, key="btn_mutant"):
     new_id = f"AI_MUTANT_{int(time.time())}_{random.randint(10, 99)}"
     if new_id not in st.session_state['ai_algos']:
@@ -348,7 +361,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V250)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V251)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -357,8 +370,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         end_ts = int((datetime.combine(end, datetime.min.time()) + timedelta(days=1)).timestamp() * 1000)
         
         all_ohlcv, current_ts, error_count = [], start_ts, 0
-        
-        # 🔥 V250: LÍMITE DINÁMICO DE VELAS PARA EVITAR BLOQUEO DE COINBASE 🔥
         req_limit = 1000
         if 'coinbase' in exchange_id.lower(): req_limit = 300
         if 'kraken' in exchange_id.lower(): req_limit = 720
@@ -385,8 +396,9 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
             
         a_h, a_l, a_c, a_o = df['High'].values, df['Low'].values, df['Close'].values, df['Open'].values
         
-        df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
-        df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
+        # 🔥 V251: EMAS CLONADAS AL CÓDIGO C++ DE TRADINGVIEW 🔥
+        df['EMA_200'] = ema_pine(a_c, 200)
+        df['EMA_50'] = ema_pine(a_c, 50)
         df['Vol_MA_20'] = df['Volume'].rolling(window=20).mean()
         df['Vol_MA_100'] = df['Volume'].rolling(window=100).mean()
         df['RVol'] = df['Volume'] / np.where(df['Vol_MA_100'] == 0, 1, df['Vol_MA_100'])
@@ -413,15 +425,18 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         hh_14, ll_14 = df['High'].rolling(14).max(), df['Low'].rolling(14).min()
         df['CHOP'] = 100 * np.log10(sum_tr / (hh_14 - ll_14)) / np.log10(14)
         
-        df['MACD'] = df['Close'].ewm(span=12, adjust=False).mean() - df['Close'].ewm(span=26, adjust=False).mean()
-        df['MACD_Sig'] = df['MACD'].ewm(span=9, adjust=False).mean()
+        # 🔥 V251: MACD CLONADO A PINE SCRIPT 🔥
+        macd_fast = ema_pine(a_c, 12)
+        macd_slow = ema_pine(a_c, 26)
+        df['MACD'] = macd_fast - macd_slow
+        df['MACD_Sig'] = ema_pine(df['MACD'].values, 9)
         
         stoch = 100 * (df['Close'] - df['Low'].rolling(14).min()) / (df['High'].rolling(14).max() - df['Low'].rolling(14).min())
         df['Stoch_K'] = stoch.rolling(3).mean(); df['Stoch_D'] = df['Stoch_K'].rolling(3).mean()
 
         ap = (df['High'] + df['Low'] + df['Close']) / 3.0
-        esa = ap.ewm(span=10, adjust=False).mean(); d_wt = (ap - esa).abs().ewm(span=10, adjust=False).mean()
-        df['WT1'] = ((ap - esa) / (0.015 * np.where(d_wt == 0, 1, d_wt))).ewm(span=21, adjust=False).mean()
+        esa = ema_pine(ap, 10); d_wt = ema_pine(np.abs(ap - esa), 10)
+        df['WT1'] = ema_pine(((ap - esa) / (0.015 * np.where(d_wt == 0, 1, d_wt))), 21)
         df['WT2'] = df['WT1'].rolling(4).mean()
         
         df['Basis'] = df['Close'].rolling(20).mean(); dev = df['Close'].rolling(20).std(ddof=0)
@@ -444,8 +459,9 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         
         df['PA_Engulfing_Buy'] = (df['Vela_Verde']) & (df['Vela_Roja'].shift(1)) & (df['Close'] > df['Open'].shift(1)) & (df['Open'] < df['Close'].shift(1))
         df['PA_Engulfing_Sell'] = (df['Vela_Roja']) & (df['Vela_Verde'].shift(1)) & (df['Close'] < df['Open'].shift(1)) & (df['Open'] > df['Close'].shift(1))
+        # 🔥 V251: Corrección sintaxis body_size 🔥
         df['PA_Pinbar_Buy'] = (df['lower_wick'] > df['body_size'] * 2.5) & (df['upper_wick'] < df['body_size'])
-        df['PA_Pinbar_Sell'] = (df['upper_wick'] > body_size * 2.5) & (df['lower_wick'] < df['body_size'])
+        df['PA_Pinbar_Sell'] = (df['upper_wick'] > df['body_size'] * 2.5) & (df['lower_wick'] < df['body_size'])
         df['PA_3_Soldiers'] = (df['Vela_Verde']) & (df['Vela_Verde'].shift(1)) & (df['Vela_Verde'].shift(2)) & (df['Close'] > df['Close'].shift(1)) & (df['Close'].shift(1) > df['Close'].shift(2))
         df['PA_3_Crows'] = (df['Vela_Roja']) & (df['Vela_Roja'].shift(1)) & (df['Vela_Roja'].shift(2)) & (df['Close'] < df['Close'].shift(1)) & (df['Close'].shift(1) < df['Close'].shift(2))
 
@@ -593,7 +609,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
     vault = get_safe_vault(s_id)
     best_fit_live, best_net_live, best_pf_live, best_nt_live = vault.get('fit', -float('inf')), vault.get('net', -float('inf')), vault.get('pf', 0.0), vault.get('nt', 0)
     
-    # 🔥 V250: HIPERVELOCIDAD DESTRUCTORA (1000 iteraciones antes de recargar la web = fluye como el agua) 🔥
     iters = 3000 * epochs
     chunk_size = 1000
     chunks = max(1, iters // chunk_size)
@@ -613,7 +628,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             f_buy_tactical.fill(False)
             f_sell_tactical.fill(False)
             
-            # IA SIN RESTRICCIONES (Escuadrones masivos)
             dna_b_team = random.sample(todas_las_armas_b, random.randint(3, 12))
             dna_s_team = random.sample(todas_las_armas_s, random.randint(3, 12))
             
@@ -651,24 +665,18 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0
             )
 
-            # 🔥 V250: FITNESS DEL DEPREDADOR (Net Profit Manda, ADO se castiga matemáticamente pero no lo mata) 🔥
+            # 🔥 V251: ECUACIÓN DEL CREADOR (NET PROFIT COMO REY ABSOLUTO) 🔥
             ado_actual = nt / max(1, dias_entrenamiento)
             fit_score = -float('inf') 
             
             if nt >= 3 and net > 0: 
                 ado_target_safe = max(0.1, target_ado)
-                ado_factor = ado_actual / ado_target_safe
                 
-                # Castigo exponencial brutal para forzar Trades (ADO), pero sin descartar a los titanes de 3000%
-                if ado_factor < 1.0:
-                    ado_penalty = ado_factor ** 3.0 
-                else:
-                    ado_penalty = 1.0
-
-                safe_pf = min(pf, 10.0)
-                dd_penalty = 1.0 if mdd <= 30.0 else (30.0 / mdd)
+                # Bono sumativo masivo. Si net es gigante, domina. Si empatan, decide ADO y PF.
+                bonus_pf = min(pf, 5.0) * 100
+                bonus_ado = min(ado_actual, ado_target_safe) * 200
                 
-                fit_score = net * safe_pf * ado_penalty * dd_penalty
+                fit_score = net + bonus_pf + bonus_ado - (mdd * 2)
             elif nt > 0:
                 fit_score = net - mdd - (abs(ado_actual - max(0.1, target_ado)) * 5)
             else:
@@ -696,7 +704,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             title = f"🌌 DEEP FORGE: {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V250: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
+            title = f"GENESIS LAB V251: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
 
         html_str = f"""
         <style>
@@ -751,7 +759,6 @@ def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_
     json_sell = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {sell_pct}, "limit_price": {{{{close}}}}, "side": "🔴 VENTA"}}'
 
     ps_base = f"""//@version=5
-// 🔥 V250: SALIDA SIMULTÁNEA PARA CERO LAG + COMISIÓN EXACTA TV 🔥
 strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value={buy_pct}, commission_type=strategy.commission.percent, commission_value={com_pct*100}, slippage=0)
 wt_enter_long = input.text_area(defval='{json_buy}', title="🟢 WT: Mensaje Enter Long")
 wt_exit_long  = input.text_area(defval='{json_sell}', title="🔴 WT: Mensaje Exit Long")
@@ -1026,12 +1033,12 @@ var float sl_price = na
 
 if signal_buy and strategy.position_size == 0 and window
     locked_atr := atr
-    // 🔥 V250: ANCLADO ESTRICTO AL CIERRE DE LA SEÑAL (CERO LAG, IDENTICO A PYTHON) 🔥
+    // 🔥 V251: TP/SL se calculan en el mismo tick de la señal para evitar desfase TV/Python 🔥
     tp_price := math.round(close + (locked_atr * atr_tp_mult), 5)
     sl_price := math.round(close - (locked_atr * atr_sl_mult), 5)
     
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
-    // El Limite de Salida se activa INMEDIATAMENTE para la siguiente vela
+    // El escudo de salida se lanza preventivamente
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
 // La orden de salida persiste si estamos en posición
@@ -1118,11 +1125,11 @@ with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Ne
     
     leaderboard_data.sort(key=lambda x: x['Neto_Num'], reverse=True)
     
+    # 🔥 V251: DEDUPLICACIÓN DE LLAVES DE STREAMLIT PARA EL SALÓN DE LA FAMA 🔥
     for rank, item in enumerate(leaderboard_data):
         col1, col2 = st.columns([4, 1])
         col1.markdown(f"**#{rank+1} | {item['Mutante']}** -> Profit: `{item['Rentabilidad']}` | WR: `{item['WinRate']}` | Estado: {item['Estado']}")
-        # 🔥 V250: LLAVE DEL BOTÓN TOTALMENTE ÚNICA PARA EVITAR BUG DE STREAMLIT 🔥
-        if col2.button("👉 CARGAR SCRIPT", key=f"btn_load_{item['Mutante']}_{rank}"):
+        if col2.button("👉 CARGAR SCRIPT", key=f"btn_load_script_{item['Mutante']}_{rank}"):
             st.session_state['selected_mutant'] = item['Mutante']
             st.rerun()
     st.markdown("---")
