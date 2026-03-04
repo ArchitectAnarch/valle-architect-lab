@@ -23,8 +23,8 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V257: FRANCOTIRADOR IA + WIN RATE REAL + RADAR DE PRECISIÓN 🔥
-APP_VERSION = 'V257'
+# 🔥 V258: INCORPORACIÓN DEL "IA GREED FACTOR" 🔥
+APP_VERSION = 'V258'
 if st.session_state.get('app_version') != APP_VERSION:
     st.cache_data.clear()
     for key in list(st.session_state.keys()):
@@ -185,6 +185,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
             en_pos = False; cierra = True
             
         pending_dyn_exit = False
+        
         if en_pos and not cierra:
             bars_in_trade += 1
             if bars_in_trade >= 1:
@@ -206,7 +207,6 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
                     gross = pos_size * (1 + ret); comm_out = gross * com_pct; total_comms += comm_out
                     profit = gross - comm_out - invest_amt; cap_act += profit
                     if cap_act <= 0: cap_act = 0
-                    # 🔥 V257: El visual ahora registra el nombre real dependiendo si ganó o perdió neto 🔥
                     final_type = 'TP' if profit > 0 else 'SL'
                     registro_trades.append({'Fecha': f_arr[i], 'Tipo': final_type, 'Precio': exec_p, 'Ganancia_$': profit})
                     en_pos = False; cierra = True
@@ -341,7 +341,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V257</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V258</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); st.session_state.clear(); gc.collect(); st.rerun()
 
@@ -365,6 +365,12 @@ start_date, end_date = st.sidebar.slider("📅 Rango de Fecha de Inicio", min_va
 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.15, step=0.05) / 100.0 
+
+# 🔥 V258: IA GREED FACTOR 🔥
+st.sidebar.markdown("---")
+st.sidebar.markdown("<h3 style='text-align: center; color: #FFA500;'>🧠 IA GREED FACTOR</h3>", unsafe_allow_html=True)
+st.sidebar.info("Ajusta la 'Avaricia' de la IA. \n- **0.0 - 0.3**: Modo Búnker (Seguro, poco ADO, Alto WR).\n- **0.4 - 0.6**: Balance Institucional.\n- **0.7 - 1.0**: Depredador Agresivo (Busca +5000% Net Profit ignorando el WR y operando a lo loco).")
+greed_factor = st.sidebar.slider("Nivel de Avaricia (Greed Factor)", 0.0, 1.0, 0.8, 0.1)
 
 st.sidebar.markdown("---")
 is_calib_mode = st.sidebar.checkbox("🛠️ ACTIVAR MODO CALIBRACIÓN", value=False)
@@ -410,7 +416,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V257)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V258)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -653,7 +659,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Calibrador'] = f_calib_buy
     return s_dict
 
-def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None):
+def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None, greed_factor=0.5):
     vault = get_safe_vault(s_id)
     best_fit_live, best_net_live, best_pf_live, best_nt_live = vault.get('fit', -float('inf')), vault.get('net', -float('inf')), vault.get('pf', 0.0), vault.get('nt', 0)
     
@@ -666,11 +672,16 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
     split_idx = n_len; dias_entrenamiento = max(1, dias_reales)
     default_f, ones_mask = np.zeros(n_len, dtype=bool), np.ones(n_len, dtype=bool)
 
+    f_buy_tactical = np.empty(n_len, dtype=bool)
+    f_sell_tactical = np.empty(n_len, dtype=bool)
+
     for c in range(chunks):
         if st.session_state.get('abort_opt', False): break
 
         for _ in range(chunk_size): 
-            # 🔥 V257: ESCUADRONES LÓGICOS DE ALTA PRECISIÓN 🔥
+            f_buy_tactical.fill(False)
+            f_sell_tactical.fill(False)
+            
             dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 3))
             dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 3))
             dna_b_op = random.choice(['&', '|'])
@@ -717,7 +728,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
             )
 
-            # 🔥 V257: FITNESS DEL REY (Premia Profit Masivo, Exige Profit Factor Decente) 🔥
+            # 🔥 V258: IA GREED FACTOR (Modificador Hormonal de Fitness) 🔥
             ado_actual = nt / max(1, dias_entrenamiento)
             fit_score = -float('inf') 
             
@@ -725,11 +736,24 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 ado_target_safe = max(0.1, target_ado)
                 ado_ratio = min(2.0, ado_actual / ado_target_safe)
                 
-                # Castigamos si el Profit Factor es muy malo (menor a 1.1)
-                if pf < 1.1:
-                    fit_score = net - 1000.0
-                else:
+                # Efecto del Greed Factor en la evaluación
+                if greed_factor >= 0.7:
+                    # Modo Depredador: Solo le importa el Net Profit y el Volumen de trades. Ignora el Drawdown
+                    pf_mod = 1.0 if pf > 1.0 else 0.5
+                    dd_penalty = 1.0 if mdd <= 60.0 else (mdd / 60.0) # Muy tolerante al riesgo
+                    ado_bonus = ado_ratio ** 2.0 # Premia excesivamente operar mucho
+                    fit_score = (net * pf_mod * ado_bonus) / dd_penalty
+                    
+                elif greed_factor <= 0.3:
+                    # Modo Búnker: Premia Win Rate, Drawdown bajo y Profit Factor alto. Desprecia operar mucho.
                     pf_mod = pf ** 2.0
+                    wr_mod = (wr / 40.0) ** 2.0
+                    dd_penalty = np.exp(mdd / 20.0) # Extremadamente intolerante al riesgo
+                    fit_score = (net * pf_mod * wr_mod) / dd_penalty
+                    
+                else:
+                    # Modo Equilibrado (Clásico)
+                    pf_mod = min(pf, 5.0)
                     dd_penalty = 1.0 if mdd <= 35.0 else (mdd / 35.0)
                     fit_score = (net * pf_mod * ado_ratio) / dd_penalty
                 
@@ -760,7 +784,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             title = f"🌌 DEEP FORGE: {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V257: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
+            title = f"GENESIS LAB V258: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
 
         html_str = f"""
         <style>
@@ -788,7 +812,7 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     n_len = len(a_c)
     
     w_rsi, w_z, w_adx = round(float(vault.get('w_rsi', 0.0)), 4), round(float(vault.get('w_z', 0.0)), 4), round(float(vault.get('w_adx', 0.0)), 4)
-    th_buy, th_sell = round(float(vault.get('th_buy', 99.0)), 2), round(float(vault.get('th_sell', -99.0)), 2)
+    th_buy, th_sell = round(float(vault.get('th_buy', 999.0)), 2), round(float(vault.get('th_sell', -999.0)), 2)
     atr_tp, atr_sl = round(float(vault.get('atr_tp', 0.0)), 2), round(float(vault.get('atr_sl', 0.0)), 2)
     
     f_tp, f_sl = np.full(n_len, atr_tp), np.full(n_len, atr_sl)
@@ -1154,7 +1178,8 @@ if st.session_state.get('run_global', False):
         buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
         buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
         
-        bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=global_epochs, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))))
+        # Le pasamos el IA Greed Factor (Avaricia) desde la interfaz
+        bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=global_epochs, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=None, greed_factor=st.session_state.get(f'greed_{s_id}', 0.8))
         
         st.rerun()
     else:
@@ -1179,7 +1204,7 @@ if deep_state and not deep_state.get('paused', False) and deep_state.get('curren
     
     deep_info = {'current': deep_state['current_epoch'], 'total': deep_state['target_epochs'], 'start_time': deep_state.get('start_time', time.time())}
     
-    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=chunk, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=deep_info)
+    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=chunk, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=deep_info, greed_factor=st.session_state.get(f'greed_{s_id}', 0.8))
     
     st.session_state['deep_opt_state']['current_epoch'] += chunk
     
@@ -1253,6 +1278,9 @@ if len(tab_names) > 0:
     ado_ui = c_ia1.slider("🎯 Target ADO (IA Override)", 0.0, 100.0, value=ado_val_ui, key=f"ui_{s_id}_ado_w", step=0.5)
     reinv_ui = c_ia2.slider("💵 Reinversión % (IA Override)", 0.0, 100.0, value=reinv_val_ui, key=f"ui_{s_id}_reinv_w", step=5.0)
 
+    # El Greed Factor se guarda en el estado por mutante para que la IA sepa qué tan agresiva ser en la forja
+    st.session_state[f'greed_{s_id}'] = greed_factor
+
     c_ps1, c_ps2 = st.columns(2)
     ps_buy_pct = c_ps1.number_input("🟢 % Inversión Compra (Pine Script)", min_value=0, max_value=100, value=int(reinv_val_ui), step=1, key=f"ui_{s_id}_ps_buy")
     ps_sell_pct = c_ps2.number_input("🔴 % Desinversión Venta (Pine Script)", min_value=1, max_value=100, value=100, step=1, key=f"ui_{s_id}_ps_sell")
@@ -1284,7 +1312,6 @@ if len(tab_names) > 0:
         exs = dftr[dftr['Tipo'].isin(['TP', 'SL', 'DYN_WIN', 'DYN_LOSS'])]
         tt = len(exs)
         if tt > 0:
-            # 🔥 V257: Win Rate Exacto (Calculado por rentabilidad neta real igual que TV) 🔥
             ws = len(exs[exs['Ganancia_$'] > 0])
             wr = (ws / tt) * 100
             gpp = exs[exs['Ganancia_$'] > 0]['Ganancia_$'].sum()
