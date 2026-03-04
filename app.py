@@ -23,8 +23,8 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V255: LÓGICA DE COLISIÓN TV INYECTADA + TEXTOS REALES EN RADAR 🔥
-APP_VERSION = 'V255'
+# 🔥 V256: ESCUDO ANTI-SCALPERS + EMAS CLONADAS AL NÚCLEO + CERO LAG TV 🔥
+APP_VERSION = 'V256'
 if st.session_state.get('app_version') != APP_VERSION:
     st.cache_data.clear()
     for key in list(st.session_state.keys()):
@@ -51,17 +51,6 @@ def npshift_bool(arr, num, fill_value=False):
 
 def rma_pine(arr, length):
     alpha = 1.0 / length; out = np.full_like(arr, np.nan, dtype=float)
-    sum_val = 0.0; count = 0
-    for i in range(len(arr)):
-        if not np.isnan(arr[i]):
-            if count < length:
-                sum_val += arr[i]; count += 1
-                if count == length: out[i] = sum_val / length
-            else: out[i] = alpha * arr[i] + (1.0 - alpha) * out[i-1]
-    return out
-
-def ema_pine(arr, length):
-    alpha = 2.0 / (length + 1); out = np.full_like(arr, np.nan, dtype=float)
     sum_val = 0.0; count = 0
     for i in range(len(arr)):
         if not np.isnan(arr[i]):
@@ -100,7 +89,7 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
             
         pending_dyn_exit = False 
         
-        # 🔥 V255: REPLICA EXACTA DE LA REGLA "CLOSEST TO OPEN" DE TRADINGVIEW 🔥
+        # 🔥 RÉPLICA DE COLISIÓN DE PINE SCRIPT (DISTANCIA AL OPEN) 🔥
         if en_pos and not cierra:
             bars_in_trade += 1
             if bars_in_trade >= 1: 
@@ -187,7 +176,6 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
             
         pending_dyn_exit = False
         
-        # 🔥 LÓGICA INTRABAR COLISIÓN ESPEJO DE TRADINGVIEW 🔥
         if en_pos and not cierra:
             bars_in_trade += 1
             if bars_in_trade >= 1:
@@ -259,24 +247,15 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
     risk_of_ruin = (ruined_count / num_simulations) * 100.0
     return mc_curves, risk_of_ruin
 
-# 🔥 V255: CREADOR DEL DIAGRAMA RADAR CON TEXTOS REALES INYECTADOS 🔥
 def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
     fig = go.Figure()
-    
     norm_wr = min(wr * 2, 100) 
     norm_pf = min(pf * 25, 100) 
     norm_ado = min((ado / max(0.1, target_ado)) * 100, 100) 
     norm_ret = min(max(ret_pct / 30, 0), 100) 
     norm_alpha = min(max(alpha_pct / 30, 0), 100)
     
-    real_texts = [
-        f"{wr:.1f}% WR", 
-        f"{pf:.2f}x PF", 
-        f"{ado:.2f} ADO", 
-        f"{ret_pct:.1f}% Neto", 
-        f"{alpha_pct:.1f}% Alpha",
-        f"{wr:.1f}% WR"
-    ]
+    real_texts = [f"{wr:.1f}% WR", f"{pf:.2f}x PF", f"{ado:.2f} ADO", f"{ret_pct:.1f}% Neto", f"{alpha_pct:.1f}% Alpha", f"{wr:.1f}% WR"]
     
     fig.add_trace(go.Scatterpolar(
         r=[norm_wr, norm_pf, norm_ado, norm_ret, norm_alpha, norm_wr],
@@ -288,9 +267,7 @@ def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
         fill='toself', name='Perfil de Depredador IA', line_color='#00FFFF', fillcolor='rgba(0, 255, 255, 0.2)'
     ))
     fig.update_layout(
-        polar=dict(
-            radialaxis=dict(visible=True, showticklabels=False, range=[0, 100], color='gray', gridcolor='rgba(255, 255, 255, 0.1)')
-        ),
+        polar=dict(radialaxis=dict(visible=True, showticklabels=False, range=[0, 100], color='gray', gridcolor='rgba(255, 255, 255, 0.1)')),
         showlegend=False, template='plotly_dark', height=350, margin=dict(l=40, r=40, t=30, b=30),
         title=dict(text="🧬 Escáner de Poder de la IA", x=0.5, font=dict(color="cyan"))
     )
@@ -352,7 +329,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V255</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V256</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); st.session_state.clear(); gc.collect(); st.rerun()
 
@@ -370,14 +347,15 @@ intervalo_sel = st.sidebar.selectbox("Temporalidad", list(intervalos.keys()), in
 iv_download = intervalos[intervalo_sel]
 hoy = datetime.today().date()
 is_micro = iv_download in ["1m", "5m", "15m", "30m"]
-start_date, end_date = st.sidebar.slider("📅 Scope", min_value=hoy - timedelta(days=250 if is_micro else 1500), max_value=hoy, value=(hoy - timedelta(days=200 if is_micro else 1500), hoy), format="YYYY-MM-DD")
+
+st.sidebar.info("⚠️ **IMPORTANTE:** Para que la ganancia acumulada sea IDÉNTICA a TradingView, debes poner aquí la misma Fecha de Inicio que dice el **'Trading Range'** en tu gráfico de TV (ej. si TV dice Aug 20, pon Aug 20 aquí).")
+start_date, end_date = st.sidebar.slider("📅 Rango de Fecha de Inicio (Match TradingView)", min_value=hoy - timedelta(days=250 if is_micro else 1500), max_value=hoy, value=(hoy - timedelta(days=200 if is_micro else 1500), hoy), format="YYYY-MM-DD")
 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.15, step=0.05) / 100.0 
 
-# 🔥 V255: CHECKBOX DE MODO CALIBRADOR 🔥
 st.sidebar.markdown("---")
-is_calib_mode = st.sidebar.checkbox("🛠️ ACTIVAR MODO CALIBRACIÓN (Trades Fijos en Python y TV para aislar variables)", value=False)
+is_calib_mode = st.sidebar.checkbox("🛠️ ACTIVAR MODO CALIBRACIÓN", value=False)
 if is_calib_mode:
     st.sidebar.warning("Atención: La IA se apaga. Entrará en compra cada 50 barras exactas con TP y SL de 0.2%. Úsalo para certificar TradingView.")
 
@@ -400,7 +378,7 @@ if st.sidebar.button("🤖 CREAR NUEVO MUTANTE IA", type="secondary", use_contai
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 style='text-align: center; color: #9932CC;'>🌌 DEEP FORGE (Standby)</h3>", unsafe_allow_html=True)
-deep_epochs_target = st.sidebar.number_input("Objetivo Épocas Profundas", min_value=10000, max_value=10000000, value=1000000, step=10000)
+deep_epochs_target = st.sidebar.number_input("Objetivo Épocas Profundas", min_value=10000, max_value=10000000, value=100000, step=10000)
 
 if st.sidebar.button("🌌 CREAR MUTANTE PROFUNDO", type="secondary", use_container_width=True, key="btn_mutant_deep"):
     new_id = f"AI_DEEP_{int(time.time())}_{random.randint(10, 99)}"
@@ -422,7 +400,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V255)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V256)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -457,8 +435,9 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
             
         a_h, a_l, a_c, a_o = df['High'].values, df['Low'].values, df['Close'].values, df['Open'].values
         
-        df['EMA_200'] = ema_pine(a_c, 200)
-        df['EMA_50'] = ema_pine(a_c, 50)
+        # 🔥 V256: RETORNO A EMAS NATIVAS DE PANDAS (Es el cálculo idéntico al motor C++ de Pine Script) 🔥
+        df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
+        df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
         df['Vol_MA_20'] = df['Volume'].rolling(window=20).mean()
         df['Vol_MA_100'] = df['Volume'].rolling(window=100).mean()
         df['RVol'] = df['Volume'] / np.where(df['Vol_MA_100'] == 0, 1, df['Vol_MA_100'])
@@ -485,15 +464,15 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         hh_14, ll_14 = df['High'].rolling(14).max(), df['Low'].rolling(14).min()
         df['CHOP'] = 100 * np.log10(sum_tr / (hh_14 - ll_14)) / np.log10(14)
         
-        df['MACD'] = ema_pine(a_c, 12) - ema_pine(a_c, 26)
-        df['MACD_Sig'] = ema_pine(df['MACD'].values, 9)
+        df['MACD'] = df['Close'].ewm(span=12, adjust=False).mean() - df['Close'].ewm(span=26, adjust=False).mean()
+        df['MACD_Sig'] = df['MACD'].ewm(span=9, adjust=False).mean()
         
         stoch = 100 * (df['Close'] - df['Low'].rolling(14).min()) / (df['High'].rolling(14).max() - df['Low'].rolling(14).min())
         df['Stoch_K'] = stoch.rolling(3).mean(); df['Stoch_D'] = df['Stoch_K'].rolling(3).mean()
 
         ap = (df['High'] + df['Low'] + df['Close']) / 3.0
-        esa = ema_pine(ap, 10); d_wt = ema_pine(np.abs(ap - esa), 10)
-        df['WT1'] = ema_pine(((ap - esa) / (0.015 * np.where(d_wt == 0, 1, d_wt))), 21)
+        esa = ap.ewm(span=10, adjust=False).mean(); d_wt = (ap - esa).abs().ewm(span=10, adjust=False).mean()
+        df['WT1'] = ((ap - esa) / (0.015 * np.where(d_wt == 0, 1, d_wt))).ewm(span=21, adjust=False).mean()
         df['WT2'] = df['WT1'].rolling(4).mean()
         
         df['Basis'] = df['Close'].rolling(20).mean(); dev = df['Close'].rolling(20).std(ddof=0)
@@ -725,21 +704,27 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
             )
 
+            # 🔥 V256: ESCUDO ANTI-SCALPING Y ECUACIÓN PURISTA 🔥
             ado_actual = nt / max(1, dias_entrenamiento)
             fit_score = -float('inf') 
             
             if nt >= 3 and net > 0: 
-                ado_target_safe = max(0.1, target_ado)
-                ado_ratio = ado_actual / ado_target_safe
-                ado_mod = min(1.2, ado_ratio) if ado_ratio > 0.5 else max(0.2, ado_ratio)
-                
-                wr_mod = max(0.5, wr / 30.0) 
-                pf_mod = min(pf, 5.0)
-                dd_penalty = 1.0 if mdd <= 35.0 else (mdd / 35.0)
-                
-                base_score = net * (1.0 + max(0, (net - buy_hold_money) / max(1, cap_ini)))
-                fit_score = (base_score * pf_mod * wr_mod * ado_mod) / dd_penalty
-                
+                # Escudo anti-centavos: Si el promedio de ganancia por trade es menor a 0.25% neto, se elimina.
+                avg_trade_net_pct = (net / cap_ini) / nt * 100.0
+                if avg_trade_net_pct < 0.25:
+                    fit_score = -9999.0
+                else:
+                    ado_target_safe = max(0.1, target_ado)
+                    ado_ratio = ado_actual / ado_target_safe
+                    ado_mod = min(1.2, ado_ratio) if ado_ratio > 0.5 else max(0.2, ado_ratio)
+                    
+                    wr_mod = max(0.5, wr / 30.0) 
+                    pf_mod = min(pf, 5.0)
+                    dd_penalty = 1.0 if mdd <= 35.0 else (mdd / 35.0)
+                    
+                    base_score = net * (1.0 + max(0, (net - buy_hold_money) / max(1, cap_ini)))
+                    fit_score = (base_score * pf_mod * wr_mod * ado_mod) / dd_penalty
+                    
             elif nt > 0:
                 fit_score = net - mdd - (abs(ado_actual - max(0.1, target_ado)) * 5)
             else:
@@ -767,7 +752,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             title = f"🌌 DEEP FORGE: {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V255: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
+            title = f"GENESIS LAB V256: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
 
         html_str = f"""
         <style>
@@ -1121,7 +1106,6 @@ var float sl_price = na
 
 if signal_buy and strategy.position_size == 0 and window
     locked_atr := atr
-    // 🔥 V255: ANCLAJE EXACTO CON TRUNCADO PARA EVITAR LAG DE TRADINGVIEW 🔥
     tp_price := math.round(close + (locked_atr * atr_tp_mult), 5)
     sl_price := math.round(close - (locked_atr * atr_sl_mult), 5)
     
@@ -1211,7 +1195,7 @@ with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Ne
     for rank, item in enumerate(leaderboard_data):
         col1, col2 = st.columns([4, 1])
         col1.markdown(f"**#{rank+1} | {item['Mutante']}** -> Profit: `{item['Rentabilidad']}` | WR: `{item['WinRate']}` | Estado: {item['Estado']}")
-        if col2.button("👉 CARGAR SCRIPT", key=f"btn_load_script_{item['Mutante']}_{rank}"):
+        if col2.button("👉 CARGAR SCRIPT", key=f"btn_load_{item['Mutante']}_rk{rank}"):
             st.session_state['selected_mutant'] = item['Mutante']
             st.rerun()
     st.markdown("---")
