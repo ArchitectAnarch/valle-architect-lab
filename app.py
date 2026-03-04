@@ -23,8 +23,8 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V252: DIAGRAMA RADAR + FITNESS ANTI-CENTAVOS + FIX PINE SCRIPT CERO LAG 🔥
-APP_VERSION = 'V252'
+# 🔥 V253: MODO CALIBRADOR + RADAR CORREGIDO + FITNESS EQUILIBRADO 🔥
+APP_VERSION = 'V253'
 if st.session_state.get('app_version') != APP_VERSION:
     st.cache_data.clear()
     for key in list(st.session_state.keys()):
@@ -76,7 +76,7 @@ def ema_pine(arr, length):
 # ==========================================
 @njit(fastmath=True)
 def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr, 
-    f_buy, f_sell, atr_tp_mult, atr_sl_mult, cap_ini, com_pct, invest_pct, slippage_pct):
+    f_buy, f_sell, atr_tp_mult, atr_sl_mult, cap_ini, com_pct, invest_pct, slippage_pct, is_calib=False):
     
     cap_act = cap_ini; en_pos = False; pending_dyn_exit = False
     p_ent = 0.0; pos_size = 0.0; invest_amt = 0.0; g_profit = 0.0; g_loss = 0.0
@@ -107,17 +107,13 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
                     if c_arr[i] <= o_arr[i]: 
-                        exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
-                        ret = (exec_p - p_ent) / p_ent
+                        exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
                     else: 
-                        exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
-                        ret = (exec_p - p_ent) / p_ent
+                        exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
                 elif hit_sl:
-                    exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]
-                    ret = (exec_p - p_ent) / p_ent
+                    exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
                 elif hit_tp:
-                    exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]
-                    ret = (exec_p - p_ent) / p_ent
+                    exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
                 
                 if hit_sl or hit_tp:
                     exec_p = exec_p * slip_out
@@ -129,7 +125,7 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                     if cap_act > peak: peak = cap_act
                     if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
 
-        if en_pos and not cierra:
+        if en_pos and not cierra and not is_calib:
             if f_sell[i]: pending_dyn_exit = True
                 
         if cap_act <= 0: break
@@ -138,13 +134,18 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
             if f_buy[i]:
                 invest_amt = cap_act * (invest_pct / 100.0) if invest_pct > 0 else cap_ini
                 if invest_amt > cap_act: invest_amt = cap_act 
+                
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
-                # ANCLADO ESTRICTO AL CLOSE DE LA SEÑAL (CERO LAG PINE SCRIPT)
-                base_p = c_arr[i] 
-                tp_p = round(base_p + (atr_arr[i] * atr_tp_mult), 5)
-                sl_p = round(base_p - (atr_arr[i] * atr_sl_mult), 5)
+                # MODO CALIBRADOR (TP Y SL MATEMÁTICOS DE 0.2%) vs IA (ATR MULTIPLIER)
+                if is_calib:
+                    tp_p = round(p_ent * 1.002, 5)
+                    sl_p = round(p_ent * 0.998, 5)
+                else:
+                    base_p = c_arr[i] 
+                    tp_p = round(base_p + (atr_arr[i] * atr_tp_mult), 5)
+                    sl_p = round(base_p - (atr_arr[i] * atr_sl_mult), 5)
                 
                 en_pos = True; bars_in_trade = 0
                 
@@ -153,9 +154,9 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
     return (cap_act - cap_ini), pf, num_trades, max_dd, wr
 
 # ==========================================
-# 📊 SIMULADOR VISUAL & MONTE CARLO
+# 📊 SIMULADOR VISUAL
 # ==========================================
-def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
+def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_calib=False):
     registro_trades = []; n = len(df_sim); curva = np.full(n, cap_ini, dtype=float)
     h_arr, l_arr = df_sim['High'].values, df_sim['Low'].values
     c_arr, o_arr = df_sim['Close'].values, df_sim['Open'].values
@@ -201,7 +202,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
                     registro_trades.append({'Fecha': f_arr[i], 'Tipo': p_type, 'Precio': exec_p, 'Ganancia_$': profit})
                     en_pos = False; cierra = True
             
-        if en_pos and not cierra:
+        if en_pos and not cierra and not is_calib:
             if sell_arr[i]: pending_dyn_exit = True
         
         if not en_pos and not pending_dyn_exit and i+1 < n and cap_act > 0:
@@ -211,9 +212,14 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
                 comm_in = invest_amt * com_pct; total_comms += comm_in; pos_size = invest_amt - comm_in
                 
                 p_ent = o_arr[i+1] * slip_in
-                base_p = c_arr[i]
-                tp_p = np.round(base_p + (atr_arr[i] * float(tp_arr[i])), 5)
-                sl_p = np.round(base_p - (atr_arr[i] * float(sl_arr[i])), 5)
+                
+                if is_calib:
+                    tp_p = np.round(p_ent * 1.002, 5)
+                    sl_p = np.round(p_ent * 0.998, 5)
+                else:
+                    base_p = c_arr[i]
+                    tp_p = np.round(base_p + (atr_arr[i] * float(tp_arr[i])), 5)
+                    sl_p = np.round(base_p - (atr_arr[i] * float(sl_arr[i])), 5)
                 
                 en_pos = True; bars_in_trade = 0
                 registro_trades.append({'Fecha': f_arr[i+1], 'Tipo': 'ENTRY', 'Precio': p_ent, 'Ganancia_$': 0})
@@ -243,23 +249,38 @@ def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
     risk_of_ruin = (ruined_count / num_simulations) * 100.0
     return mc_curves, risk_of_ruin
 
-# 🔥 CREADOR DEL DIAGRAMA DE TELARAÑA (RADAR) 🔥
+# 🔥 V253: CREADOR DEL DIAGRAMA DE TELARAÑA (RADAR CORREGIDO) 🔥
 def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
     fig = go.Figure()
-    norm_wr = min(wr, 100)
-    norm_pf = min(pf * 20, 100) # Un PF de 5.0 es el maximo escaleable (100)
+    
+    # Escalas relativas para que el polígono tenga sentido visual
+    norm_wr = min(wr * 2, 100) # 50% es visualmente el máximo necesario en cripto (100)
+    norm_pf = min(pf * 25, 100) # 4.0x PF llena el radar
     norm_ado = min((ado / max(0.1, target_ado)) * 100, 100) 
-    norm_ret = min(max(ret_pct / 10, 0), 100) # Cada 10% = 1 punto en el radar (max 1000% visual)
+    norm_ret = min(max(ret_pct / 10, 0), 100) # 1000% llena el radar
     norm_alpha = min(max(alpha_pct / 10, 0), 100)
+    
+    # TEXTOS EXACTOS para no confundir la visualización con la realidad
+    real_texts = [
+        f"{wr:.1f}% Win Rate", 
+        f"{pf:.2f}x Profit Factor", 
+        f"{ado:.2f} ADO", 
+        f"{ret_pct:.1f}% Neto", 
+        f"{alpha_pct:.1f}% Alpha",
+        f"{wr:.1f}% Win Rate"
+    ]
     
     fig.add_trace(go.Scatterpolar(
         r=[norm_wr, norm_pf, norm_ado, norm_ret, norm_alpha, norm_wr],
-        theta=['Win Rate', 'Profit Factor', 'ADO', 'Rentabilidad', 'Alpha', 'Win Rate'],
-        fill='toself', name='Perfil de Depredador IA', line_color='#00FF00'
+        theta=['Win Rate', 'Profit Factor', 'Trades/Día (ADO)', 'Rentabilidad', 'Alpha (vs Hold)', 'Win Rate'],
+        fill='toself', name='Perfil de Depredador IA', line_color='#00FFFF', fillcolor='rgba(0, 255, 255, 0.3)',
+        text=real_texts, hoverinfo="text"
     ))
     fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 100], color='gray')),
-        showlegend=False, template='plotly_dark', height=350, margin=dict(l=30, r=30, t=30, b=30),
+        polar=dict(
+            radialaxis=dict(visible=True, showticklabels=False, range=[0, 100], color='gray', gridcolor='rgba(255, 255, 255, 0.1)')
+        ),
+        showlegend=False, template='plotly_dark', height=350, margin=dict(l=40, r=40, t=30, b=30),
         title=dict(text="🧬 Escáner de Equilibrio Genético", x=0.5, font=dict(color="cyan"))
     )
     return fig
@@ -280,14 +301,7 @@ estrategias = st.session_state['ai_algos']
 tab_id_map = {f"🤖 {ai_id}": ai_id for ai_id in estrategias}
 
 def get_default_dna():
-    return {
-        'b_team': random.sample(todas_las_armas_b, random.randint(3, 7)), 
-        's_team': random.sample(todas_las_armas_s, random.randint(3, 7)), 
-        'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 
-        'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 
-        'net': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0, 'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 
-        'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0
-    }
+    return {'b_team': [random.choice(todas_las_armas_b)], 's_team': [random.choice(todas_las_armas_s)], 'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 'net': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0, 'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0}
 
 def get_safe_vault(s_id):
     vault = st.session_state.get(f'champion_{s_id}')
@@ -320,7 +334,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V251</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V253</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); st.session_state.clear(); gc.collect(); st.rerun()
 
@@ -342,6 +356,12 @@ start_date, end_date = st.sidebar.slider("📅 Scope", min_value=hoy - timedelta
 
 capital_inicial = st.sidebar.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
 comision_pct = st.sidebar.number_input("Comisión (%)", value=0.15, step=0.05) / 100.0 
+
+# 🔥 V253: CHECKBOX DE MODO CALIBRADOR (EL CONTROL GROUP) 🔥
+st.sidebar.markdown("---")
+is_calib_mode = st.sidebar.checkbox("🛠️ ACTIVAR MODO CALIBRACIÓN (100 Trades Fijos de 0.2%)", value=False)
+if is_calib_mode:
+    st.sidebar.warning("Atención: La IA se apaga. Entrará en corto cada 50 barras exactas con TP 0.2% y SL 0.2%. Úsalo para alinear TradingView.")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 style='text-align: center; color: lime;'>🤖 CÁMARA DE MUTACIÓN</h3>", unsafe_allow_html=True)
@@ -384,7 +404,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V251)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V253)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -478,7 +498,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         
         df['PA_Engulfing_Buy'] = (df['Vela_Verde']) & (df['Vela_Roja'].shift(1)) & (df['Close'] > df['Open'].shift(1)) & (df['Open'] < df['Close'].shift(1))
         df['PA_Engulfing_Sell'] = (df['Vela_Roja']) & (df['Vela_Verde'].shift(1)) & (df['Close'] < df['Open'].shift(1)) & (df['Open'] > df['Close'].shift(1))
-        # 🔥 Corrección de body_size 🔥
         df['PA_Pinbar_Buy'] = (df['lower_wick'] > df['body_size'] * 2.5) & (df['upper_wick'] < df['body_size'])
         df['PA_Pinbar_Sell'] = (df['upper_wick'] > df['body_size'] * 2.5) & (df['lower_wick'] < df['body_size'])
         df['PA_3_Soldiers'] = (df['Vela_Verde']) & (df['Vela_Verde'].shift(1)) & (df['Vela_Verde'].shift(2)) & (df['Close'] > df['Close'].shift(1)) & (df['Close'].shift(1) > df['Close'].shift(2))
@@ -622,13 +641,16 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
 
     s_dict['Organic_Vol'] = a_hvol; s_dict['Organic_Squeeze'] = a_sqz_on; s_dict['Organic_Safe'] = a_mb & ~a_fk; s_dict['Organic_Pump'] = pump_memory; s_dict['Organic_Dump'] = dump_memory; s_dict['Organic_Gaussian_Clean'] = a_chop < 61.8
 
+    # Si es calibrador
+    f_calib_buy = np.zeros(n_len, dtype=bool)
+    for i in range(0, n_len, 50): f_calib_buy[i] = True
+    s_dict['Calibrador'] = f_calib_buy
     return s_dict
 
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None):
     vault = get_safe_vault(s_id)
     best_fit_live, best_net_live, best_pf_live, best_nt_live = vault.get('fit', -float('inf')), vault.get('net', -float('inf')), vault.get('pf', 0.0), vault.get('nt', 0)
     
-    # 🔥 V252: VELOCIDAD MAXIMA. 1000 Iteraciones en la sombra.
     iters = 3000 * epochs
     chunk_size = 1000
     chunks = max(1, iters // chunk_size)
@@ -682,30 +704,28 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             net, pf, nt, mdd, wr = simular_core_rapido(
                 a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx], a_atr[:split_idx], 
                 f_buy_final[:split_idx], f_sell_final[:split_idx], 
-                r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0
+                r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
             )
 
-            # 🔥 V252: FITNESS ANTI-CENTAVOS (Net Profit Total como Soberano) 🔥
+            # 🔥 V253: FITNESS EQUILIBRADO EL REY ES EL PROFIT 🔥
             ado_actual = nt / max(1, dias_entrenamiento)
             fit_score = -float('inf') 
             
-            if nt >= 10 and net > 0: 
-                avg_trade = net / nt
-                # Destruir estrategias que ganan centavos a costa de falsas señales
-                if avg_trade < (cap_ini * 0.002): 
-                    fit_score = net - 1000.0
-                else:
-                    ado_target_safe = max(0.1, target_ado)
-                    ado_ratio = ado_actual / ado_target_safe
-                    ado_multiplier = min(1.5, max(0.3, ado_ratio))
-                    
-                    wr_multiplier = max(0.5, wr / 40.0) 
-                    dd_penalty = np.exp(mdd / 30.0) 
-                    
-                    # Net Profit es lo principal, el resto solo empuja
-                    fit_score = (net * min(pf, 5.0) * wr_multiplier * ado_multiplier) / dd_penalty
+            if nt >= 3 and net > 0: 
+                ado_target_safe = max(0.1, target_ado)
+                ado_ratio = ado_actual / ado_target_safe
+                # Solo castiga levemente si el ADO es muy bajo, pero no mata al Profit
+                ado_mod = min(1.2, ado_ratio) if ado_ratio > 0.5 else max(0.2, ado_ratio)
+                
+                wr_mod = max(0.5, wr / 30.0) 
+                pf_mod = min(pf, 5.0)
+                dd_penalty = 1.0 if mdd <= 35.0 else (mdd / 35.0)
+                
+                base_score = net * (1.0 + max(0, (net - buy_hold_money) / max(1, cap_ini)))
+                fit_score = (base_score * pf_mod * wr_mod * ado_mod) / dd_penalty
+                
             elif nt > 0:
-                fit_score = net - mdd - 500.0
+                fit_score = net - mdd - (abs(ado_actual - max(0.1, target_ado)) * 5)
             else:
                 fit_score = net - 1000.0 
 
@@ -731,7 +751,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             title = f"🌌 DEEP FORGE: {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V252: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
+            title = f"GENESIS LAB V253: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
 
         html_str = f"""
         <style>
@@ -753,6 +773,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
 
 def run_backtest_eval(s_id, cap_ini, com_pct):
     vault = get_safe_vault(s_id)
+    is_calib = st.session_state.get('is_calib_mode', False)
+    
     s_dict = calcular_señales_numpy(vault.get('hitbox',1.5), vault.get('therm_w',4.0), vault.get('adx_th',25.0), vault.get('whale_f',2.5))
     n_len = len(a_c)
     
@@ -763,24 +785,28 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     f_tp, f_sl = np.full(n_len, atr_tp), np.full(n_len, atr_sl)
     default_f, ones_mask = np.zeros(n_len, dtype=bool), np.ones(n_len, dtype=bool)
 
-    m_mask = ones_mask if vault.get('macro') in ["Ignore", "All-Weather"] else (a_mb if vault.get('macro') == "Bull Only" else (~a_mb if vault.get('macro') == "Bear Only" else s_dict.get(vault.get('macro'), ones_mask)))
-    v_mask = ones_mask if vault.get('vol') in ["Ignore", "All-Weather"] else ((a_adx >= vault.get('adx_th', 25.0)) if vault.get('vol') == "Trend" else ((a_adx < vault.get('adx_th', 25.0)) if vault.get('vol') == "Range" else s_dict.get(vault.get('vol'), ones_mask)))
+    if is_calib:
+        f_buy = s_dict['Calibrador']
+        f_sell = default_f
+    else:
+        m_mask = ones_mask if vault.get('macro') in ["Ignore", "All-Weather"] else (a_mb if vault.get('macro') == "Bull Only" else (~a_mb if vault.get('macro') == "Bear Only" else s_dict.get(vault.get('macro'), ones_mask)))
+        v_mask = ones_mask if vault.get('vol') in ["Ignore", "All-Weather"] else ((a_adx >= vault.get('adx_th', 25.0)) if vault.get('vol') == "Trend" else ((a_adx < vault.get('adx_th', 25.0)) if vault.get('vol') == "Range" else s_dict.get(vault.get('vol'), ones_mask)))
 
-    f_buy_tactical = np.zeros(n_len, dtype=bool)
-    f_sell_tactical = np.zeros(n_len, dtype=bool)
-    for r in vault.get('b_team', []): f_buy_tactical |= s_dict.get(r, default_f)
-    for r in vault.get('s_team', []): f_sell_tactical |= s_dict.get(r, default_f)
-    
-    score_arr = (a_rsi * w_rsi) + (a_zscore * w_z) + (a_adx * w_adx)
-    f_buy = (f_buy_tactical | (score_arr > th_buy)) & (m_mask & v_mask)
-    f_sell = f_sell_tactical | (score_arr < th_sell)
+        f_buy_tactical = np.zeros(n_len, dtype=bool)
+        f_sell_tactical = np.zeros(n_len, dtype=bool)
+        for r in vault.get('b_team', []): f_buy_tactical |= s_dict.get(r, default_f)
+        for r in vault.get('s_team', []): f_sell_tactical |= s_dict.get(r, default_f)
+        
+        score_arr = (a_rsi * w_rsi) + (a_zscore * w_z) + (a_adx * w_adx)
+        f_buy = (f_buy_tactical | (score_arr > th_buy)) & (m_mask & v_mask)
+        f_sell = f_sell_tactical | (score_arr < th_sell)
 
     df_strat = df_global.copy()
     df_strat['Signal_Buy'], df_strat['Signal_Sell'], df_strat['Active_TP'], df_strat['Active_SL'] = f_buy, f_sell, f_tp, f_sl
-    eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.0)
+    eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.0, is_calib)
     return df_strat, eq_curve, t_log, total_comms
 
-def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj):
+def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj, is_calib=False):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0); v_adx = vault.get('adx_th', 25.0); v_wf = vault.get('whale_f', 2.5)
     json_buy = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {buy_pct}, "limit_price": {{{{close}}}}, "side": "🟢 COMPRA"}}'
     json_sell = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {sell_pct}, "limit_price": {{{{close}}}}, "side": "🔴 VENTA"}}'
@@ -795,14 +821,37 @@ start_year = input.int({start_date_obj.year}, "Año de Inicio", group=grp_time)
 start_month = input.int({start_date_obj.month}, "Mes de Inicio", group=grp_time)
 start_day = input.int({start_date_obj.day}, "Día de Inicio", group=grp_time)
 window = time >= timestamp(syminfo.timezone, start_year, start_month, start_day, 0, 0)
+"""
+    if is_calib:
+        return ps_base + """
+// 🔥 MODO CALIBRADOR (Control Group) 🔥
+bool signal_buy = bar_index % 50 == 0
 
+var float tp_price = na
+var float sl_price = na
+
+if signal_buy and strategy.position_size == 0 and window
+    tp_price := math.round(close * 1.002, 5)
+    sl_price := math.round(close * 0.998, 5)
+    strategy.entry("In", strategy.long, alert_message=wt_enter_long)
+    strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
+
+if strategy.position_size > 0
+    strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
+
+if strategy.position_size == 0
+    tp_price := na
+    sl_price := na
+
+plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.belowbar, color=color.yellow, size=size.tiny)
+"""
+
+    ps_indicators = f"""
 hitbox_pct   = {v_hb}
 therm_wall   = {v_tw}
 adx_trend    = {v_adx}
 whale_factor = {v_wf}
-"""
-    
-    ps_indicators = """
+
 vol_ma_20 = ta.sma(volume, 20)
 vol_ma_100 = ta.sma(volume, 100)
 ema50  = ta.ema(close, 50)
@@ -1058,13 +1107,14 @@ var float locked_atr = na
 var float tp_price = na
 var float sl_price = na
 
-// 🔥 V252: CERO LAG DE ENTRADA. El Stop/Limit entra a la fila ANTES DE QUE LA VELA CIERRE 🔥
 if signal_buy and strategy.position_size == 0 and window
     locked_atr := atr
+    
+    // 🔥 V253: CERO LAG DE ENTRADA (Ancla a close y dispara limit/stop al mismo tiempo) 🔥
     tp_price := math.round(close + (locked_atr * atr_tp_mult), 5)
     sl_price := math.round(close - (locked_atr * atr_sl_mult), 5)
+    
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
-    // El Limit y Stop ya esperan en el libro de órdenes al momento del Entry.
     strategy.exit("TP/SL_First", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
 if strategy.position_size > 0
@@ -1084,30 +1134,10 @@ plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=locatio
     return ps_base + ps_indicators + ps_logic + ps_exec
 
 # ==========================================
-# 🛑 RADAR CHART CREATOR 🔥
-# ==========================================
-def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
-    fig = go.Figure()
-    norm_wr = min(wr, 100)
-    norm_pf = min(pf * 20, 100) 
-    norm_ado = min((ado / max(0.1, target_ado)) * 100, 100) 
-    norm_ret = min(max(ret_pct / 20, 0), 100) 
-    norm_alpha = min(max(alpha_pct / 20, 0), 100)
-    
-    fig.add_trace(go.Scatterpolar(
-        r=[norm_wr, norm_pf, norm_ado, norm_ret, norm_alpha, norm_wr],
-        theta=['Win Rate', 'Profit Factor', 'ADO (Trades/Día)', 'Rentabilidad Total', 'Alpha (vs Hold)', 'Win Rate'],
-        fill='toself', name='Perfil de Depredador IA', line_color='#00FFFF', fillcolor='rgba(0, 255, 255, 0.2)'
-    ))
-    fig.update_layout(
-        polar=dict(radialaxis=dict(visible=True, range=[0, 100], color='gray', gridcolor='rgba(255, 255, 255, 0.1)')),
-        showlegend=False, template='plotly_dark', height=350, margin=dict(l=30, r=30, t=30, b=30)
-    )
-    return fig
-
-# ==========================================
 # 🛑 7. BUCLES DE EJECUCIÓN GLOBALES Y PROFUNDOS
 # ==========================================
+st.session_state['is_calib_mode'] = is_calib_mode
+
 if st.session_state.get('run_global', False):
     time.sleep(0.1) 
     if len(st.session_state['global_queue']) > 0:
@@ -1175,7 +1205,6 @@ with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Ne
     for rank, item in enumerate(leaderboard_data):
         col1, col2 = st.columns([4, 1])
         col1.markdown(f"**#{rank+1} | {item['Mutante']}** -> Profit: `{item['Rentabilidad']}` | WR: `{item['WinRate']}` | Estado: {item['Estado']}")
-        # 🔥 V252: LLAVE DEDUPLICADA DEL BOTÓN CARGAR SCRIPT 🔥
         if col2.button("👉 CARGAR SCRIPT", key=f"btn_load_{item['Mutante']}_rk{rank}"):
             st.session_state['selected_mutant'] = item['Mutante']
             st.rerun()
@@ -1200,13 +1229,16 @@ if len(tab_names) > 0:
 
     st.markdown(f"### {selected_tab_name} {opt_badge}", unsafe_allow_html=True)
 
-    with st.expander("🧬 VER ADN DEL MUTANTE Y ARMAS TÁCTICAS", expanded=True):
-        st.markdown(f"**🟢 Escuadrón de Compra:** {', '.join(vault.get('b_team', []))}")
-        st.markdown(f"**🔴 Escuadrón de Venta:** {', '.join(vault.get('s_team', []))}")
-        st.markdown(f"**🌍 Clima Macro:** `{vault.get('macro', '')}` | **🌪️ Clima Volatilidad:** `{vault.get('vol', '')}`")
-        st.markdown(f"**🎛️ Pesos del Perceptrón:** RSI: `{vault.get('w_rsi',0):.2f}` | Z-Score: `{vault.get('w_z',0):.2f}` | ADX: `{vault.get('w_adx',0):.2f}`")
-        st.markdown(f"**📏 Gatillos Sensibles:** Buy > `{vault.get('th_buy',0):.2f}` | Sell < `{vault.get('th_sell',0):.2f}`")
-        st.markdown(f"**🎯 Camaleón ATR (Toma de Ganancias):** TP: `{vault.get('atr_tp',0):.2f}x` | SL: `{vault.get('atr_sl',0):.2f}x`")
+    if is_calib_mode:
+        st.warning("⚠️ MODO CALIBRADOR ACTIVO. La IA y los indicadores están apagados. Mostrando trades fijos cada 50 barras con TP/SL exacto de 0.2%. Úsalo para probar CCXT vs TradingView.")
+    else:
+        with st.expander("🧬 VER ADN DEL MUTANTE Y ARMAS TÁCTICAS", expanded=True):
+            st.markdown(f"**🟢 Escuadrón de Compra:** {', '.join(vault.get('b_team', []))}")
+            st.markdown(f"**🔴 Escuadrón de Venta:** {', '.join(vault.get('s_team', []))}")
+            st.markdown(f"**🌍 Clima Macro:** `{vault.get('macro', '')}` | **🌪️ Clima Volatilidad:** `{vault.get('vol', '')}`")
+            st.markdown(f"**🎛️ Pesos del Perceptrón:** RSI: `{vault.get('w_rsi',0):.2f}` | Z-Score: `{vault.get('w_z',0):.2f}` | ADX: `{vault.get('w_adx',0):.2f}`")
+            st.markdown(f"**📏 Gatillos Sensibles:** Buy > `{vault.get('th_buy',0):.2f}` | Sell < `{vault.get('th_sell',0):.2f}`")
+            st.markdown(f"**🎯 Camaleón ATR:** TP: `{vault.get('atr_tp',0):.2f}x` | SL: `{vault.get('atr_sl',0):.2f}x`")
 
     c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
     
@@ -1256,7 +1288,6 @@ if len(tab_names) > 0:
     ado_val = tt / dias_reales if dias_reales > 0 else 0.0
     mdd = abs((((pd.Series(eq_curve) - pd.Series(eq_curve).cummax()) / pd.Series(eq_curve).cummax()) * 100).min())
 
-    # 🔥 V252: RENDERIZACIÓN DEL DIAGRAMA RADAR 🔥
     col_kpi, col_radar = st.columns([3, 2])
     
     with col_kpi:
@@ -1303,7 +1334,7 @@ if len(tab_names) > 0:
 
     with st.expander("📝 CÓDIGO DE TRASPLANTE A TRADINGVIEW (PINE SCRIPT)", expanded=False):
         st.info("Traducción Matemática Idéntica. Ejecución Cuántica con Cero Repainting Activa.")
-        st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct, comision_pct, df_strat.index[0]), language="pine")
+        st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct, comision_pct, df_strat.index[0], is_calib_mode), language="pine")
 
     st.markdown("---")
     st.info("🖱️ **TIP GRÁFICO:** Si las velas se ven aplanadas, haz **Doble Clic** dentro del gráfico.")
