@@ -23,8 +23,8 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Genesis Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V248: HIPER-VELOCIDAD VECTORIAL + IA ULTRA AGRESIVA + SINCRONÍA PERFECTA 🔥
-APP_VERSION = 'V248'
+# 🔥 V249: ELIMINACIÓN DE DUPLICADOS + FITNESS DE DEPREDADOR + EXTRACCIÓN DINÁMICA 🔥
+APP_VERSION = 'V249'
 if st.session_state.get('app_version') != APP_VERSION:
     st.cache_data.clear()
     for key in list(st.session_state.keys()):
@@ -76,7 +76,6 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
     for i in range(len(h_arr)):
         cierra = False
         
-        # 1. SALIDA DINÁMICA
         if pending_dyn_exit and en_pos:
             exit_price = o_arr[i] * slip_out
             ret = (exit_price - p_ent) / p_ent
@@ -90,7 +89,6 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
             
         pending_dyn_exit = False 
         
-        # 2. INTRABAR TP/SL
         if en_pos and not cierra:
             bars_in_trade += 1
             if bars_in_trade >= 1: 
@@ -120,13 +118,11 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                     if cap_act > peak: peak = cap_act
                     if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
 
-        # 3. SEÑAL SALIDA
         if en_pos and not cierra:
             if f_sell[i]: pending_dyn_exit = True
                 
         if cap_act <= 0: break
         
-        # 4. ENTRADA
         if not en_pos and not pending_dyn_exit and i+1 < len(h_arr):
             if f_buy[i]:
                 invest_amt = cap_act * (invest_pct / 100.0) if invest_pct > 0 else cap_ini
@@ -135,7 +131,6 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
-                # 🔥 V248: TRUNCADO ESTRICTO A 5 DECIMALES DESDE ENTRADA REAL 🔥
                 current_atr = atr_arr[i]
                 tp_p = round(p_ent + (current_atr * atr_tp_mult), 5)
                 sl_p = round(p_ent - (current_atr * atr_sl_mult), 5)
@@ -164,7 +159,6 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
 
     for i in range(n):
         cierra = False
-        
         if pending_dyn_exit and en_pos:
             exit_price = o_arr[i] * slip_out; ret = (exit_price - p_ent) / p_ent
             gross = pos_size * (1 + ret); comm_out = gross * com_pct; total_comms += comm_out
@@ -174,7 +168,6 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
             en_pos = False; cierra = True
             
         pending_dyn_exit = False
-            
         if en_pos and not cierra:
             bars_in_trade += 1
             if bars_in_trade >= 1:
@@ -249,6 +242,8 @@ pine_map = {'Ping_Buy': 'ping_b', 'Ping_Sell': 'ping_s', 'Squeeze_Buy': 'squeeze
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     st.session_state['ai_algos'] = [f"AI_GENESIS_{random.randint(100, 999)}"]
 
+# 🔥 V249: DEDUPLICACIÓN ESTRICTA DE MEMORIA PARA EVITAR BUG DE BOTONES 🔥
+st.session_state['ai_algos'] = list(dict.fromkeys(st.session_state['ai_algos']))
 estrategias = st.session_state['ai_algos']
 tab_id_map = {f"🤖 {ai_id}": ai_id for ai_id in estrategias}
 
@@ -286,7 +281,7 @@ for s_id in estrategias:
 # ==========================================
 # 🌍 4. SIDEBAR UI
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V248</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 GENESIS LAB V249</h2>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Purgar Memoria & Sincronizar", use_container_width=True, key="btn_purge"): 
     st.cache_data.clear(); st.session_state.clear(); gc.collect(); st.rerun()
 
@@ -318,15 +313,26 @@ if st.sidebar.button(f"🧠 DEEP MINE GLOBAL", type="primary", use_container_wid
     st.session_state['global_queue'] = target_strats.copy(); st.session_state['abort_opt'] = False; st.session_state['run_global'] = True; st.rerun()
 
 if st.sidebar.button("🤖 CREAR NUEVO MUTANTE IA", type="secondary", use_container_width=True, key="btn_mutant"):
-    new_id = f"AI_MUTANT_{random.randint(100, 999)}"; st.session_state['ai_algos'].append(new_id); estrategias.append(new_id); get_safe_vault(new_id); st.session_state['global_queue'] = [new_id]; st.session_state['run_global'] = True; st.rerun()
+    new_id = f"AI_MUTANT_{random.randint(100, 999)}"
+    if new_id not in st.session_state['ai_algos']:
+        st.session_state['ai_algos'].append(new_id)
+        get_safe_vault(new_id)
+        st.session_state['global_queue'] = [new_id]
+        st.session_state['run_global'] = True
+        st.rerun()
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("<h3 style='text-align: center; color: #9932CC;'>🌌 DEEP FORGE (Standby)</h3>", unsafe_allow_html=True)
 deep_epochs_target = st.sidebar.number_input("Objetivo Épocas Profundas", min_value=10000, max_value=10000000, value=1000000, step=10000)
 
 if st.sidebar.button("🌌 CREAR MUTANTE PROFUNDO", type="secondary", use_container_width=True, key="btn_mutant_deep"):
-    new_id = f"AI_DEEP_{random.randint(100, 999)}"; st.session_state['ai_algos'].append(new_id); estrategias.append(new_id); get_safe_vault(new_id)
-    st.session_state['abort_opt'] = False; st.session_state['deep_opt_state'] = {'s_id': new_id, 'target_epochs': deep_epochs_target, 'current_epoch': 0, 'paused': False, 'start_time': time.time()}; st.rerun()
+    new_id = f"AI_DEEP_{random.randint(100, 999)}"
+    if new_id not in st.session_state['ai_algos']:
+        st.session_state['ai_algos'].append(new_id)
+        get_safe_vault(new_id)
+        st.session_state['abort_opt'] = False
+        st.session_state['deep_opt_state'] = {'s_id': new_id, 'target_epochs': deep_epochs_target, 'current_epoch': 0, 'paused': False, 'start_time': time.time()}
+        st.rerun()
 
 deep_state = st.session_state.get('deep_opt_state', {})
 if deep_state and deep_state.get('target_epochs', 0) > 0:
@@ -339,7 +345,7 @@ if deep_state and deep_state.get('target_epochs', 0) > 0:
 # ==========================================
 # 🛑 5. EXTRACCIÓN Y WARM-UP INSTITUCIONAL
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V248)...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Línea Temporal con TradingView (V249)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -348,14 +354,19 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         end_ts = int((datetime.combine(end, datetime.min.time()) + timedelta(days=1)).timestamp() * 1000)
         
         all_ohlcv, current_ts, error_count = [], start_ts, 0
+        
+        # 🔥 V249: LÍMITE DINÁMICO (Coinbase falla con +300 en periodos largos, Binance aguanta 1000) 🔥
+        req_limit = 1000
+        if 'coinbase' in exchange_id.lower(): req_limit = 300
+        if 'kraken' in exchange_id.lower(): req_limit = 720
+
         while current_ts < end_ts:
             try: 
-                # 🔥 V248: Límite 300 para no bloquear IP de CCXT en periodos de 1H y 4H 🔥
-                ohlcv = ex_class.fetch_ohlcv(sym, iv_down, since=current_ts, limit=300); error_count = 0 
+                ohlcv = ex_class.fetch_ohlcv(sym, iv_down, since=current_ts, limit=req_limit); error_count = 0 
             except Exception as e: 
                 error_count += 1
                 if error_count >= 3: return pd.DataFrame(), f"❌ ERROR CCXT ({exchange_id}): {str(e)}"
-                time.sleep(2); continue
+                time.sleep(0.5); continue
             if not ohlcv or len(ohlcv) == 0: break
             if all_ohlcv and ohlcv[0][0] <= all_ohlcv[-1][0]:
                 ohlcv = [c for c in ohlcv if c[0] > all_ohlcv[-1][0]]
@@ -371,7 +382,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
             
         a_h, a_l, a_c, a_o = df['High'].values, df['Low'].values, df['Close'].values, df['Open'].values
         
-        # 🔥 V248: EMAS REGRESAN A LA FUNCIÓN NATIVA DE PANDAS (Es idéntica al motor de Pine Script) 🔥
+        # Las EMA usando la función nativa de Pandas ewm son el equivalente matemático exacto al C++ de TradingView
         df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
         df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
         df['Vol_MA_20'] = df['Volume'].rolling(window=20).mean()
@@ -580,10 +591,12 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
     vault = get_safe_vault(s_id)
     best_fit_live, best_net_live, best_pf_live, best_nt_live = vault.get('fit', -float('inf')), vault.get('net', -float('inf')), vault.get('pf', 0.0), vault.get('nt', 0)
     
-    # 🔥 V248: HIPER-VELOCIDAD REAL (Reducción de overhead de Streamlit) 🔥
+    # 🔥 V248: HIPER-VELOCIDAD REAL (1000 mutaciones por bloque para volar en segundos) 🔥
     iters = 3000 * epochs
-    chunks = min(iters, 20) if not deep_info else 20
-    chunk_size = max(1, iters // chunks)
+    chunk_size = 1000
+    chunks = max(1, iters // chunk_size)
+    if deep_info: chunks = min(chunks, 10)
+    
     start_time = time.time(); n_len = len(a_c)
     split_idx = n_len; dias_entrenamiento = max(1, dias_reales)
     default_f, ones_mask = np.zeros(n_len, dtype=bool), np.ones(n_len, dtype=bool)
@@ -635,27 +648,25 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0
             )
 
-            # 🔥 V248: FITNESS ORIGINAL + PENALIZACIÓN ESTRICTA DE ADO 🔥
+            # 🔥 V248: FITNESS ULTRA-AGRESIVO (Net Profit es Rey, ADO se moldea sin destruirlo) 🔥
             ado_actual = nt / max(1, dias_entrenamiento)
             fit_score = -float('inf') 
             
-            if nt >= 5 and net > 0: 
+            if nt >= 3 and net > 0: 
                 ado_target_safe = max(0.1, target_ado)
                 
-                # Exponencial drop-off si se aleja de la meta de ADO (Forza a la IA a buscar los 4 trades)
-                ado_diff = abs(ado_actual - ado_target_safe)
-                ado_penalty = max(0.1, 1.0 - (ado_diff / ado_target_safe)) 
-                
-                cap_final = cap_ini + net
-                initial_tokens = cap_ini / a_o[0]
-                final_tokens = cap_final / a_c[-1] 
-                token_ratio = final_tokens / initial_tokens
+                # Penalización controlada: si no cumple el ADO, baja un poco, pero no mata los $6,000
+                ado_penalty = 1.0
+                if ado_actual < ado_target_safe:
+                    ado_penalty = max(0.5, ado_actual / ado_target_safe)
+                elif ado_actual >= ado_target_safe:
+                    ado_penalty = 1.5 # Bonus por cumplir
 
-                safe_pf = min(pf, 10.0)
-                token_factor = token_ratio ** 2.0 
-                dd_penalty = np.exp(mdd / 25.0) 
+                safe_pf = min(pf, 4.0)
+                dd_penalty = 1.0 if mdd <= 30.0 else (30.0 / mdd)
                 
-                fit_score = (net * safe_pf * token_factor * ado_penalty) / dd_penalty
+                # Esta ecuación respeta que Net Profit gane
+                fit_score = net * safe_pf * ado_penalty * dd_penalty
             elif nt > 0:
                 fit_score = net - mdd - (abs(ado_actual - max(0.1, target_ado)) * 5)
             else:
@@ -1010,17 +1021,20 @@ var float locked_atr = na
 var float tp_price = na
 var float sl_price = na
 
+// 1. Detectar señal y congelar ATR 
 if signal_buy and strategy.position_size == 0 and window
     locked_atr := atr
-    
-    // 🔥 V248: CÁLCULO INSTANTÁNEO PREVENTIVO PARA EVITAR EL LAG DE TRADINGVIEW 🔥
-    tp_price := math.round(close + (locked_atr * atr_tp_mult), 5)
-    sl_price := math.round(close - (locked_atr * atr_sl_mult), 5)
-    
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
 
-// La salida entra al libro de órdenes EN LA MISMA VELA que la orden de compra (0 Milisegundos de Lag)
-if strategy.position_size > 0 or (signal_buy and strategy.position_size == 0 and window)
+bool just_entered = ta.change(strategy.position_size) > 0
+
+if just_entered
+    // 🔥 V249: ANCLAJE EXACTO CON TRUNCADO PARA EVITAR LAG DE TRADINGVIEW 🔥
+    tp_price := math.round(strategy.position_avg_price + (locked_atr[1] * atr_tp_mult), 5)
+    sl_price := math.round(strategy.position_avg_price - (locked_atr[1] * atr_sl_mult), 5)
+
+// El Limits y Stops entran EN EL MISMO TICK que la posición
+if strategy.position_size > 0
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
 if signal_sell and strategy.position_size > 0
@@ -1103,7 +1117,6 @@ with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Ne
     
     leaderboard_data.sort(key=lambda x: x['Neto_Num'], reverse=True)
     
-    # 🔥 V248: BOTONES DE DESPLIEGUE RÁPIDO PARA EXTRAER EL PINE SCRIPT 🔥
     for rank, item in enumerate(leaderboard_data):
         col1, col2 = st.columns([4, 1])
         col1.markdown(f"**#{rank+1} | {item['Mutante']}** -> Profit: `{item['Rentabilidad']}` | WR: `{item['WinRate']}` | Estado: {item['Estado']}")
@@ -1155,8 +1168,6 @@ if len(tab_names) > 0:
     st.session_state[f'champion_{s_id}']['reinv'] = ps_buy_pct 
 
     c_btn1, c_btn2 = c_ia3.columns(2)
-    
-    # 🔥 V248: Aceleración Brutal. Ya no se frena. 🔥
     if c_btn1.button(f"🚀 FORJAR RÁPIDO ({global_epochs*3000})", type="primary", key=f"btn_opt_{s_id}"):
         st.session_state['abort_opt'] = False
         st.session_state['global_queue'] = [s_id]
