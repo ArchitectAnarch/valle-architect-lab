@@ -1,3 +1,4 @@
+
 import streamlit as st
 import ccxt
 import plotly.graph_objects as go
@@ -288,8 +289,7 @@ def get_safe_vault(s_id):
                     data = json.load(f)
                     if data and isinstance(data, dict): vault = data
         except: pass
-    if not vault or not isinstance(vault, dict):
-        vault = get_default_dna()
+    if not vault or not isinstance(vault, dict): vault = get_default_dna()
     st.session_state[f'champion_{s_id}'] = vault
     return vault
 
@@ -634,14 +634,12 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         if st.session_state.get('abort_opt', False): break
 
         for _ in range(chunk_size): 
-            dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 3))
-            dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 3))
+            # 🔥 V260: SISTEMA DE VOTACIÓN DEMOCRÁTICA (FRANCOTIRADOR) 🔥
+            dna_b_team = random.sample(todas_las_armas_b, random.randint(3, 8))
+            dna_s_team = random.sample(todas_las_armas_s, random.randint(3, 8))
             
             dna_b_op = random.choice(['&', '|', 'vote'])
             dna_s_op = random.choice(['&', '|', 'vote'])
-            
-            dna_b_vote = random.randint(1, len(dna_b_team)) if dna_b_op == 'vote' else 1
-            dna_s_vote = random.randint(1, len(dna_s_team)) if dna_s_op == 'vote' else 1
             
             dna_macro = random.choice(["All-Weather", "Bull Only", "Bear Only", "Ignore", "Organic_Vol", "Organic_Squeeze", "Organic_Safe", "Organic_Gaussian_Clean"])
             dna_vol = random.choice(["All-Weather", "Trend", "Range", "Ignore", "Organic_Pump", "Organic_Dump", "Organic_Gaussian_Clean"])
@@ -673,7 +671,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             else:
                 votes = np.zeros(n_len, dtype=int)
                 for r in dna_b_team: votes += s_dict.get(r, default_f).astype(int)
-                f_buy_tactical = votes >= dna_b_vote
+                f_buy_tactical = votes >= max(1, len(dna_b_team) // 2)
 
             if dna_s_op == '&':
                 f_sell_tactical = np.ones(n_len, dtype=bool)
@@ -684,7 +682,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             else:
                 votes = np.zeros(n_len, dtype=int)
                 for r in dna_s_team: votes += s_dict.get(r, default_f).astype(int)
-                f_sell_tactical = votes >= dna_s_vote
+                f_sell_tactical = votes >= max(1, len(dna_s_team) // 2)
             
             score_arr = (a_rsi * r_w_rsi) + (a_zscore * r_w_z) + (a_adx * r_w_adx)
             f_buy_final = (f_buy_tactical | (score_arr > r_th_b)) & m_mask & v_mask
@@ -696,6 +694,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
             )
 
+            # 🔥 V260: ESCUDO ANTI-SCALPING & GREED FACTOR 🔥
             ado_actual = nt / max(1, dias_entrenamiento)
             fit_score = -float('inf') 
             
@@ -1162,10 +1161,10 @@ if st.session_state.get('run_global', False):
         time.sleep(0.1)
         
         v = get_safe_vault(s_id)
-        if 'df_global' in globals() and not df_global.empty:
-            buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
-            buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
-            bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=global_epochs, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=None, greed_factor=st.session_state.get(f'greed_{s_id}', 0.8))
+        buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
+        buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
+        
+        bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=global_epochs, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=None, greed_factor=st.session_state.get(f'greed_{s_id}', 0.8))
         
         st.rerun()
     else:
@@ -1185,32 +1184,103 @@ if deep_state and not deep_state.get('paused', False) and deep_state.get('curren
         
     s_id = deep_state['s_id']
     v = get_safe_vault(s_id)
+    buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
+    buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
     
-    if 'df_global' in globals() and not df_global.empty:
-        buy_hold_ret = ((df_global['Close'].iloc[-1] - df_global['Open'].iloc[0]) / df_global['Open'].iloc[0]) * 100
-        buy_hold_money = capital_inicial * (buy_hold_ret / 100.0)
-        deep_info = {'current': deep_state['current_epoch'], 'total': deep_state['target_epochs'], 'start_time': deep_state.get('start_time', time.time())}
-        bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=chunk, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=deep_info, greed_factor=st.session_state.get(f'greed_{s_id}', 0.8))
+    deep_info = {'current': deep_state['current_epoch'], 'total': deep_state['target_epochs'], 'start_time': deep_state.get('start_time', time.time())}
+    
+    bp = optimizar_ia_tracker(s_id, capital_inicial, comision_pct, float(v.get('reinv', 20.0)), float(v.get('ado',4.0)), dias_reales, buy_hold_money, epochs=chunk, cur_net=float(v.get('net',-float('inf'))), cur_fit=float(v.get('fit',-float('inf'))), deep_info=deep_info, greed_factor=st.session_state.get(f'greed_{s_id}', 0.8))
+    
+    st.session_state['deep_opt_state']['current_epoch'] += chunk
+    
+    if st.session_state['deep_opt_state']['current_epoch'] >= deep_state['target_epochs']:
+        st.session_state['deep_opt_state']['paused'] = True
+        ph_holograma.empty()
+        st.sidebar.success(f"🌌 ¡FORJA PROFUNDA COMPLETADA PARA {s_id}!")
+        time.sleep(2)
         
-        st.session_state['deep_opt_state']['current_epoch'] += chunk
-        
-        if st.session_state['deep_opt_state']['current_epoch'] >= deep_state['target_epochs']:
-            st.session_state['deep_opt_state']['paused'] = True
-            ph_holograma.empty()
-            st.sidebar.success(f"🌌 ¡FORJA PROFUNDA COMPLETADA PARA {s_id}!")
-            time.sleep(2)
-            
+    st.rerun()
+
+# ==========================================
+# 🛑 8. PANEL DE RENDERIZADO VISUAL Y SALÓN DE LA FAMA
+# ==========================================
+st.title("🛡️ GENESIS LAB - The Omni-Brain")
+
+with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Neta)", expanded=False):
+    leaderboard_data = []
+    for s in estrategias:
+        v = get_safe_vault(s)
+        fit = v.get('fit', -float('inf'))
+        opt_str = "✅" if fit != -float('inf') else "➖ No Opt"
+        net_val = v.get('net', 0)
+        leaderboard_data.append({"Mutante": s, "Neto_Num": net_val, "Rentabilidad": f"${net_val:,.2f}", "WinRate": f"{v.get('winrate', 0):.1f}%", "Estado": opt_str})
+    
+    leaderboard_data.sort(key=lambda x: x['Neto_Num'], reverse=True)
+    
+    for rank, item in enumerate(leaderboard_data):
+        col1, col2 = st.columns([4, 1])
+        col1.markdown(f"**#{rank+1} | {item['Mutante']}** -> Profit: `{item['Rentabilidad']}` | WR: `{item['WinRate']}` | Estado: {item['Estado']}")
+        if col2.button("👉 CARGAR SCRIPT", key=f"btn_load_script_{item['Mutante']}_{rank}"):
+            st.session_state['selected_mutant'] = item['Mutante']
+            st.rerun()
+    st.markdown("---")
+
+st.markdown("<h3 style='text-align: center; color: #00FF00;'>🎡 CARRUSEL DE MUTANTES IA</h3>", unsafe_allow_html=True)
+tab_names = list(tab_id_map.keys())
+
+if len(tab_names) > 0:
+    default_idx = len(tab_names) - 1
+    if 'selected_mutant' in st.session_state:
+        target_name = f"🤖 {st.session_state['selected_mutant']}"
+        if target_name in tab_names:
+            default_idx = tab_names.index(target_name)
+
+    selected_tab_name = st.selectbox("Selecciona un Espécimen:", tab_names, index=default_idx)
+    s_id = tab_id_map[selected_tab_name]
+    is_opt = st.session_state.get(f'opt_status_{s_id}', False)
+    opt_badge = "<span style='color: lime;'>✅ ADN OPTIMIZADO</span>" if is_opt else "<span style='color: gray;'>➖ ADN VIRGEN</span>"
+    
+    vault = get_safe_vault(s_id) 
+
+    st.markdown(f"### {selected_tab_name} {opt_badge}", unsafe_allow_html=True)
+
+    if is_calib_mode:
+        st.warning("⚠️ MODO CALIBRADOR ACTIVO. La IA y los indicadores están apagados. Mostrando trades fijos cada 50 barras con TP/SL exacto de 0.2%. Úsalo para probar CCXT vs TradingView.")
+    else:
+        with st.expander("🧬 VER ADN DEL MUTANTE Y ARMAS TÁCTICAS", expanded=True):
+            st.markdown(f"**🟢 Escuadrón de Compra:** {', '.join(vault.get('b_team', []))} (Táctica: {vault.get('b_op', '&')})")
+            st.markdown(f"**🔴 Escuadrón de Venta:** {', '.join(vault.get('s_team', []))} (Táctica: {vault.get('s_op', '&')})")
+            st.markdown(f"**🌍 Clima Macro:** `{vault.get('macro', '')}` | **🌪️ Clima Volatilidad:** `{vault.get('vol', '')}`")
+            st.markdown(f"**🎛️ Pesos del Perceptrón:** RSI: `{vault.get('w_rsi',0):.2f}` | Z-Score: `{vault.get('w_z',0):.2f}` | ADX: `{vault.get('w_adx',0):.2f}`")
+            st.markdown(f"**📏 Gatillos Sensibles:** Buy > `{vault.get('th_buy',0):.2f}` | Sell < `{vault.get('th_sell',0):.2f}`")
+            st.markdown(f"**🎯 Camaleón ATR:** TP: `{vault.get('atr_tp',0):.2f}x` | SL: `{vault.get('atr_sl',0):.2f}x`")
+
+    c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
+    
+    ado_val_ui = float(vault.get('ado', 4.0)) if vault.get('ado') is not None else 4.0
+    reinv_val_ui = float(vault.get('reinv', 20.0)) if vault.get('reinv') is not None else 20.0
+
+    ado_ui = c_ia1.slider("🎯 Target ADO (IA Override)", 0.0, 100.0, value=ado_val_ui, key=f"ui_{s_id}_ado_w", step=0.5)
+    reinv_ui = c_ia2.slider("💵 Reinversión % (IA Override)", 0.0, 100.0, value=reinv_val_ui, key=f"ui_{s_id}_reinv_w", step=5.0)
+
+    st.session_state[f'champion_{s_id}']['ado'] = ado_ui
+    st.session_state[f'champion_{s_id}']['reinv'] = reinv_ui 
+    
+    ps_buy_pct = reinv_ui
+    ps_sell_pct = 100
+
+    c_btn1, c_btn2 = c_ia3.columns(2)
+    if c_btn1.button(f"🚀 FORJAR RÁPIDO ({global_epochs*1000})", type="primary", key=f"btn_opt_{s_id}"):
+        st.session_state['abort_opt'] = False
+        st.session_state['global_queue'] = [s_id]
+        st.session_state['run_global'] = True
         st.rerun()
 
-# Si no hay datos, ocultar la gráfica pero dejar el Salón de la Fama activo
-if 'data_params' not in st.session_state:
-    st.info("👈 Configura los datos en el menú lateral y haz clic en **'📥 DESCARGAR MATRIX DE DATOS'** para correr la IA y ver los gráficos.")
-    st.stop()
+    if c_btn2.button(f"🌌 ACTIVAR FORJA PROFUNDA", type="secondary", key=f"btn_deep_{s_id}"):
+        st.session_state['abort_opt'] = False
+        st.session_state['deep_opt_state'] = {'s_id': s_id, 'target_epochs': deep_epochs_target, 'current_epoch': 0, 'paused': False, 'start_time': time.time()}
+        st.rerun()
 
-# ==========================================
-# 🛑 RENDERIZADO VISUAL DEL MUTANTE SELECCIONADO
-# ==========================================
-if len(tab_names) > 0:
     df_strat, eq_curve, t_log, total_comms = run_backtest_eval(s_id, capital_inicial, comision_pct)
     df_strat['Total_Portfolio'] = eq_curve
     ret_pct = ((eq_curve[-1] - capital_inicial) / capital_inicial) * 100
