@@ -415,7 +415,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df.index = df.index + timedelta(hours=offset); df = df[~df.index.duplicated(keep='first')]
         if len(df) < 50: return pd.DataFrame(), f"❌ Solo {len(df)} velas. Intenta ampliar el rango de fechas."
         
-        # 🔥 FIX DE SINCRONIZACIÓN: RELLENADOR DE BARRAS FANTASMAS (Para igualar Nro de Trades a TV) 🔥
+        # 🔥 FIX DE SINCRONIZACIÓN: RELLENADOR DE BARRAS FANTASMAS 🔥
         freq_map = {'1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min', '1h': '1h', '4h': '4h', '1d': '1D'}
         pd_freq = freq_map.get(iv_down, '15min')
         df = df.resample(pd_freq).asfreq()
@@ -486,8 +486,11 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         
         df['PA_Engulfing_Buy'] = (df['Vela_Verde']) & (df['Vela_Roja'].shift(1)) & (df['Close'] > df['Open'].shift(1)) & (df['Open'] < df['Close'].shift(1))
         df['PA_Engulfing_Sell'] = (df['Vela_Roja']) & (df['Vela_Verde'].shift(1)) & (df['Close'] < df['Open'].shift(1)) & (df['Open'] > df['Close'].shift(1))
-        df['PA_Pinbar_Buy'] = (df['lower_wick'] > body_size * 2.5) & (df['upper_wick'] < df['body_size'])
-        df['PA_Pinbar_Sell'] = (df['upper_wick'] > body_size * 2.5) & (df['lower_wick'] < df['body_size'])
+        
+        # 🔥 CORRECCIÓN DEL ERROR DE SINTAXIS (df['body_size']) 🔥
+        df['PA_Pinbar_Buy'] = (df['lower_wick'] > df['body_size'] * 2.5) & (df['upper_wick'] < df['body_size'])
+        df['PA_Pinbar_Sell'] = (df['upper_wick'] > df['body_size'] * 2.5) & (df['lower_wick'] < df['body_size'])
+        
         df['PA_3_Soldiers'] = (df['Vela_Verde']) & (df['Vela_Verde'].shift(1)) & (df['Vela_Verde'].shift(2)) & (df['Close'] > df['Close'].shift(1)) & (df['Close'].shift(1) > df['Close'].shift(2))
         df['PA_3_Crows'] = (df['Vela_Roja']) & (df['Vela_Roja'].shift(1)) & (df['Vela_Roja'].shift(2)) & (df['Close'] < df['Close'].shift(1)) & (df['Close'].shift(1) < df['Close'].shift(2))
 
@@ -609,7 +612,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Thermal_Buy'] = cond_therm_buy_bounce; s_dict['Thermal_Sell'] = cond_therm_sell_wall
     s_dict['Climax_Buy'] = cond_pink_whale_buy; s_dict['Climax_Sell'] = (a_rsi > 80)
     s_dict['Lock_Buy'] = cond_lock_buy_bounce; s_dict['Lock_Sell'] = cond_lock_sell_reject
-    # 🔥 CORRECCIÓN DEL TYPO AQUÍ 🔥
     s_dict['Defcon_Buy'] = cond_defcon_buy; s_dict['Defcon_Sell'] = cond_defcon_sell
     s_dict['Jugg_Buy'] = a_mb & (a_c > a_ema50) & (a_c_s1 < npshift(a_ema50,1)) & a_vv & ~a_fk; s_dict['Jugg_Sell'] = (a_c < a_ema50)
     s_dict['Trinity_Buy'] = a_mb & (a_rsi < 35) & a_vv & ~a_fk; s_dict['Trinity_Sell'] = (a_rsi > 75) | (a_c < a_ema200)
@@ -637,7 +639,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Calibrador'] = f_calib_buy
     return s_dict
 
-# 🔥 RECONECTANDO CABLES: SALVANDO SIEMPRE AL CAMPEÓN (CERO DESCARTES INVISIBLES) 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None, greed_factor=0.8):
     vault = get_safe_vault(s_id)
     best_fit_live = vault.get('fit', -float('inf'))
@@ -706,12 +707,12 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 for r in dna_s_team: votes += s_dict.get(r, default_f).astype(int)
                 f_sell_tactical = votes >= max(1, len(dna_s_team) // 2)
             
-            # 🔥 CORRECCIÓN DEL TYPO AQUI (r_w_adx en lugar de w_adx) 🔥
+            # 🔥 CORRECCIÓN APLICADA: r_w_adx 🔥
             score_arr = (a_rsi * r_w_rsi) + (a_zscore * r_w_z) + (a_adx * r_w_adx)
             f_buy_final = (f_buy_tactical | (score_arr > r_th_b)) & m_mask & v_mask
             f_sell_final = f_sell_tactical | (score_arr < r_th_s)
 
-            # 🛑 1. SIMULACIÓN IN-SAMPLE (Entrenamiento)
+            # 🛑 SIMULACIÓN IN-SAMPLE (Entrenamiento)
             net_is, pf_is, nt_is, mdd_is, wr_is = simular_core_rapido(
                 a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx], a_atr[:split_idx], 
                 f_buy_final[:split_idx], f_sell_final[:split_idx], 
@@ -744,7 +745,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             else:
                 fit_score = net_is - 1000.0 
 
-            # 🛑 2. SIMULACIÓN OUT-OF-SAMPLE (Evaluación)
+            # 🛑 SIMULACIÓN OUT-OF-SAMPLE
             if fit_score > best_fit_live:
                 net_oos, pf_oos, nt_oos, mdd_oos, wr_oos = simular_core_rapido(
                     a_h[split_idx:], a_l[split_idx:], a_c[split_idx:], a_o[split_idx:], a_atr[split_idx:], 
