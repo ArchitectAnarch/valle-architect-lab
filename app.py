@@ -227,6 +227,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
             if bars_in_trade >= 1:
                 hit_sl = l_arr[i] <= sl_p; hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
+                    # 🔥 EMULADOR INTRABARRA TV VISUAL 🔥
                     if c_arr[i] >= o_arr[i]:
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'SL'
                     else:
@@ -608,7 +609,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Thermal_Buy'] = cond_therm_buy_bounce; s_dict['Thermal_Sell'] = cond_therm_sell_wall
     s_dict['Climax_Buy'] = cond_pink_whale_buy; s_dict['Climax_Sell'] = (a_rsi > 80)
     s_dict['Lock_Buy'] = cond_lock_buy_bounce; s_dict['Lock_Sell'] = cond_lock_sell_reject
-    s_dict['Defcon_Buy'] = cond_defcon_buy; s_dict['Defcon_Sell'] = cond_defcon_s
+    s_dict['Defcon_Buy'] = cond_defcon_buy; s_dict['Defcon_Sell'] = cond_defcon_sell
     s_dict['Jugg_Buy'] = a_mb & (a_c > a_ema50) & (a_c_s1 < npshift(a_ema50,1)) & a_vv & ~a_fk; s_dict['Jugg_Sell'] = (a_c < a_ema50)
     s_dict['Trinity_Buy'] = a_mb & (a_rsi < 35) & a_vv & ~a_fk; s_dict['Trinity_Sell'] = (a_rsi > 75) | (a_c < a_ema200)
     s_dict['Lev_Buy'] = a_mb & a_rcu & (a_rsi < 45); s_dict['Lev_Sell'] = (a_c < a_ema200)
@@ -742,7 +743,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 fit_score = net_is - 1000.0 
 
             # 🛑 2. SIMULACIÓN OUT-OF-SAMPLE (Evaluación)
-            # ELIMINAMOS EL DESCARTAR SI FALLA. SIEMPRE SE GUARDA EL MEJOR IN-SAMPLE, y reportamos cómo le fue en el OOS
             if fit_score > best_fit_live:
                 net_oos, pf_oos, nt_oos, mdd_oos, wr_oos = simular_core_rapido(
                     a_h[split_idx:], a_l[split_idx:], a_c[split_idx:], a_o[split_idx:], a_atr[split_idx:], 
@@ -772,9 +772,9 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         time_str = f"{int(h):02d}h:{int(m):02d}m:{int(s):02d}s"
         
         vault = get_safe_vault(s_id)
-        current_best_net = vault.get('net', 0)
+        current_best_net = vault.get('net', 0.0)
         current_best_nt = vault.get('nt', 0)
-        current_best_pf = vault.get('pf', 0)
+        current_best_pf = vault.get('pf', 0.0)
 
         if deep_info:
             current_epoch_val = deep_info['current'] + (c+1)*(chunk_size); macro_pct = int((current_epoch_val / deep_info['total']) * 100)
@@ -1254,7 +1254,8 @@ if deep_state and not deep_state.get('paused', False) and deep_state.get('curren
 # ==========================================
 st.title("🛡️ GENESIS LAB - The Omni-Brain")
 
-with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Neta)", expanded=False):
+# 🔥 EL SALÓN DE LA FAMA AHORA ESTÁ SIEMPRE ABIERTO POR DEFECTO (expanded=True) 🔥
+with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Neta)", expanded=True):
     leaderboard_data = []
     for s in estrategias:
         v = get_safe_vault(s)
