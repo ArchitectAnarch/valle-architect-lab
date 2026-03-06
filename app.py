@@ -1,4 +1,3 @@
-
 import streamlit as st
 import ccxt
 import plotly.graph_objects as go
@@ -617,6 +616,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Calibrador'] = f_calib_buy
     return s_dict
 
+# 🔥 INYECCIÓN DE LA ESCUDO MATEMÁTICO: IN-SAMPLE / OUT-OF-SAMPLE 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None, greed_factor=0.8):
     vault = get_safe_vault(s_id)
     best_fit_live, best_net_live, best_pf_live, best_nt_live = vault.get('fit', -float('inf')), vault.get('net', -float('inf')), vault.get('pf', 0.0), vault.get('nt', 0)
@@ -627,14 +627,17 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
     if deep_info: chunks = min(chunks, 10) 
     
     start_time = time.time(); n_len = len(a_c)
-    split_idx = n_len; dias_entrenamiento = max(1, dias_reales)
+    
+    # 🔥 DIVISION DE DATOS: 70% ENTRENAMIENTO, 30% VALIDACIÓN 🔥
+    split_idx = int(n_len * 0.70) 
+    dias_entrenamiento = max(1, dias_reales * 0.70)
     default_f, ones_mask = np.zeros(n_len, dtype=bool), np.ones(n_len, dtype=bool)
 
     for c in range(chunks):
         if st.session_state.get('abort_opt', False): break
 
         for _ in range(chunk_size): 
-            # 🔥 V260: SISTEMA DE VOTACIÓN DEMOCRÁTICA (FRANCOTIRADOR) 🔥
+            # SISTEMA DE VOTACIÓN DEMOCRÁTICA (FRANCOTIRADOR)
             dna_b_team = random.sample(todas_las_armas_b, random.randint(3, 8))
             dna_s_team = random.sample(todas_las_armas_s, random.randint(3, 8))
             
@@ -688,50 +691,64 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             f_buy_final = (f_buy_tactical | (score_arr > r_th_b)) & m_mask & v_mask
             f_sell_final = f_sell_tactical | (score_arr < r_th_s)
 
-            net, pf, nt, mdd, wr = simular_core_rapido(
+            # 🛑 1. SIMULACIÓN IN-SAMPLE (70% de datos)
+            net_is, pf_is, nt_is, mdd_is, wr_is = simular_core_rapido(
                 a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx], a_atr[:split_idx], 
                 f_buy_final[:split_idx], f_sell_final[:split_idx], 
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
             )
 
-            # 🔥 V260: ESCUDO ANTI-SCALPING & GREED FACTOR 🔥
-            ado_actual = nt / max(1, dias_entrenamiento)
+            # ESCUDO ANTI-SCALPING & GREED FACTOR (Evaluado solo en In-Sample)
+            ado_actual = nt_is / max(1, dias_entrenamiento)
             fit_score = -float('inf') 
             
-            if nt >= 3 and net > 0: 
-                avg_trade_net_pct = (net / cap_ini) / nt * 100.0
+            if nt_is >= 3 and net_is > 0: 
+                avg_trade_net_pct = (net_is / cap_ini) / nt_is * 100.0
                 
                 # Prohíbe a la IA hacer trades que en promedio ganen menos de 0.25% neto
                 if avg_trade_net_pct < 0.25:
-                    fit_score = net - 5000.0 
+                    fit_score = net_is - 5000.0 
                 else:
                     if greed_factor >= 0.7:
-                        pf_mod = 1.0 if pf > 1.1 else 0.5
-                        dd_penalty = 1.0 if mdd <= 60.0 else (mdd / 60.0)
-                        # Multiplica el net profit por el logaritmo de trades para empujar el ADO sin romper la meta
-                        fit_score = (net * (1.0 + np.log10(nt)) * pf_mod) / dd_penalty
+                        pf_mod = 1.0 if pf_is > 1.1 else 0.5
+                        dd_penalty = 1.0 if mdd_is <= 60.0 else (mdd_is / 60.0)
+                        fit_score = (net_is * (1.0 + np.log10(nt_is)) * pf_mod) / dd_penalty
                     elif greed_factor <= 0.3:
-                        pf_mod = pf ** 2.0
-                        wr_mod = (wr / 40.0) ** 2.0
-                        dd_penalty = np.exp(mdd / 20.0)
-                        fit_score = (net * pf_mod * wr_mod) / dd_penalty
+                        pf_mod = pf_is ** 2.0
+                        wr_mod = (wr_is / 40.0) ** 2.0
+                        dd_penalty = np.exp(mdd_is / 20.0)
+                        fit_score = (net_is * pf_mod * wr_mod) / dd_penalty
                     else:
-                        pf_mod = min(pf, 5.0)
-                        dd_penalty = 1.0 if mdd <= 35.0 else (mdd / 35.0)
-                        fit_score = (net * pf_mod) / dd_penalty
+                        pf_mod = min(pf_is, 5.0)
+                        dd_penalty = 1.0 if mdd_is <= 35.0 else (mdd_is / 35.0)
+                        fit_score = (net_is * pf_mod) / dd_penalty
                 
-            elif nt > 0:
-                fit_score = net - mdd - (abs(ado_actual - max(0.1, target_ado)) * 5)
+            elif nt_is > 0:
+                fit_score = net_is - mdd_is - (abs(ado_actual - max(0.1, target_ado)) * 5)
             else:
-                fit_score = net - 1000.0 
+                fit_score = net_is - 1000.0 
 
+            # 🛑 2. SIMULACIÓN OUT-OF-SAMPLE (30% de datos - Solo si el IS rompe el récord)
             if fit_score > best_fit_live:
-                best_fit_live, best_net_live, best_pf_live, best_nt_live = fit_score, net, pf, nt
+                net_oos, pf_oos, nt_oos, mdd_oos, wr_oos = simular_core_rapido(
+                    a_h[split_idx:], a_l[split_idx:], a_c[split_idx:], a_o[split_idx:], a_atr[split_idx:], 
+                    f_buy_final[split_idx:], f_sell_final[split_idx:], 
+                    r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
+                )
+                
+                # REGLA DE SUPERVIVENCIA: Si muere en OOS, se descarta por Overfitting
+                if net_oos < 0 and nt_oos > 0:
+                    continue
+                
+                # ¡Es un campeón robusto! Sumamos estadísticas de ambas fases.
+                best_fit_live, best_net_live, best_pf_live, best_nt_live = fit_score, (net_is + net_oos), pf_is, (nt_is + nt_oos)
+                
                 bp = {
                     'b_team': dna_b_team, 's_team': dna_s_team, 'b_op': dna_b_op, 's_op': dna_s_op,
                     'macro': dna_macro, 'vol': dna_vol, 'hitbox': r_hitbox, 'therm_w': r_therm, 
-                    'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 'net': net, 'winrate': wr, 
-                    'pf': pf, 'nt': nt, 'reinv': invest_pct, 'ado': ado_actual, 
+                    'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 
+                    'net': best_net_live, 'net_is': net_is, 'net_oos': net_oos,
+                    'winrate': wr_is, 'pf': pf_is, 'nt': best_nt_live, 'reinv': invest_pct, 'ado': ado_actual, 
                     'w_rsi': r_w_rsi, 'w_z': r_w_z, 'w_adx': r_w_adx, 
                     'th_buy': r_th_b, 'th_sell': r_th_s, 'atr_tp': r_atr_tp, 'atr_sl': r_atr_sl
                 }
@@ -744,10 +761,10 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
 
         if deep_info:
             current_epoch_val = deep_info['current'] + (c+1)*(chunk_size); macro_pct = int((current_epoch_val / deep_info['total']) * 100)
-            title = f"🌌 DEEP FORGE: {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
+            title = f"🌌 DEEP FORGE (OOS): {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V260: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
+            title = f"GENESIS LAB V260 (OOS): {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
 
         html_str = f"""
         <style>
@@ -1351,7 +1368,7 @@ if len(tab_names) > 0:
         st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct, comision_pct, df_strat.index[0], is_calib_mode), language="pine")
 
     st.markdown("---")
-    st.info("🖱️ **TIP GRÁFICO:** Si las velas se ven aplanadas, haz **Doble Clic** dentro del gráfico.")
+    st.info("🖱️ **TIP GRÁFICO:** Si las velas se ven aplanadas, haz **Doble Clic** dentro del gráfico. Observa la línea naranja punteada que divide el entrenamiento y la validación.")
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
     fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio", increasing_line_color='cyan', decreasing_line_color='magenta'), row=1, col=1)
     fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['EMA_50'], mode='lines', name='Río Center (EMA 50)', line=dict(color='yellow', width=1, dash='dot')), row=1, col=1)
@@ -1368,6 +1385,14 @@ if len(tab_names) > 0:
         fig.add_trace(go.Scatter(x=loss['Fecha'], y=loss['Precio'], mode='markers', name='LOSS', marker=dict(symbol='triangle-down', color='#FF0000', size=14, line=dict(width=2, color='white'))), row=1, col=1)
 
     fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
+    
+    # 🔥 MARCADOR VISUAL OUT-OF-SAMPLE 🔥
+    split_idx = int(len(df_strat) * 0.70)
+    if split_idx < len(df_strat):
+        split_date = df_strat.index[split_idx]
+        fig.add_vline(x=split_date, line_width=2, line_dash="dash", line_color="orange", annotation_text="⬅️ Entrenamiento (IS) | Validación (OOS) ➡️", annotation_position="top left", row=1, col=1)
+        fig.add_vline(x=split_date, line_width=2, line_dash="dash", line_color="orange", row=2, col=1)
+
     y_min_force = df_strat['Low'].min() * 0.98
     y_max_force = df_strat['High'].max() * 1.02
     fig.update_xaxes(fixedrange=False)
