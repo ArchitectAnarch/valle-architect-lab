@@ -96,7 +96,7 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 hit_sl = l_arr[i] <= sl_p
                 hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
-                    # 🔥 EMULADOR INTRABARRA TV: Evalúa primero el color de la vela para decidir el orden 🔥
+                    # EMULADOR INTRABARRA TV
                     if c_arr[i] >= o_arr[i]:
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
                     else:
@@ -128,12 +128,12 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
-                base_p = c_arr[i] 
+                # 🔥 FIX DE ANCLAJE: Imitando el "strategy.position_avg_price" de Pine Script 🔥
                 if is_calib:
-                    tp_p = round(base_p * 1.002, 5); sl_p = round(base_p * 0.998, 5)
+                    tp_p = round(p_ent * 1.002, 5); sl_p = round(p_ent * 0.998, 5)
                 else:
-                    tp_p = round(base_p + (atr_arr[i] * atr_tp_mult), 5)
-                    sl_p = round(base_p - (atr_arr[i] * atr_sl_mult), 5)
+                    tp_p = round(p_ent + (atr_arr[i] * atr_tp_mult), 5)
+                    sl_p = round(p_ent - (atr_arr[i] * atr_sl_mult), 5)
                 en_pos = True; bars_in_trade = 0
                 
     pf = g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0)
@@ -171,7 +171,6 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
             if bars_in_trade >= 1:
                 hit_sl = l_arr[i] <= sl_p; hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
-                    # 🔥 EMULADOR INTRABARRA TV VISUAL 🔥
                     if c_arr[i] >= o_arr[i]:
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'SL'
                     else:
@@ -200,12 +199,12 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
                 comm_in = invest_amt * com_pct; total_comms += comm_in; pos_size = invest_amt - comm_in
                 
                 p_ent = o_arr[i+1] * slip_in
-                base_p = c_arr[i]
                 
+                # 🔥 FIX DE ANCLAJE VISUAL: Imitando a Pine Script 🔥
                 if is_calib:
-                    tp_p = np.round(base_p * 1.002, 5); sl_p = np.round(base_p * 0.998, 5)
+                    tp_p = np.round(p_ent * 1.002, 5); sl_p = np.round(p_ent * 0.998, 5)
                 else:
-                    tp_p = np.round(base_p + (atr_arr[i] * float(tp_arr[i])), 5); sl_p = np.round(base_p - (atr_arr[i] * float(sl_arr[i])), 5)
+                    tp_p = np.round(p_ent + (atr_arr[i] * float(tp_arr[i])), 5); sl_p = np.round(p_ent - (atr_arr[i] * float(sl_arr[i])), 5)
                 
                 en_pos = True; bars_in_trade = 0
                 registro_trades.append({'Fecha': f_arr[i+1], 'Tipo': 'ENTRY', 'Precio': p_ent, 'Ganancia_$': 0})
@@ -879,15 +878,21 @@ bool signal_buy = bar_index % 50 == 0
 
 var float tp_price = na
 var float sl_price = na
+bool just_entered = ta.change(strategy.position_size) > 0
 
 if signal_buy and strategy.position_size == 0 and window
-    tp_price := math.round(close * 1.002, 5)
-    sl_price := math.round(close * 0.998, 5)
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
-    strategy.exit("TP/SL_First", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
+
+if just_entered
+    tp_price := math.round(strategy.position_avg_price * 1.002, 5)
+    sl_price := math.round(strategy.position_avg_price * 0.998, 5)
 
 if strategy.position_size > 0
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
+
+if strategy.position_size == 0
+    tp_price := na
+    sl_price := na
 
 plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.belowbar, color=color.yellow, size=size.tiny)
 """
@@ -1153,18 +1158,27 @@ var float locked_atr = na
 var float tp_price = na
 var float sl_price = na
 
+bool just_entered = ta.change(strategy.position_size) > 0
+
 if signal_buy and strategy.position_size == 0 and window
-    locked_atr := atr
-    tp_price := math.round(close + (locked_atr * atr_tp_mult), 5)
-    sl_price := math.round(close - (locked_atr * atr_sl_mult), 5)
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
-    strategy.exit("TP/SL_First", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
+
+// 🔥 TRASPLANTE: El mismo anclaje de C++ llevado a Pine Script 🔥
+if just_entered
+    locked_atr := atr[1] 
+    tp_price := math.round(strategy.position_avg_price + (locked_atr * atr_tp_mult), 5)
+    sl_price := math.round(strategy.position_avg_price - (locked_atr * atr_sl_mult), 5)
 
 if strategy.position_size > 0
     strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
 
 if signal_sell and strategy.position_size > 0
     strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
+
+if strategy.position_size == 0
+    locked_atr := na
+    tp_price := na
+    sl_price := na
 
 plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.belowbar, color=color.aqua, size=size.tiny)
 plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
@@ -1392,7 +1406,6 @@ if len(tab_names) > 0:
 
     fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
     
-    # 🔥 MARCADOR VISUAL OUT-OF-SAMPLE (CORREGIDO) 🔥
     split_idx = int(len(df_strat) * 0.70)
     if split_idx < len(df_strat):
         split_date_str = df_strat.index[split_idx].strftime('%Y-%m-%d %H:%M:%S')
