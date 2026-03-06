@@ -486,8 +486,8 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         
         df['PA_Engulfing_Buy'] = (df['Vela_Verde']) & (df['Vela_Roja'].shift(1)) & (df['Close'] > df['Open'].shift(1)) & (df['Open'] < df['Close'].shift(1))
         df['PA_Engulfing_Sell'] = (df['Vela_Roja']) & (df['Vela_Verde'].shift(1)) & (df['Close'] < df['Open'].shift(1)) & (df['Open'] > df['Close'].shift(1))
-        df['PA_Pinbar_Buy'] = (df['lower_wick'] > df['body_size'] * 2.5) & (df['upper_wick'] < df['body_size'])
-        df['PA_Pinbar_Sell'] = (df['upper_wick'] > df['body_size'] * 2.5) & (df['lower_wick'] < df['body_size'])
+        df['PA_Pinbar_Buy'] = (df['lower_wick'] > body_size * 2.5) & (df['upper_wick'] < df['body_size'])
+        df['PA_Pinbar_Sell'] = (df['upper_wick'] > body_size * 2.5) & (df['lower_wick'] < df['body_size'])
         df['PA_3_Soldiers'] = (df['Vela_Verde']) & (df['Vela_Verde'].shift(1)) & (df['Vela_Verde'].shift(2)) & (df['Close'] > df['Close'].shift(1)) & (df['Close'].shift(1) > df['Close'].shift(2))
         df['PA_3_Crows'] = (df['Vela_Roja']) & (df['Vela_Roja'].shift(1)) & (df['Vela_Roja'].shift(2)) & (df['Close'] < df['Close'].shift(1)) & (df['Close'].shift(1) < df['Close'].shift(2))
 
@@ -609,6 +609,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Thermal_Buy'] = cond_therm_buy_bounce; s_dict['Thermal_Sell'] = cond_therm_sell_wall
     s_dict['Climax_Buy'] = cond_pink_whale_buy; s_dict['Climax_Sell'] = (a_rsi > 80)
     s_dict['Lock_Buy'] = cond_lock_buy_bounce; s_dict['Lock_Sell'] = cond_lock_sell_reject
+    # 🔥 CORRECCIÓN DEL TYPO AQUÍ 🔥
     s_dict['Defcon_Buy'] = cond_defcon_buy; s_dict['Defcon_Sell'] = cond_defcon_sell
     s_dict['Jugg_Buy'] = a_mb & (a_c > a_ema50) & (a_c_s1 < npshift(a_ema50,1)) & a_vv & ~a_fk; s_dict['Jugg_Sell'] = (a_c < a_ema50)
     s_dict['Trinity_Buy'] = a_mb & (a_rsi < 35) & a_vv & ~a_fk; s_dict['Trinity_Sell'] = (a_rsi > 75) | (a_c < a_ema200)
@@ -705,7 +706,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 for r in dna_s_team: votes += s_dict.get(r, default_f).astype(int)
                 f_sell_tactical = votes >= max(1, len(dna_s_team) // 2)
             
-            score_arr = (a_rsi * r_w_rsi) + (a_zscore * r_w_z) + (a_adx * w_adx)
+            # 🔥 CORRECCIÓN DEL TYPO AQUI (r_w_adx en lugar de w_adx) 🔥
+            score_arr = (a_rsi * r_w_rsi) + (a_zscore * r_w_z) + (a_adx * r_w_adx)
             f_buy_final = (f_buy_tactical | (score_arr > r_th_b)) & m_mask & v_mask
             f_sell_final = f_sell_tactical | (score_arr < r_th_s)
 
@@ -1254,7 +1256,7 @@ if deep_state and not deep_state.get('paused', False) and deep_state.get('curren
 # ==========================================
 st.title("🛡️ GENESIS LAB - The Omni-Brain")
 
-# 🔥 EL SALÓN DE LA FAMA AHORA ESTÁ SIEMPRE ABIERTO POR DEFECTO (expanded=True) 🔥
+# 🔥 EL SALÓN DE LA FAMA AHORA ESTÁ SIEMPRE ABIERTO POR DEFECTO 🔥
 with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA (Ordenado por Rentabilidad Neta)", expanded=True):
     leaderboard_data = []
     for s in estrategias:
