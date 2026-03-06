@@ -97,9 +97,8 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 hit_sl = l_arr[i] <= sl_p
                 hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
-                    dist_sl = abs(sl_p - o_arr[i])
-                    dist_tp = abs(tp_p - o_arr[i])
-                    if dist_sl <= dist_tp:
+                    # 🔥 FIX: Emulador Intrabarra de TradingView (Open->Low->High->Close) 🔥
+                    if c_arr[i] >= o_arr[i]:
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
                     else:
                         exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
@@ -173,8 +172,8 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
             if bars_in_trade >= 1:
                 hit_sl = l_arr[i] <= sl_p; hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
-                    dist_sl = abs(sl_p - o_arr[i]); dist_tp = abs(tp_p - o_arr[i])
-                    if dist_sl <= dist_tp:
+                    # 🔥 FIX: Emulador Intrabarra de TradingView (Visual) 🔥
+                    if c_arr[i] >= o_arr[i]:
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'SL'
                     else:
                         exec_p = tp_p if o_arr[i] < tp_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'TP'
@@ -403,6 +402,16 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms'); df.set_index('timestamp', inplace=True)
         df.index = df.index + timedelta(hours=offset); df = df[~df.index.duplicated(keep='first')]
         if len(df) < 50: return pd.DataFrame(), f"❌ Solo {len(df)} velas. Intenta ampliar el rango de fechas."
+        
+        # 🔥 FIX MASIVO DE SINCRONIZACIÓN: RELLENADOR DE BARRAS FANTASMAS (Para igualar Nro de Trades a TV) 🔥
+        freq_map = {'1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min', '1h': '1h', '4h': '4h', '1d': '1D'}
+        pd_freq = freq_map.get(iv_down, '15min')
+        df = df.resample(pd_freq).asfreq()
+        df['Close'] = df['Close'].ffill()
+        df['Open'] = df['Open'].fillna(df['Close'])
+        df['High'] = df['High'].fillna(df['Close'])
+        df['Low'] = df['Low'].fillna(df['Close'])
+        df['Volume'] = df['Volume'].fillna(0)
             
         a_h, a_l, a_c, a_o = df['High'].values, df['Low'].values, df['Close'].values, df['Open'].values
         
