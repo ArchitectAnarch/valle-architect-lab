@@ -1386,12 +1386,13 @@ if len(tab_names) > 0:
 
     fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['Total_Portfolio'], mode='lines', name='Equidad', line=dict(color='#00FF00', width=3)), row=2, col=1)
     
-    # 🔥 MARCADOR VISUAL OUT-OF-SAMPLE 🔥
+    # 🔥 MARCADOR VISUAL OUT-OF-SAMPLE (CORREGIDO) 🔥
     split_idx = int(len(df_strat) * 0.70)
     if split_idx < len(df_strat):
-        split_date = df_strat.index[split_idx]
-        fig.add_vline(x=split_date, line_width=2, line_dash="dash", line_color="orange", annotation_text="⬅️ Entrenamiento (IS) | Validación (OOS) ➡️", annotation_position="top left", row=1, col=1)
-        fig.add_vline(x=split_date, line_width=2, line_dash="dash", line_color="orange", row=2, col=1)
+        split_date_str = df_strat.index[split_idx].strftime('%Y-%m-%d %H:%M:%S')
+        fig.add_vline(x=split_date_str, line_width=2, line_dash="dash", line_color="orange", row=1, col=1)
+        fig.add_vline(x=split_date_str, line_width=2, line_dash="dash", line_color="orange", row=2, col=1)
+        fig.add_annotation(x=split_date_str, y=1.05, yref="paper", text="⬅️ IS | OOS ➡️", showarrow=False, font=dict(color="orange"), xanchor="center", row=1, col=1)
 
     y_min_force = df_strat['Low'].min() * 0.98
     y_max_force = df_strat['High'].max() * 1.02
