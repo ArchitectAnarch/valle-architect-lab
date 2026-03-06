@@ -37,7 +37,6 @@ if st.session_state.get('app_version') != APP_VERSION:
 # ==========================================
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     loaded_algos = []
-    # Escanea el directorio por archivos de ADN previamente forjados
     for file in os.listdir():
         if file.startswith("champ_") and file.endswith(".json"):
             loaded_algos.append(file.replace("champ_", "").replace(".json", ""))
@@ -82,7 +81,6 @@ def save_champion(s_id, bp):
         with open(f"champ_{s_id}.json", "w") as f: json.dump(vault, f)
     except: pass
 
-# Restaura el estado de optimización para los badges visuales
 for s_id in estrategias:
     v = get_safe_vault(s_id)
     if f'opt_status_{s_id}' not in st.session_state: 
@@ -152,7 +150,7 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 hit_sl = l_arr[i] <= sl_p
                 hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
-                    # EMULADOR INTRABARRA TV
+                    # 🔥 EMULADOR INTRABARRA TV Y CALIBRACIÓN 🔥
                     if c_arr[i] >= o_arr[i]:
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
                     else:
@@ -184,7 +182,7 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
-                # 🔥 FIX DE ANCLAJE: Imitando el "strategy.position_avg_price" + "atr[1]" de Pine Script 🔥
+                # 🔥 FIX DE ANCLAJE: Imitando el "strategy.position_avg_price" + "atr[1]" 🔥
                 if is_calib:
                     tp_p = round(p_ent * 1.002, 5); sl_p = round(p_ent * 0.998, 5)
                 else:
@@ -227,7 +225,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
             if bars_in_trade >= 1:
                 hit_sl = l_arr[i] <= sl_p; hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
-                    # 🔥 EMULADOR INTRABARRA TV VISUAL 🔥
+                    # 🔥 EMULADOR INTRABARRA TV VISUAL Y CALIBRACIÓN 🔥
                     if c_arr[i] >= o_arr[i]:
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'SL'
                     else:
@@ -257,7 +255,6 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
                 
                 p_ent = o_arr[i+1] * slip_in
                 
-                # 🔥 FIX DE ANCLAJE VISUAL: Imitando a Pine Script 🔥
                 if is_calib:
                     tp_p = np.round(p_ent * 1.002, 5); sl_p = np.round(p_ent * 0.998, 5)
                 else:
@@ -415,7 +412,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df.index = df.index + timedelta(hours=offset); df = df[~df.index.duplicated(keep='first')]
         if len(df) < 50: return pd.DataFrame(), f"❌ Solo {len(df)} velas. Intenta ampliar el rango de fechas."
         
-        # 🔥 FIX DE SINCRONIZACIÓN: RELLENADOR DE BARRAS FANTASMAS 🔥
+        # 🔥 FIX DE SINCRONIZACIÓN: RELLENADOR DE BARRAS FANTASMAS (Para igualar Nro de Trades a TV) 🔥
         freq_map = {'1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min', '1h': '1h', '4h': '4h', '1d': '1D'}
         pd_freq = freq_map.get(iv_down, '15min')
         df = df.resample(pd_freq).asfreq()
@@ -487,7 +484,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['PA_Engulfing_Buy'] = (df['Vela_Verde']) & (df['Vela_Roja'].shift(1)) & (df['Close'] > df['Open'].shift(1)) & (df['Open'] < df['Close'].shift(1))
         df['PA_Engulfing_Sell'] = (df['Vela_Roja']) & (df['Vela_Verde'].shift(1)) & (df['Close'] < df['Open'].shift(1)) & (df['Open'] > df['Close'].shift(1))
         
-        # 🔥 CORRECCIÓN DEL ERROR DE SINTAXIS (df['body_size']) 🔥
         df['PA_Pinbar_Buy'] = (df['lower_wick'] > df['body_size'] * 2.5) & (df['upper_wick'] < df['body_size'])
         df['PA_Pinbar_Sell'] = (df['upper_wick'] > df['body_size'] * 2.5) & (df['lower_wick'] < df['body_size'])
         
@@ -639,6 +635,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Calibrador'] = f_calib_buy
     return s_dict
 
+# 🔥 RECONECTANDO CABLES: SALVANDO SIEMPRE AL CAMPEÓN CON SINCRONIZACIÓN PERFECTA 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None, greed_factor=0.8):
     vault = get_safe_vault(s_id)
     best_fit_live = vault.get('fit', -float('inf'))
@@ -707,12 +704,11 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 for r in dna_s_team: votes += s_dict.get(r, default_f).astype(int)
                 f_sell_tactical = votes >= max(1, len(dna_s_team) // 2)
             
-            # 🔥 CORRECCIÓN APLICADA: r_w_adx 🔥
             score_arr = (a_rsi * r_w_rsi) + (a_zscore * r_w_z) + (a_adx * r_w_adx)
             f_buy_final = (f_buy_tactical | (score_arr > r_th_b)) & m_mask & v_mask
             f_sell_final = f_sell_tactical | (score_arr < r_th_s)
 
-            # 🛑 SIMULACIÓN IN-SAMPLE (Entrenamiento)
+            # 🛑 1. SIMULACIÓN IN-SAMPLE (Entrenamiento)
             net_is, pf_is, nt_is, mdd_is, wr_is = simular_core_rapido(
                 a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx], a_atr[:split_idx], 
                 f_buy_final[:split_idx], f_sell_final[:split_idx], 
@@ -745,7 +741,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             else:
                 fit_score = net_is - 1000.0 
 
-            # 🛑 SIMULACIÓN OUT-OF-SAMPLE
+            # 🛑 2. SIMULACIÓN OOS & PASADA GLOBAL PARA SINCRONIZAR UI
             if fit_score > best_fit_live:
                 net_oos, pf_oos, nt_oos, mdd_oos, wr_oos = simular_core_rapido(
                     a_h[split_idx:], a_l[split_idx:], a_c[split_idx:], a_o[split_idx:], a_atr[split_idx:], 
@@ -753,16 +749,20 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
                 )
                 
+                # 🔥 TERCERA PASADA: Simulamos todo el dataset para que el Net final coincida con los KPI Visuales del panel
+                net_tot, pf_tot, nt_tot, mdd_tot, wr_tot = simular_core_rapido(
+                    a_h, a_l, a_c, a_o, a_atr, f_buy_final, f_sell_final, 
+                    r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
+                )
+                
                 best_fit_live = fit_score
-                total_net = net_is + net_oos
-                total_nt = nt_is + nt_oos
                 
                 bp = {
                     'b_team': dna_b_team, 's_team': dna_s_team, 'b_op': dna_b_op, 's_op': dna_s_op,
                     'macro': dna_macro, 'vol': dna_vol, 'hitbox': r_hitbox, 'therm_w': r_therm, 
                     'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 
-                    'net': total_net, 'net_is': net_is, 'net_oos': net_oos,
-                    'winrate': wr_is, 'pf': pf_is, 'nt': total_nt, 'reinv': invest_pct, 'ado': ado_actual, 
+                    'net': net_tot, 'net_is': net_is, 'net_oos': net_oos,
+                    'winrate': wr_tot, 'pf': pf_tot, 'nt': nt_tot, 'reinv': invest_pct, 'ado': ado_actual, 
                     'w_rsi': r_w_rsi, 'w_z': r_w_z, 'w_adx': r_w_adx, 
                     'th_buy': r_th_b, 'th_sell': r_th_s, 'atr_tp': r_atr_tp, 'atr_sl': r_atr_sl
                 }
@@ -1223,6 +1223,9 @@ if st.session_state.get('run_global', False):
         ph_holograma.empty()
         st.sidebar.success("✅ ¡Incubación Genética Completada!")
         time.sleep(2)
+        # Obligar al UI a mostrar el último mutante en el carrusel al terminar
+        if st.session_state.get('ai_algos'):
+            st.session_state['selected_mutant'] = st.session_state['ai_algos'][-1]
         st.rerun()
 
 deep_state = st.session_state.get('deep_opt_state', {})
@@ -1246,6 +1249,7 @@ if deep_state and not deep_state.get('paused', False) and deep_state.get('curren
     
     if st.session_state['deep_opt_state']['current_epoch'] >= deep_state['target_epochs']:
         st.session_state['deep_opt_state']['paused'] = True
+        st.session_state['selected_mutant'] = s_id
         ph_holograma.empty()
         st.sidebar.success(f"🌌 ¡FORJA PROFUNDA COMPLETADA PARA {s_id}!")
         time.sleep(2)
