@@ -49,7 +49,6 @@ def npshift_bool(arr, num, fill_value=False):
     else: result[:] = arr
     return result
 
-# 🔥 V260: COMPILACIÓN C++ PARA RSI Y ATR AL VUELO 🔥
 @njit(fastmath=True)
 def rma_pine(arr, length):
     alpha = 1.0 / length; out = np.full_like(arr, np.nan)
@@ -97,7 +96,7 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 hit_sl = l_arr[i] <= sl_p
                 hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
-                    # 🔥 FIX: Emulador Intrabarra de TradingView (Open->Low->High->Close) 🔥
+                    # 🔥 EMULADOR INTRABARRA TV: Evalúa primero el color de la vela para decidir el orden 🔥
                     if c_arr[i] >= o_arr[i]:
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
                     else:
@@ -172,7 +171,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
             if bars_in_trade >= 1:
                 hit_sl = l_arr[i] <= sl_p; hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
-                    # 🔥 FIX: Emulador Intrabarra de TradingView (Visual) 🔥
+                    # 🔥 EMULADOR INTRABARRA TV VISUAL 🔥
                     if c_arr[i] >= o_arr[i]:
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'SL'
                     else:
@@ -403,7 +402,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df.index = df.index + timedelta(hours=offset); df = df[~df.index.duplicated(keep='first')]
         if len(df) < 50: return pd.DataFrame(), f"❌ Solo {len(df)} velas. Intenta ampliar el rango de fechas."
         
-        # 🔥 FIX MASIVO DE SINCRONIZACIÓN: RELLENADOR DE BARRAS FANTASMAS (Para igualar Nro de Trades a TV) 🔥
+        # 🔥 FIX DE SINCRONIZACIÓN: RELLENADOR DE BARRAS FANTASMAS (Para igualar Nro de Trades a TV) 🔥
         freq_map = {'1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min', '1h': '1h', '4h': '4h', '1d': '1D'}
         pd_freq = freq_map.get(iv_down, '15min')
         df = df.resample(pd_freq).asfreq()
@@ -415,7 +414,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
             
         a_h, a_l, a_c, a_o = df['High'].values, df['Low'].values, df['Close'].values, df['Open'].values
         
-        # 🔥 V260: CLON EXACTO EMA DE TRADINGVIEW C++ (Native Pandas adjust=False) 🔥
         df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
         df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
         df['Vol_MA_20'] = df['Volume'].rolling(window=20).mean()
@@ -625,10 +623,10 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Calibrador'] = f_calib_buy
     return s_dict
 
-# 🔥 INYECCIÓN DE LA ESCUDO MATEMÁTICO: IN-SAMPLE / OUT-OF-SAMPLE 🔥
+# 🔥 RECONECTANDO CABLES: SALVANDO SIEMPRE AL CAMPEÓN 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None, greed_factor=0.8):
     vault = get_safe_vault(s_id)
-    best_fit_live, best_net_live, best_pf_live, best_nt_live = vault.get('fit', -float('inf')), vault.get('net', -float('inf')), vault.get('pf', 0.0), vault.get('nt', 0)
+    best_fit_live = vault.get('fit', -float('inf'))
     
     iters = 3000 * epochs
     chunk_size = 1000
@@ -646,7 +644,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         if st.session_state.get('abort_opt', False): break
 
         for _ in range(chunk_size): 
-            # SISTEMA DE VOTACIÓN DEMOCRÁTICA (FRANCOTIRADOR)
             dna_b_team = random.sample(todas_las_armas_b, random.randint(3, 8))
             dna_s_team = random.sample(todas_las_armas_s, random.randint(3, 8))
             
@@ -700,21 +697,18 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             f_buy_final = (f_buy_tactical | (score_arr > r_th_b)) & m_mask & v_mask
             f_sell_final = f_sell_tactical | (score_arr < r_th_s)
 
-            # 🛑 1. SIMULACIÓN IN-SAMPLE (70% de datos)
+            # 🛑 1. SIMULACIÓN IN-SAMPLE (Entrenamiento)
             net_is, pf_is, nt_is, mdd_is, wr_is = simular_core_rapido(
                 a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx], a_atr[:split_idx], 
                 f_buy_final[:split_idx], f_sell_final[:split_idx], 
                 r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
             )
 
-            # ESCUDO ANTI-SCALPING & GREED FACTOR (Evaluado solo en In-Sample)
             ado_actual = nt_is / max(1, dias_entrenamiento)
             fit_score = -float('inf') 
             
             if nt_is >= 3 and net_is > 0: 
                 avg_trade_net_pct = (net_is / cap_ini) / nt_is * 100.0
-                
-                # Prohíbe a la IA hacer trades que en promedio ganen menos de 0.25% neto
                 if avg_trade_net_pct < 0.25:
                     fit_score = net_is - 5000.0 
                 else:
@@ -731,13 +725,13 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                         pf_mod = min(pf_is, 5.0)
                         dd_penalty = 1.0 if mdd_is <= 35.0 else (mdd_is / 35.0)
                         fit_score = (net_is * pf_mod) / dd_penalty
-                
             elif nt_is > 0:
                 fit_score = net_is - mdd_is - (abs(ado_actual - max(0.1, target_ado)) * 5)
             else:
                 fit_score = net_is - 1000.0 
 
-            # 🛑 2. SIMULACIÓN OUT-OF-SAMPLE (30% de datos - Solo si el IS rompe el récord)
+            # 🛑 2. SIMULACIÓN OUT-OF-SAMPLE (Evaluación)
+            # AHORA SÍ GUARDAMOS SIEMPRE AL CAMPEÓN (Incluso si falla el OOS, así lo ves y puedes descartarlo o mejorarlo)
             if fit_score > best_fit_live:
                 net_oos, pf_oos, nt_oos, mdd_oos, wr_oos = simular_core_rapido(
                     a_h[split_idx:], a_l[split_idx:], a_c[split_idx:], a_o[split_idx:], a_atr[split_idx:], 
@@ -745,35 +739,39 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
                 )
                 
-                # REGLA DE SUPERVIVENCIA: Si muere en OOS, se descarta por Overfitting
-                if net_oos < 0 and nt_oos > 0:
-                    continue
-                
-                # ¡Es un campeón robusto! Sumamos estadísticas de ambas fases.
-                best_fit_live, best_net_live, best_pf_live, best_nt_live = fit_score, (net_is + net_oos), pf_is, (nt_is + nt_oos)
+                best_fit_live = fit_score
+                # Guardamos las métricas combinadas (IS + OOS) para el registro total
+                total_net = net_is + net_oos
+                total_nt = nt_is + nt_oos
                 
                 bp = {
                     'b_team': dna_b_team, 's_team': dna_s_team, 'b_op': dna_b_op, 's_op': dna_s_op,
                     'macro': dna_macro, 'vol': dna_vol, 'hitbox': r_hitbox, 'therm_w': r_therm, 
                     'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 
-                    'net': best_net_live, 'net_is': net_is, 'net_oos': net_oos,
-                    'winrate': wr_is, 'pf': pf_is, 'nt': best_nt_live, 'reinv': invest_pct, 'ado': ado_actual, 
+                    'net': total_net, 'net_is': net_is, 'net_oos': net_oos,
+                    'winrate': wr_is, 'pf': pf_is, 'nt': total_nt, 'reinv': invest_pct, 'ado': ado_actual, 
                     'w_rsi': r_w_rsi, 'w_z': r_w_z, 'w_adx': r_w_adx, 
                     'th_buy': r_th_b, 'th_sell': r_th_s, 'atr_tp': r_atr_tp, 'atr_sl': r_atr_sl
                 }
-                save_champion(s_id, bp); st.session_state[f'opt_status_{s_id}'] = True
+                save_champion(s_id, bp)
+                st.session_state[f'opt_status_{s_id}'] = True
             
         global_start = deep_info.get('start_time', start_time) if deep_info else start_time
         total_elapsed_sec = time.time() - global_start
         h, rem = divmod(total_elapsed_sec, 3600); m, s = divmod(rem, 60)
         time_str = f"{int(h):02d}h:{int(m):02d}m:{int(s):02d}s"
+        
+        vault = get_safe_vault(s_id)
+        current_best_net = vault.get('net', 0)
+        current_best_nt = vault.get('nt', 0)
+        current_best_pf = vault.get('pf', 0)
 
         if deep_info:
             current_epoch_val = deep_info['current'] + (c+1)*(chunk_size); macro_pct = int((current_epoch_val / deep_info['total']) * 100)
-            title = f"🌌 DEEP FORGE (OOS): {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
+            title = f"🌌 DEEP FORGE: {s_id}"; subtitle = f"Épocas: {current_epoch_val:,} / {deep_info['total']:,} ({macro_pct}%)<br>⏱️ Tiempo: {time_str}"; color = "#9932CC"
         else:
             pct_done = int(((c + 1) / chunks) * 100); combos = (c + 1) * chunk_size
-            title = f"GENESIS LAB V260 (OOS): {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
+            title = f"GENESIS LAB V260: {s_id}"; subtitle = f"Progreso: {pct_done}% | ADN Probados: {combos:,}<br>⏱️ Tiempo Ejecución: {time_str}"; color = "#00FFFF"
 
         html_str = f"""
         <style>
@@ -785,8 +783,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             <div class="rocket">🧬</div>
             <div style="color: {color}; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">{title}</div>
             <div style="color: white; font-size: 1.3rem;">{subtitle}</div>
-            <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Récord Global: ${best_net_live:.2f}</div>
-            <div style="color: cyan; font-size: 1.0rem;">Trades: {best_nt_live} | Win Rate: {best_pf_live:.2f}x PF</div>
+            <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Récord Global: ${current_best_net:.2f}</div>
+            <div style="color: cyan; font-size: 1.0rem;">Trades Totales: {current_best_nt} | Win Rate: {current_best_pf:.2f}x PF</div>
         </div>
         """
         ph_holograma.markdown(html_str, unsafe_allow_html=True)
@@ -1131,7 +1129,6 @@ stoch_ob_sell = (stoch_k > 80) and (stoch_k < stoch_d)
     m_cond = "macro_bull" if vault.get('macro') == "Bull Only" else "not macro_bull" if vault.get('macro') == "Bear Only" else "high_vol" if vault.get('macro') == "Organic_Vol" else "squeeze_on" if vault.get('macro') == "Organic_Squeeze" else "trinity_safe" if vault.get('macro') == "Organic_Safe" else "gaussian_clean" if vault.get('macro') == "Organic_Gaussian_Clean" else "true"
     v_cond = "(adx >= adx_trend)" if vault.get('vol') == "Trend" else "(adx < adx_trend)" if vault.get('vol') == "Range" else "pump_memory" if vault.get('vol') == "Organic_Pump" else "dump_memory" if vault.get('vol') == "Organic_Dump" else "gaussian_clean" if vault.get('vol') == "Organic_Gaussian_Clean" else "true"
 
-    # Construcción dinámica de la condición Pine Script (And, Or, Vote)
     b_cond = build_pine_cond(vault.get('b_team', []), vault.get('b_op', '&'))
     s_cond = build_pine_cond(vault.get('s_team', []), vault.get('s_op', '&'))
     
