@@ -23,17 +23,26 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Brain Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-# 🔥 V260 + V320 CORE: OMNI-BRAIN (NORMALIZADO PARA VELAS TRADICIONALES) 🔥
-APP_VERSION = 'V320_CORE'
+# 🔥 V320 CORE: OMNI-BRAIN (PROTOCOL DE PURGA NUCLEAR ACTIVADO) 🔥
+APP_VERSION = 'V320_CORE_V2'
 if st.session_state.get('app_version') != APP_VERSION:
     st.cache_data.clear()
+    
+    # ☢️ EXTERMINIO DE ADN ANTIGUO (JSON) PARA EVITAR CORRUPCIÓN GENÉTICA ☢️
+    for file in os.listdir():
+        if file.startswith("champ_") and file.endswith(".json"):
+            try:
+                os.remove(file)
+            except Exception:
+                pass
+                
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.session_state['app_version'] = APP_VERSION
     st.rerun()
 
 # ==========================================
-# 💾 RECUPERACIÓN DE MEMORIA (HALL OF FAME NATIVO)
+# 💾 RECUPERACIÓN DE MEMORIA (NUEVO ADN)
 # ==========================================
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     loaded_algos = []
@@ -53,10 +62,10 @@ def get_default_dna():
     return {
         'b_team': random.sample(['Q_Pink_Whale_Buy', 'Q_Nuclear_Buy', 'Q_Defcon_Buy'], 2), 
         's_team': random.sample(['Q_Therm_Panic_Sell', 'Q_Nuclear_Sell', 'Q_Defcon_Sell'], 2), 
-        'b_op': '&', 's_op': '&', 'macro': "All-Weather", 'vol': "All-Weather", 'hitbox': 1.5, 'therm_w': 4.0, 
+        'b_op': '|', 's_op': '|', 'hitbox': 1.5, 'therm_w': 4.0, 
         'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 
-        'net': 0.0, 'net_is': 0.0, 'net_oos': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0, 'w_rsi': 0.0, 'w_z': 0.0, 'w_adx': 0.0, 
-        'th_buy': 99.0, 'th_sell': -99.0, 'atr_tp': 2.0, 'atr_sl': 1.0
+        'net': 0.0, 'net_is': 0.0, 'net_oos': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0, 
+        'tp_pct': 3.0, 'sl_pct': 1.5
     }
 
 def get_safe_vault(s_id):
@@ -121,7 +130,7 @@ def rma_pine(arr, length):
 # ==========================================
 @njit(fastmath=True)
 def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr, 
-    f_buy, f_sell, atr_tp_mult, atr_sl_mult, cap_ini, com_pct, invest_pct, slippage_pct, is_calib):
+    f_buy, f_sell, tp_pct_val, sl_pct_val, cap_ini, com_pct, invest_pct, slippage_pct, is_calib):
     
     cap_act = cap_ini; en_pos = False; pending_dyn_exit = False
     p_ent = 0.0; pos_size = 0.0; invest_amt = 0.0; g_profit = 0.0; g_loss = 0.0
@@ -185,8 +194,8 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 if is_calib:
                     tp_p = round(p_ent * 1.002, 5); sl_p = round(p_ent * 0.998, 5)
                 else:
-                    tp_p = round(p_ent + (atr_arr[i] * atr_tp_mult), 5)
-                    sl_p = round(p_ent - (atr_arr[i] * atr_sl_mult), 5)
+                    tp_p = round(p_ent * (1 + (tp_pct_val / 100.0)), 5)
+                    sl_p = round(p_ent * (1 - (sl_pct_val / 100.0)), 5)
                 en_pos = True; bars_in_trade = 0
                 
     pf = g_profit / g_loss if g_loss > 0 else (1.0 if g_profit > 0 else 0.0)
@@ -199,7 +208,7 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
 def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_calib=False):
     registro_trades = []; n = len(df_sim); curva = np.full(n, cap_ini, dtype=float)
     h_arr, l_arr, c_arr, o_arr = df_sim['High'].values, df_sim['Low'].values, df_sim['Close'].values, df_sim['Open'].values
-    atr_arr, buy_arr, sell_arr = df_sim['ATR'].values, df_sim['Signal_Buy'].values, df_sim['Signal_Sell'].values
+    buy_arr, sell_arr = df_sim['Signal_Buy'].values, df_sim['Signal_Sell'].values
     tp_arr, sl_arr, f_arr = df_sim['Active_TP'].values, df_sim['Active_SL'].values, df_sim.index
     
     en_pos = False; pending_dyn_exit = False
@@ -256,7 +265,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
                 if is_calib:
                     tp_p = np.round(p_ent * 1.002, 5); sl_p = np.round(p_ent * 0.998, 5)
                 else:
-                    tp_p = np.round(p_ent + (atr_arr[i] * float(tp_arr[i])), 5); sl_p = np.round(p_ent - (atr_arr[i] * float(sl_arr[i])), 5)
+                    tp_p = np.round(p_ent * (1 + (tp_arr[i] / 100.0)), 5); sl_p = np.round(p_ent * (1 - (sl_arr[i] / 100.0)), 5)
                 
                 en_pos = True; bars_in_trade = 0
                 registro_trades.append({'Fecha': f_arr[i+1], 'Tipo': 'ENTRY', 'Precio': p_ent, 'Ganancia_$': 0})
@@ -305,7 +314,7 @@ def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
     return fig
 
 # ==========================================
-# 🧬 3. DICCIONARIOS Y GUARDIANES (INTEGRACIÓN V320)
+# 🧬 3. DICCIONARIOS Y GUARDIANES (INTEGRACIÓN V320 TRADICIONAL)
 # ==========================================
 todas_las_armas_b = [
     'Q_Pink_Whale_Buy', 'Q_Nuclear_Buy', 'Q_Climax_Buy', 'Q_Early_Buy',
@@ -446,7 +455,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         # EMA & Volume
         df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
         df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
-        df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean() # Flow center
+        df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean() 
         df['Vol_MA_100'] = df['Volume'].rolling(window=100).mean()
         df['RVol'] = df['Volume'] / np.where(df['Vol_MA_100'] == 0, 1, df['Vol_MA_100'])
         
@@ -488,7 +497,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['Z_Score'] = np.where(dev == 0, 0, (df['Close'] - df['Basis']) / dev)
         df['RSI_BB_Basis'] = df['RSI'].rolling(14).mean(); df['RSI_BB_Dev'] = df['RSI'].rolling(14).std(ddof=0) * 2.0
         
-        # WICK & BODY (Normalized for Traditional Candles)
+        # WICK & BODY (Normalizado para Velas Tradicionales)
         df['Vela_Verde'], df['Vela_Roja'] = df['Close'] > df['Open'], df['Close'] < df['Open']
         df['body_size'] = np.abs(df['Close'] - df['Open']) 
         df['upper_wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
@@ -1355,7 +1364,7 @@ if len(tab_names) > 0:
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
     fig.add_trace(go.Candlestick(x=df_strat.index, open=df_strat['Open'], high=df_strat['High'], low=df_strat['Low'], close=df_strat['Close'], name="Precio", increasing_line_color='cyan', decreasing_line_color='magenta'), row=1, col=1)
     
-    # Dibujando el Squeeze Channel y la Media de Gravedad
+    # Dibujando el Squeeze Channel
     fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['BBU'], mode='lines', name='Squeeze Top (BBU)', line=dict(color='rgba(128,128,128,0.5)', width=1)), row=1, col=1)
     fig.add_trace(go.Scatter(x=df_strat.index, y=df_strat['BBL'], mode='lines', name='Squeeze Bot (BBL)', line=dict(color='rgba(128,128,128,0.5)', width=1)), row=1, col=1)
 
