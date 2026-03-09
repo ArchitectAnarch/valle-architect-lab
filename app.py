@@ -24,7 +24,7 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Brain", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-APP_VERSION = 'V320_OMNI_CLEAN'
+APP_VERSION = 'V320_OMNI_STABLE_V1'
 
 # ==========================================
 # ☢️ PROTOCOLO DE PURGA Y RECUPERACIÓN
@@ -32,6 +32,7 @@ APP_VERSION = 'V320_OMNI_CLEAN'
 def purga_nuclear():
     st.cache_data.clear()
     st.session_state.clear()
+    # Exterminio de archivos JSON de versiones antiguas en disco
     for f in glob.glob("champ_*.json"):
         try: os.remove(f)
         except: pass
@@ -498,7 +499,6 @@ a_wt1_s1, a_wt2_s1 = npshift(a_wt1, 1, 0.0), npshift(a_wt2, 1, 0.0)
 def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     n_len = len(a_c); s_dict = {}
     
-    # MATRIX 3D GRAVITY
     a_tsup = np.maximum(a_pl100_l, np.maximum(a_pl300_l, a_pl800_l))
     a_tres = np.minimum(a_ph100_l, np.minimum(a_ph300_l, a_ph800_l))
     a_dsup = np.where(a_c == 0, 0, np.abs(a_c - a_tsup) / a_c * 100)
@@ -516,7 +516,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     rsi_cross_up = (a_rsi > a_rsi_ma) & (a_rsi_s1 <= npshift(a_rsi_ma, 1))
     rsi_cross_dn = (a_rsi < a_rsi_ma) & (a_rsi_s1 >= npshift(a_rsi_ma, 1))
     
-    # 🌊 QUANTUM RIVER (V320 VECTOR)
     rsi_vel = a_rsi - a_rsi_s1
     river_w = a_atr * (1.2 + (np.abs(rsi_vel) / 10.0))
     river_top = a_ema20 + (river_w * 0.5)
@@ -530,7 +529,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     river_entry_up = (a_c > river_bot) & (a_c_s1 <= npshift(river_bot, 1))
     river_entry_dn = (a_c < river_top) & (a_c_s1 >= npshift(river_top, 1))
     
-    # 🚀 DEFCON
     defcon_level = np.full(n_len, 5)
     m4 = neon_up | neon_dn; defcon_level[m4] = 4
     m3 = m4 & (a_bb_delta > 0); defcon_level[m3] = 3
@@ -544,7 +542,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     cond_therm_buy_vacuum = (ceil_w <= 3) & neon_up & ~is_abyss
     cond_therm_sell_panic = is_abyss & a_vr
 
-    # 🎯 TARGET LOCK (V320 Strict: < 3x ATR)
     tol = a_atr * 0.5
     is_grav_sup = (a_c - a_tsup) < (a_atr * 3.0)
     is_grav_res = (a_tres - a_c) < (a_atr * 3.0)
@@ -554,7 +551,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     cond_lock_sell_reject = is_grav_res & (a_h >= a_tres - tol) & (a_c < a_tres) & a_vr
     cond_lock_sell_breakd = is_grav_sup & (a_c < a_tsup) & (a_c_s1 >= npshift(a_tsup, 1)) & a_vr
 
-    # 🐋 WHALE & PUMP/DUMP MEMORY
     flash_vol = (a_rvol > whale_f * 0.8) & (a_bs > a_atr * 0.3)
     whale_buy, whale_sell = flash_vol & a_vv, flash_vol & a_vr
     whale_memory = whale_buy | npshift_bool(whale_buy, 1) | npshift_bool(whale_buy, 2) | whale_sell | npshift_bool(whale_sell, 1) | npshift_bool(whale_sell, 2)
@@ -565,7 +561,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     pre_dump = ((a_l < a_bbl) | (rsi_vel < -5)) & flash_vol & a_vr
     dump_memory = pre_dump | npshift_bool(pre_dump, 1) | npshift_bool(pre_dump, 2)
 
-    # 🌸 VELA ROSA (SCORING V320)
     retro_peak_buy = (a_rsi < 30) & (a_c < a_bbl)
     retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
@@ -590,7 +585,10 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     is_magenta_sell = (sell_score >= 70) | retro_peak_sell
     cond_pink_whale_buy = is_magenta_buy & is_whale_icon
 
-    # 💥 CLIMAX / NUCLEAR (Wick Rejection Dynamic)
+    wt_cross_up = (a_wt1 > a_wt2) & (a_wt1_s1 <= a_wt2_s1)
+    wt_cross_dn = (a_wt1 < a_wt2) & (a_wt1_s1 >= a_wt2_s1)
+    wt_oversold, wt_overbought = a_wt1 < -60, a_wt1 > 60
+
     dyn_wick_req = np.where(a_adx < 40, 0.4, 0.5)
     final_wick_req = np.where(is_struct_sup | is_struct_res | is_grav_sup | is_grav_res, 0.15, dyn_wick_req)
     final_vol_req = np.where(is_struct_sup | is_struct_res | is_grav_sup | is_grav_res, 1.2, np.where(a_adx < 40, 1.5, 1.8))
@@ -602,14 +600,9 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     climax_buy = is_magenta_buy & (wick_rej_buy | vol_stop_chk)
     climax_sell = is_magenta_sell & (wick_rej_sell | vol_stop_chk)
     
-    wt_cross_up = (a_wt1 > a_wt2) & (a_wt1_s1 <= a_wt2_s1)
-    wt_cross_dn = (a_wt1 < a_wt2) & (a_wt1_s1 >= a_wt2_s1)
-    wt_oversold, wt_overbought = a_wt1 < -60, a_wt1 > 60
-    
     nuclear_buy = climax_buy & (wt_oversold | wt_cross_up)
     nuclear_sell = climax_sell & (wt_overbought | wt_cross_dn)
-
-    # MAPEO FINAL AL DICCIONARIO V320
+    
     s_dict['Q_Pink_Whale_Buy'] = cond_pink_whale_buy
     s_dict['Q_Nuclear_Buy'] = nuclear_buy
     s_dict['Q_Climax_Buy'] = climax_buy
@@ -687,7 +680,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             f_sell_tactical = np.zeros(n_len, dtype=bool)
             for r in dna_s_team: f_sell_tactical |= s_dict.get(r, default_f)
             
-            # 🛑 1. SIMULACIÓN IN-SAMPLE (Usando nueva sintaxis)
+            # 🛑 1. SIMULACIÓN IN-SAMPLE
             net_is, pf_is, nt_is, mdd_is, wr_is = simular_core_rapido(
                 a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx],
                 f_buy_tactical[:split_idx], f_sell_tactical[:split_idx], 
@@ -813,10 +806,13 @@ def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0); v_adx = vault.get('adx_th', 25.0); v_wf = vault.get('whale_f', 2.5)
     v_tp = vault.get('tp_pct', 3.0); v_sl = vault.get('sl_pct', 1.5)
     
+    b_cond = build_pine_cond(vault.get('b_team', []))
+    s_cond = build_pine_cond(vault.get('s_team', []))
+    
     json_buy = f'{{"passphrase": "ASTRONAUTA", "action": "buy", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {buy_pct}, "order_type": "limit", "limit_price": {{{{close}}}}, "slippage_pct": 1.0, "side": "🟢 COMPRA LIMIT"}}'
     json_sell = f'{{"passphrase": "ASTRONAUTA", "action": "sell", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {sell_pct}, "order_type": "market", "side": "🔴 VENTA MARKET"}}'
 
-    ps_base = f"""//@version=5
+    pine_code = f"""//@version=5
 strategy("{s_id} OMNI-BRAIN [{sym} {tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value={buy_pct}, commission_type=strategy.commission.percent, commission_value={com_pct*100}, process_orders_on_close=true)
 
 wt_enter_long = input.text_area(defval='{json_buy}', title="🟢 Webhook de Compra (Limit)")
@@ -1058,7 +1054,7 @@ plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=locatio
 plot(strategy.position_size > 0 ? locked_tp : na, color=color.green, style=plot.style_linebr, linewidth=2)
 plot(strategy.position_size > 0 ? locked_sl : na, color=color.red, style=plot.style_linebr, linewidth=2)
 """
-    return ps_base
+    return pine_code
 
 # ==========================================
 # 🛑 EJECUCIÓN GLOBAL
