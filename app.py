@@ -24,7 +24,7 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Predator Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-APP_VERSION = 'V320_PREDATOR_STRICT'
+APP_VERSION = 'V320_PREDATOR_RESTORED'
 
 # ==========================================
 # ☢️ PROTOCOLO DE PURGA Y RECUPERACIÓN
@@ -57,7 +57,7 @@ todas_las_armas_b = [
     'Q_Defcon_Buy', 'Q_Neon_Up', 'Q_Therm_Bounce', 'Q_Therm_Vacuum',
     'Q_Lock_Bounce', 'Q_Lock_Break', 'Q_Rebound_Buy',
     'Q_River_Push_Buy', 'Q_River_Entry_Buy',
-    'Q_Div_Bull_Buy', 'Q_WT_Oversold_Buy', # <-- GENES PREDICTIVOS PUROS
+    'Q_Div_Bull_Buy', 'Q_WT_Oversold_Buy',
     'PA_Engulfing_Buy', 'PA_Pinbar_Buy'
 ]
 todas_las_armas_s = [
@@ -65,7 +65,7 @@ todas_las_armas_s = [
     'Q_Defcon_Sell', 'Q_Neon_Dn', 'Q_Therm_Wall_Sell', 'Q_Therm_Panic_Sell',
     'Q_Lock_Reject', 'Q_Lock_Breakd', 'Q_Pullback_Sell',
     'Q_River_Push_Sell', 'Q_River_Entry_Sell',
-    'Q_Div_Bear_Sell', 'Q_WT_Overbought_Sell', # <-- GENES DE AGOTAMIENTO PUROS
+    'Q_Div_Bear_Sell', 'Q_WT_Overbought_Sell',
     'PA_Engulfing_Sell', 'PA_Pinbar_Sell'
 ]
 
@@ -93,7 +93,7 @@ def get_default_dna():
         'b_op': '&', 's_op': '|', 'hitbox': 1.5, 'therm_w': 4.0, 
         'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 
         'net': 0.0, 'net_is': 0.0, 'net_oos': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0, 
-        'tp_pct': 25.0, 'sl_pct': 10.0 # Redes de seguridad altísimas por defecto
+        'tp_pct': 25.0, 'sl_pct': 10.0
     }
 
 def get_safe_vault(s_id):
@@ -164,7 +164,6 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, f_buy, f_sell, tp_pct_val, s
     for i in range(len(h_arr)):
         cierra = False
         
-        # 1. CIERRE DINÁMICO (LA IA PREDICE EL TECHO)
         if pending_dyn_exit and en_pos:
             exit_price = o_arr[i] * slip_out
             ret = (exit_price - p_ent) / p_ent
@@ -178,7 +177,6 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, f_buy, f_sell, tp_pct_val, s
             
         pending_dyn_exit = False 
         
-        # 2. REDES DE SEGURIDAD (TP EXTREMO O SL)
         if en_pos and not cierra:
             bars_in_trade += 1
             if bars_in_trade >= 1: 
@@ -203,13 +201,11 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, f_buy, f_sell, tp_pct_val, s
                     if cap_act > peak: peak = cap_act
                     if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
 
-        # SEÑAL DE VENTA DINÁMICA DE LA IA
         if en_pos and not cierra and not is_calib:
             if f_sell[i]: pending_dyn_exit = True
                 
         if cap_act <= 0: break
         
-        # ENTRADA
         if not en_pos and not pending_dyn_exit and i+1 < len(h_arr):
             if f_buy[i]:
                 invest_amt = cap_act * (invest_pct / 100.0) if invest_pct > 0 else cap_ini
@@ -592,7 +588,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     pre_dump = ((a_l < a_bbl) | (rsi_vel < -5)) & flash_vol & a_vr
     dump_memory = pre_dump | npshift_bool(pre_dump, 1) | npshift_bool(pre_dump, 2)
 
-    # 🌸 VELA ROSA (SCORING V320) & DIVERGENCIAS (SNIPER MODE)
+    # 🌸 VELA ROSA & DIVERGENCIAS (SNIPER MODE)
     retro_peak_buy = (a_rsi < 30) & (a_c < a_bbl)
     retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
@@ -1197,7 +1193,7 @@ plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=locatio
 plot(strategy.position_size > 0 ? locked_tp : na, color=color.green, style=plot.style_linebr, linewidth=2)
 plot(strategy.position_size > 0 ? locked_sl : na, color=color.red, style=plot.style_linebr, linewidth=2)
 """
-    return ps_base
+    return ps_base + ps_indicators + ps_logic + ps_exec
 
 # ==========================================
 # 🛑 EJECUCIÓN GLOBAL
@@ -1206,7 +1202,7 @@ if st.session_state.get('run_global', False):
     time.sleep(0.1) 
     if len(st.session_state['global_queue']) > 0:
         s_id = st.session_state['global_queue'].pop(0)
-        ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid cyan; border-radius: 10px;'><h2 style='color:cyan;'>⚙️ Forjando Evolución Estricta: {s_id}...</h2><h4 style='color:lime;'>Quedan {len(st.session_state['global_queue'])} mutantes en incubación.</h4></div>", unsafe_allow_html=True)
+        ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid cyan; border-radius: 10px;'><h2 style='color:cyan;'>⚙️ Forjando Evolución: {s_id}...</h2><h4 style='color:lime;'>Quedan {len(st.session_state['global_queue'])} mutantes en incubación.</h4></div>", unsafe_allow_html=True)
         time.sleep(0.1)
         
         v = get_safe_vault(s_id)
@@ -1219,7 +1215,7 @@ if st.session_state.get('run_global', False):
     else:
         st.session_state['run_global'] = False
         ph_holograma.empty()
-        st.sidebar.success("✅ ¡Evolución Estricta Completada!")
+        st.sidebar.success("✅ ¡Evolución Genética Completada!")
         time.sleep(2)
         if st.session_state.get('ai_algos'):
             st.session_state['selected_mutant'] = st.session_state['ai_algos'][-1]
@@ -1256,7 +1252,7 @@ if deep_state and not deep_state.get('paused', False) and deep_state.get('curren
 # ==========================================
 # 🛑 UI Y RENDERIZADO
 # ==========================================
-st.title("🛡️ OMNI-BRAIN LAB (V320 PREDATOR)")
+st.title("🛡️ OMNI-BRAIN LAB (V320 Evolución)")
 
 with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA", expanded=True):
     leaderboard_data = []
@@ -1290,7 +1286,7 @@ if len(tab_names) > 0:
     selected_tab_name = st.selectbox("Selecciona un Espécimen:", tab_names, index=default_idx)
     s_id = tab_id_map[selected_tab_name]
     is_opt = st.session_state.get(f'opt_status_{s_id}', False)
-    opt_badge = "<span style='color: lime;'>✅ ADN PREDATOR OPTIMIZADO</span>" if is_opt else "<span style='color: gray;'>➖ ADN VIRGEN</span>"
+    opt_badge = "<span style='color: lime;'>✅ ADN OMNI OPTIMIZADO</span>" if is_opt else "<span style='color: gray;'>➖ ADN VIRGEN</span>"
     
     vault = get_safe_vault(s_id) 
 
@@ -1301,7 +1297,7 @@ if len(tab_names) > 0:
         st.markdown(f"**🔴 Escuadrón de Venta (V320 Core):** {', '.join(vault.get('s_team', []))} (Táctica: {vault.get('s_op', '&')})")
         st.markdown(f"**📡 Densidad Radial:** Hitbox: `{vault.get('hitbox',0):.2f}%` | Muro Térmico: `{vault.get('therm_w',0)}`")
         st.markdown(f"**🐋 Anomalías:** Fuerza ADX: `{vault.get('adx_th',0):.1f}` | Factor Ballena: `{vault.get('whale_f',0):.1f}x`")
-        st.markdown(f"**🎯 Redes de Seguridad Macro:** TP: `{vault.get('tp_pct',0):.2f}%` | SL: `{vault.get('sl_pct',0):.2f}%`")
+        st.markdown(f"**🎯 Target Asimétrico:** TP Limit: `{vault.get('tp_pct',0):.2f}%` | SL Market: `{vault.get('sl_pct',0):.2f}%`")
 
     c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
     ado_val_ui = float(vault.get('ado', 4.0)) if vault.get('ado') is not None else 4.0
@@ -1383,7 +1379,7 @@ if len(tab_names) > 0:
         fig_mc.update_layout(template='plotly_dark', height=300, margin=dict(l=10, r=10, t=30, b=10), showlegend=False)
         c_mc2.plotly_chart(fig_mc, use_container_width=True)
 
-    with st.expander("📝 CÓDIGO PINE SCRIPT PREDATOR (LISTO PARA TRADINGVIEW)", expanded=False):
+    with st.expander("📝 CÓDIGO PINE SCRIPT OMNI-BRAIN (LISTO PARA TRADINGVIEW)", expanded=False):
         st.info("Traducción Matemática Exacta. Pégalo en TradingView.")
         st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct, comision_pct, df_strat.index[0], is_calib_mode), language="pine")
 
