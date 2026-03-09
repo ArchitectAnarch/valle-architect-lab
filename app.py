@@ -21,10 +21,10 @@ except ImportError:
         if len(args) == 1 and callable(args[0]): return args[0]
         return decorator
 
-st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Brain", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="ROCKET PROTOCOL | Predator Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-APP_VERSION = 'V320_OMNI_CALIB_RESTORED'
+APP_VERSION = 'V320_PREDATOR_STRICT'
 
 # ==========================================
 # ☢️ PROTOCOLO DE PURGA Y RECUPERACIÓN
@@ -32,7 +32,6 @@ APP_VERSION = 'V320_OMNI_CALIB_RESTORED'
 def purga_nuclear():
     st.cache_data.clear()
     st.session_state.clear()
-    # Exterminio de archivos JSON de versiones antiguas en disco
     for f in glob.glob("champ_*.json"):
         try: os.remove(f)
         except: pass
@@ -44,54 +43,57 @@ if st.session_state.get('app_version') != APP_VERSION:
 
 if 'ai_algos' not in st.session_state or len(st.session_state['ai_algos']) == 0: 
     loaded_algos = [f.replace("champ_", "").replace(".json", "") for f in glob.glob("champ_*.json")]
-    if not loaded_algos: loaded_algos = [f"OMNI_GENESIS_{random.randint(100, 999)}"]
+    if not loaded_algos: loaded_algos = [f"PREDATOR_{random.randint(100, 999)}"]
     st.session_state['ai_algos'] = list(dict.fromkeys(loaded_algos))
 
 estrategias = st.session_state['ai_algos']
 tab_id_map = {f"🤖 {ai_id}": ai_id for ai_id in estrategias}
 
 # ==========================================
-# 🧬 DICCIONARIOS GENÉTICOS AUDITADOS (V320 REAL)
+# 🧬 DICCIONARIOS GENÉTICOS (FRANCOTIRADOR V320)
 # ==========================================
 todas_las_armas_b = [
     'Q_Pink_Whale_Buy', 'Q_Nuclear_Buy', 'Q_Climax_Buy', 'Q_Early_Buy',
     'Q_Defcon_Buy', 'Q_Neon_Up', 'Q_Therm_Bounce', 'Q_Therm_Vacuum',
     'Q_Lock_Bounce', 'Q_Lock_Break', 'Q_Rebound_Buy',
     'Q_River_Push_Buy', 'Q_River_Entry_Buy',
-    'PA_Engulfing_Buy', 'PA_Pinbar_Buy', 'PA_3_Soldiers_Buy'
+    'Q_Div_Bull_Buy', 'Q_WT_Oversold_Buy', # <-- GENES PREDICTIVOS PUROS
+    'PA_Engulfing_Buy', 'PA_Pinbar_Buy'
 ]
 todas_las_armas_s = [
     'Q_Nuclear_Sell', 'Q_Climax_Sell', 'Q_Early_Sell',
     'Q_Defcon_Sell', 'Q_Neon_Dn', 'Q_Therm_Wall_Sell', 'Q_Therm_Panic_Sell',
     'Q_Lock_Reject', 'Q_Lock_Breakd', 'Q_Pullback_Sell',
     'Q_River_Push_Sell', 'Q_River_Entry_Sell',
-    'PA_Engulfing_Sell', 'PA_Pinbar_Sell', 'PA_3_Crows_Sell'
+    'Q_Div_Bear_Sell', 'Q_WT_Overbought_Sell', # <-- GENES DE AGOTAMIENTO PUROS
+    'PA_Engulfing_Sell', 'PA_Pinbar_Sell'
 ]
 
 pine_map = {
     'Q_Pink_Whale_Buy': 'cond_pink_whale_buy', 'Q_Nuclear_Buy': 'nuclear_buy', 'Q_Climax_Buy': 'climax_buy', 'Q_Early_Buy': 'climax_buy_early',
-    'Q_Defcon_Buy': 'cond_defcon_buy', 'Q_Neon_Up': 'neon_break_up', 'Q_Therm_Bounce': 'cond_therm_buy_bounce', 'Q_Therm_Vacuum': 'cond_therm_buy_vacuum',
+    'Q_Defcon_Buy': 'cond_defcon_buy', 'Q_Neon_Up': 'neon_up_trig', 'Q_Therm_Bounce': 'cond_therm_buy_bounce', 'Q_Therm_Vacuum': 'cond_therm_buy_vacuum',
     'Q_Lock_Bounce': 'cond_lock_buy_bounce', 'Q_Lock_Break': 'cond_lock_buy_break', 'Q_Rebound_Buy': 'normal_reb_buy',
     'Q_River_Push_Buy': 'river_push_up', 'Q_River_Entry_Buy': 'river_entry_up',
+    'Q_Div_Bull_Buy': 'div_bull_trig', 'Q_WT_Oversold_Buy': 'wt_oversold_trig',
     
     'Q_Nuclear_Sell': 'nuclear_sell', 'Q_Climax_Sell': 'climax_sell', 'Q_Early_Sell': 'climax_sell_early',
-    'Q_Defcon_Sell': 'cond_defcon_sell', 'Q_Neon_Dn': 'neon_break_dn', 'Q_Therm_Wall_Sell': 'cond_therm_sell_wall', 'Q_Therm_Panic_Sell': 'cond_therm_sell_panic',
+    'Q_Defcon_Sell': 'cond_defcon_sell', 'Q_Neon_Dn': 'neon_dn_trig', 'Q_Therm_Wall_Sell': 'cond_therm_sell_wall', 'Q_Therm_Panic_Sell': 'cond_therm_sell_panic',
     'Q_Lock_Reject': 'cond_lock_sell_reject', 'Q_Lock_Breakd': 'cond_lock_sell_breakd', 'Q_Pullback_Sell': 'normal_reb_sell',
     'Q_River_Push_Sell': 'river_push_dn', 'Q_River_Entry_Sell': 'river_entry_dn',
+    'Q_Div_Bear_Sell': 'div_bear_trig', 'Q_WT_Overbought_Sell': 'wt_overbought_trig',
 
     'PA_Engulfing_Buy': 'pa_engulfing_buy', 'PA_Engulfing_Sell': 'pa_engulfing_sell', 
-    'PA_Pinbar_Buy': 'pa_pinbar_buy', 'PA_Pinbar_Sell': 'pa_pinbar_sell', 
-    'PA_3_Soldiers_Buy': 'pa_3_soldiers', 'PA_3_Crows_Sell': 'pa_3_crows'
+    'PA_Pinbar_Buy': 'pa_pinbar_buy', 'PA_Pinbar_Sell': 'pa_pinbar_sell'
 }
 
 def get_default_dna():
     return {
-        'b_team': random.sample(['Q_Pink_Whale_Buy', 'Q_River_Push_Buy', 'Q_Defcon_Buy'], 2), 
-        's_team': random.sample(['Q_Therm_Panic_Sell', 'Q_River_Push_Sell', 'Q_Defcon_Sell'], 2), 
-        'b_op': '|', 's_op': '|', 'hitbox': 1.5, 'therm_w': 4.0, 
+        'b_team': random.sample(todas_las_armas_b, 2), 
+        's_team': random.sample(todas_las_armas_s, 2), 
+        'b_op': '&', 's_op': '|', 'hitbox': 1.5, 'therm_w': 4.0, 
         'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 
         'net': 0.0, 'net_is': 0.0, 'net_oos': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0, 
-        'tp_pct': 3.0, 'sl_pct': 1.5
+        'tp_pct': 25.0, 'sl_pct': 10.0 # Redes de seguridad altísimas por defecto
     }
 
 def get_safe_vault(s_id):
@@ -161,6 +163,8 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, f_buy, f_sell, tp_pct_val, s
     
     for i in range(len(h_arr)):
         cierra = False
+        
+        # 1. CIERRE DINÁMICO (LA IA PREDICE EL TECHO)
         if pending_dyn_exit and en_pos:
             exit_price = o_arr[i] * slip_out
             ret = (exit_price - p_ent) / p_ent
@@ -173,6 +177,8 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, f_buy, f_sell, tp_pct_val, s
             if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
             
         pending_dyn_exit = False 
+        
+        # 2. REDES DE SEGURIDAD (TP EXTREMO O SL)
         if en_pos and not cierra:
             bars_in_trade += 1
             if bars_in_trade >= 1: 
@@ -197,11 +203,13 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, f_buy, f_sell, tp_pct_val, s
                     if cap_act > peak: peak = cap_act
                     if peak > 0: max_dd = max(max_dd, (peak - cap_act) / peak * 100.0)
 
+        # SEÑAL DE VENTA DINÁMICA DE LA IA
         if en_pos and not cierra and not is_calib:
             if f_sell[i]: pending_dyn_exit = True
                 
         if cap_act <= 0: break
         
+        # ENTRADA
         if not en_pos and not pending_dyn_exit and i+1 < len(h_arr):
             if f_buy[i]:
                 invest_amt = cap_act * (invest_pct / 100.0) if invest_pct > 0 else cap_ini
@@ -330,7 +338,7 @@ def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
 # ==========================================
 # 🌍 SIDEBAR UI & DATOS
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 OMNI-BRAIN LAB</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 PREDATOR LAB V320</h2>", unsafe_allow_html=True)
 
 with st.sidebar.expander("⚙️ SISTEMA (EMERGENCIAS)", expanded=True):
     if st.button("🛑 ABORTAR RUN GLOBAL", use_container_width=True, key="btn_abort"):
@@ -354,8 +362,8 @@ with st.sidebar.expander("🌍 DATOS Y EXCHANGE", expanded=False):
 
 with st.sidebar.expander("💼 CAPITAL Y COMISIONES", expanded=False):
     capital_inicial = st.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
-    comision_pct = st.number_input("Comisión (%)", value=0.15, step=0.05) / 100.0 
-    is_calib_mode = st.checkbox("🛠️ MODO CALIBRACIÓN TV", value=False) # ¡RESTORED!
+    comision_pct = st.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0 
+    is_calib_mode = st.checkbox("🛠️ MODO CALIBRACIÓN TV", value=False) 
 
 with st.sidebar.expander("🤖 INTELIGENCIA Y FORJA", expanded=False):
     greed_factor = st.slider("Nivel de Avaricia", 0.0, 1.0, 0.8, 0.1)
@@ -365,7 +373,7 @@ with st.sidebar.expander("🤖 INTELIGENCIA Y FORJA", expanded=False):
     if st.button(f"🧠 DEEP MINE GLOBAL", type="primary", use_container_width=True, key="btn_global"):
         st.session_state['global_queue'] = target_strats.copy(); st.session_state['abort_opt'] = False; st.session_state['run_global'] = True; st.rerun()
     if st.button("🤖 CREAR NUEVO MUTANTE IA", type="secondary", use_container_width=True, key="btn_mutant"):
-        new_id = f"OMNI_{int(time.time())}_{random.randint(10, 99)}"
+        new_id = f"PREDATOR_{int(time.time())}_{random.randint(10, 99)}"
         if new_id not in st.session_state['ai_algos']:
             st.session_state['ai_algos'].append(new_id); get_safe_vault(new_id); st.session_state['global_queue'] = [new_id]; st.session_state['run_global'] = True; st.rerun()
 
@@ -378,7 +386,7 @@ dp = st.session_state['data_params']
 # ==========================================
 # 🛑 EXTRACCIÓN Y WARM-UP (V320 MATH)
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Matrix V320...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Matrix V320 Predator...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
@@ -532,14 +540,17 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     rsi_cross_up = (a_rsi > a_rsi_ma) & (a_rsi_s1 <= npshift(a_rsi_ma, 1))
     rsi_cross_dn = (a_rsi < a_rsi_ma) & (a_rsi_s1 >= npshift(a_rsi_ma, 1))
     
-    # 🌊 QUANTUM RIVER (V320 VECTOR)
+    # 🌊 QUANTUM RIVER
     rsi_vel = a_rsi - a_rsi_s1
     river_w = a_atr * (1.2 + (np.abs(rsi_vel) / 10.0))
     river_top = a_ema20 + (river_w * 0.5)
     river_bot = a_ema20 - (river_w * 0.5)
     
     neon_up = a_sqz_on & (a_c >= a_bbu * 0.999) & a_vv
+    neon_up_trig = neon_up & ~npshift_bool(neon_up, 1) # Sniper Trigger
+    
     neon_dn = a_sqz_on & (a_c <= a_bbl * 1.001) & a_vr
+    neon_dn_trig = neon_dn & ~npshift_bool(neon_dn, 1) # Sniper Trigger
     
     river_push_up = (a_l <= river_top) & (a_c > river_top) & ~neon_dn
     river_push_dn = (a_h >= river_bot) & (a_c < river_bot) & ~neon_up
@@ -553,14 +564,14 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     m2 = m3 & (a_bb_delta > a_bb_delta_avg) & (a_adx > adx_th); defcon_level[m2] = 2
     m1 = m2 & (a_bb_delta > a_bb_delta_avg * 1.5) & (a_adx > adx_th + 5) & (a_rvol > 1.2); defcon_level[m1] = 1
 
-    cond_defcon_buy = (defcon_level <= 2) & neon_up
-    cond_defcon_sell = (defcon_level <= 2) & neon_dn
+    cond_defcon_buy = (defcon_level <= 2) & neon_up_trig
+    cond_defcon_sell = (defcon_level <= 2) & neon_dn_trig
     cond_therm_buy_bounce = (floor_w >= therm_w) & rsi_cross_up & ~is_hard_wall
     cond_therm_sell_wall = (ceil_w >= therm_w) & rsi_cross_dn
-    cond_therm_buy_vacuum = (ceil_w <= 3) & neon_up & ~is_abyss
+    cond_therm_buy_vacuum = (ceil_w <= 3) & neon_up_trig & ~is_abyss
     cond_therm_sell_panic = is_abyss & a_vr
 
-    # 🎯 TARGET LOCK (V320 Strict: < 3x ATR)
+    # 🎯 TARGET LOCK
     tol = a_atr * 0.5
     is_grav_sup = (a_c - a_tsup) < (a_atr * 3.0)
     is_grav_res = (a_tres - a_c) < (a_atr * 3.0)
@@ -581,7 +592,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     pre_dump = ((a_l < a_bbl) | (rsi_vel < -5)) & flash_vol & a_vr
     dump_memory = pre_dump | npshift_bool(pre_dump, 1) | npshift_bool(pre_dump, 2)
 
-    # 🌸 VELA ROSA (SCORING V320)
+    # 🌸 VELA ROSA (SCORING V320) & DIVERGENCIAS (SNIPER MODE)
     retro_peak_buy = (a_rsi < 30) & (a_c < a_bbl)
     retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
@@ -589,6 +600,9 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     
     div_bull = (a_l_s1 < a_l_s5) & (a_rsi_s1 > a_rsi_s5) & (a_rsi < 35)
     div_bear = (a_h_s1 > a_h_s5) & (a_rsi_s1 < a_rsi_s5) & (a_rsi > 65)
+    
+    div_bull_trig = div_bull & ~npshift_bool(div_bull, 1)
+    div_bear_trig = div_bear & ~npshift_bool(div_bear, 1)
 
     buy_score = np.zeros(n_len)
     base_mask_b = retro_peak_buy | k_break_up | (is_struct_sup & rsi_cross_up) | div_bull
@@ -609,6 +623,9 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     wt_cross_up = (a_wt1 > a_wt2) & (a_wt1_s1 <= a_wt2_s1)
     wt_cross_dn = (a_wt1 < a_wt2) & (a_wt1_s1 >= a_wt2_s1)
     wt_oversold, wt_overbought = a_wt1 < -60, a_wt1 > 60
+    
+    wt_oversold_trig = wt_oversold & wt_cross_up
+    wt_overbought_trig = wt_overbought & wt_cross_dn
 
     dyn_wick_req = np.where(a_adx < 40, 0.4, 0.5)
     final_wick_req = np.where(is_struct_sup | is_struct_res | is_grav_sup | is_grav_res, 0.15, dyn_wick_req)
@@ -624,12 +641,13 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     nuclear_buy = climax_buy & (wt_oversold | wt_cross_up)
     nuclear_sell = climax_sell & (wt_overbought | wt_cross_dn)
     
+    # MAPEO AL DICCIONARIO
     s_dict['Q_Pink_Whale_Buy'] = cond_pink_whale_buy
     s_dict['Q_Nuclear_Buy'] = nuclear_buy
     s_dict['Q_Climax_Buy'] = climax_buy
     s_dict['Q_Early_Buy'] = is_magenta_buy
     s_dict['Q_Defcon_Buy'] = cond_defcon_buy
-    s_dict['Q_Neon_Up'] = neon_up
+    s_dict['Q_Neon_Up'] = neon_up_trig
     s_dict['Q_Therm_Bounce'] = cond_therm_buy_bounce
     s_dict['Q_Therm_Vacuum'] = cond_therm_buy_vacuum
     s_dict['Q_Lock_Bounce'] = cond_lock_buy_bounce
@@ -637,12 +655,14 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Q_Rebound_Buy'] = rsi_cross_up & ~is_magenta_buy
     s_dict['Q_River_Push_Buy'] = river_push_up
     s_dict['Q_River_Entry_Buy'] = river_entry_up
+    s_dict['Q_Div_Bull_Buy'] = div_bull_trig
+    s_dict['Q_WT_Oversold_Buy'] = wt_oversold_trig
     
     s_dict['Q_Nuclear_Sell'] = nuclear_sell
     s_dict['Q_Climax_Sell'] = climax_sell
     s_dict['Q_Early_Sell'] = is_magenta_sell
     s_dict['Q_Defcon_Sell'] = cond_defcon_sell
-    s_dict['Q_Neon_Dn'] = neon_dn
+    s_dict['Q_Neon_Dn'] = neon_dn_trig
     s_dict['Q_Therm_Wall_Sell'] = cond_therm_sell_wall
     s_dict['Q_Therm_Panic_Sell'] = cond_therm_sell_panic
     s_dict['Q_Lock_Reject'] = cond_lock_sell_reject
@@ -650,6 +670,8 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Q_Pullback_Sell'] = rsi_cross_dn & ~is_magenta_sell
     s_dict['Q_River_Push_Sell'] = river_push_dn
     s_dict['Q_River_Entry_Sell'] = river_entry_dn
+    s_dict['Q_Div_Bear_Sell'] = div_bear_trig
+    s_dict['Q_WT_Overbought_Sell'] = wt_overbought_trig
 
     s_dict['PA_Engulfing_Buy'] = a_pa_eng_b; s_dict['PA_Engulfing_Sell'] = a_pa_eng_s
     s_dict['PA_Pinbar_Buy'] = a_pa_pin_b; s_dict['PA_Pinbar_Sell'] = a_pa_pin_s
@@ -661,7 +683,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Calibrador'] = f_calib_buy
     return s_dict
 
-# 🔥 EL MOTOR EVOLUTIVO GENÉTICO REAL (MUTACIÓN MARKOV CON ANTI-COLISIÓN) 🔥
+# 🔥 EL MOTOR EVOLUTIVO GENÉTICO REAL (MUTACIÓN MARKOV CON ANTI-COLISIÓN Y AND/OR) 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None, greed_factor=0.8):
     vault = get_safe_vault(s_id)
     best_fit_live = vault.get('fit', -float('inf'))
@@ -675,6 +697,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
     split_idx = int(n_len * 0.70) 
     dias_entrenamiento = max(1, dias_reales * 0.70)
     default_f = np.zeros(n_len, dtype=bool)
+    ones_mask = np.ones(n_len, dtype=bool)
     is_calib = st.session_state.get('is_calib_mode', False)
 
     for c in range(chunks):
@@ -685,20 +708,28 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             if best_fit_live != -float('inf') and random.random() < 0.75:
                 dna_b_team = vault.get('b_team', []).copy()
                 dna_s_team = vault.get('s_team', []).copy()
+                dna_b_op = vault.get('b_op', '|')
+                dna_s_op = vault.get('s_op', '|')
                 
+                # Mutar Operador (Restricción de tamaño para evitar que el AND nunca se cumpla)
+                if random.random() < 0.1: dna_b_op = random.choice(['&', '|'])
+                if random.random() < 0.1: dna_s_op = random.choice(['&', '|'])
+
                 if random.random() < 0.3 and len(todas_las_armas_b) > 0:
                     if random.random() < 0.5 and len(dna_b_team) > 1:
                         dna_b_team.pop(random.randint(0, len(dna_b_team)-1))
                     else:
-                        new_gene = random.choice(todas_las_armas_b)
-                        if new_gene not in dna_b_team: dna_b_team.append(new_gene)
+                        if len(dna_b_team) < (2 if dna_b_op == '&' else 4): # Si es AND, max 2 para que sea posible matemáticamente.
+                            new_gene = random.choice(todas_las_armas_b)
+                            if new_gene not in dna_b_team: dna_b_team.append(new_gene)
                 
                 if random.random() < 0.3 and len(todas_las_armas_s) > 0:
                     if random.random() < 0.5 and len(dna_s_team) > 1:
                         dna_s_team.pop(random.randint(0, len(dna_s_team)-1))
                     else:
-                        new_gene = random.choice(todas_las_armas_s)
-                        if new_gene not in dna_s_team: dna_s_team.append(new_gene)
+                        if len(dna_s_team) < (2 if dna_s_op == '&' else 4):
+                            new_gene = random.choice(todas_las_armas_s)
+                            if new_gene not in dna_s_team: dna_s_team.append(new_gene)
                 
                 r_hitbox = vault.get('hitbox', 1.5)
                 r_therm = vault.get('therm_w', 4.0)
@@ -707,30 +738,38 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 if random.random() < 0.15: r_hitbox = random.choice([1.0, 1.5, 2.0, 2.5])
                 if random.random() < 0.15: r_adx = random.choice([20.0, 25.0, 30.0])
                 
-                r_tp_pct = round(max(0.5, vault.get('tp_pct', 3.0) + random.uniform(-0.5, 0.5)), 2)
-                r_sl_pct = round(max(0.5, vault.get('sl_pct', 1.5) + random.uniform(-0.2, 0.2)), 2)
+                # TP Y SL AMPLIOS PARA FORZAR CIERRES DINÁMICOS
+                r_tp_pct = round(max(5.0, vault.get('tp_pct', 25.0) + random.uniform(-1.0, 1.0)), 2)
+                r_sl_pct = round(max(2.0, vault.get('sl_pct', 10.0) + random.uniform(-0.5, 0.5)), 2)
                 
             else:
                 # Generación Aleatoria
-                dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 3))
-                dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 3))
+                dna_b_op = random.choice(['&', '|'])
+                dna_s_op = random.choice(['&', '|'])
+                dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 2 if dna_b_op == '&' else 3))
+                dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 2 if dna_s_op == '&' else 3))
                 r_hitbox = random.choice([1.0, 1.5, 2.0, 2.5])
                 r_therm = random.choice([3.0, 4.0, 5.0, 6.0])
                 r_adx = random.choice([20.0, 25.0, 30.0])
                 r_whale = random.choice([2.0, 2.5, 3.0])
-                r_tp_pct = round(random.uniform(1.0, 8.0), 2)
-                r_sl_pct = round(random.uniform(0.5, 3.0), 2)
+                r_tp_pct = round(random.uniform(10.0, 40.0), 2) # TP Muy lejano
+                r_sl_pct = round(random.uniform(5.0, 15.0), 2)  # SL Muy lejano
             
-            dna_b_op = '|'
-            dna_s_op = '|'
-
             s_dict = calcular_señales_numpy(r_hitbox, r_therm, r_adx, r_whale)
             
-            f_buy_tactical = np.zeros(n_len, dtype=bool)
-            for r in dna_b_team: f_buy_tactical |= s_dict.get(r, default_f)
+            if dna_b_op == '&':
+                f_buy_tactical = np.ones(n_len, dtype=bool)
+                for r in dna_b_team: f_buy_tactical &= s_dict.get(r, ones_mask)
+            else:
+                f_buy_tactical = np.zeros(n_len, dtype=bool)
+                for r in dna_b_team: f_buy_tactical |= s_dict.get(r, default_f)
 
-            f_sell_tactical = np.zeros(n_len, dtype=bool)
-            for r in dna_s_team: f_sell_tactical |= s_dict.get(r, default_f)
+            if dna_s_op == '&':
+                f_sell_tactical = np.ones(n_len, dtype=bool)
+                for r in dna_s_team: f_sell_tactical &= s_dict.get(r, ones_mask)
+            else:
+                f_sell_tactical = np.zeros(n_len, dtype=bool)
+                for r in dna_s_team: f_sell_tactical |= s_dict.get(r, default_f)
 
             # 🔥 FILTRO ANTI-COLISIÓN (Castigo a la IA si compra y vende al mismo tiempo) 🔥
             overlap = f_buy_tactical & f_sell_tactical
@@ -777,7 +816,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0, is_calib
                 )
                 
-                if net_oos > 0 or is_calib: # Solo guardamos si en el OOS también sobrevive
+                if net_oos > 0 or is_calib: 
                     net_tot, pf_tot, nt_tot, mdd_tot, wr_tot = simular_core_rapido(
                         a_h, a_l, a_c, a_o, f_buy_tactical, f_sell_tactical, 
                         r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0, is_calib
@@ -840,34 +879,45 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
     sl_pct_val = vault.get('sl_pct', 1.5)
     f_tp, f_sl = np.full(n_len, tp_pct_val), np.full(n_len, sl_pct_val)
     default_f = np.zeros(n_len, dtype=bool)
+    ones_mask = np.ones(n_len, dtype=bool)
 
     if is_calib:
         f_buy = s_dict['Calibrador']
         f_sell = default_f
     else:
-        dna_b_team = vault.get('b_team', ['Q_Pink_Whale_Buy'])
-        f_buy = np.zeros(n_len, dtype=bool)
-        for r in dna_b_team: f_buy |= s_dict.get(r, default_f)
+        dna_b_op = vault.get('b_op', '|')
+        dna_s_op = vault.get('s_op', '|')
+        
+        if dna_b_op == '&':
+            f_buy = np.ones(n_len, dtype=bool)
+            for r in vault.get('b_team', []): f_buy &= s_dict.get(r, ones_mask)
+        else:
+            f_buy = np.zeros(n_len, dtype=bool)
+            for r in vault.get('b_team', []): f_buy |= s_dict.get(r, default_f)
 
-        dna_s_team = vault.get('s_team', ['Q_Therm_Panic_Sell'])
-        f_sell = np.zeros(n_len, dtype=bool)
-        for r in dna_s_team: f_sell |= s_dict.get(r, default_f)
+        if dna_s_op == '&':
+            f_sell = np.ones(n_len, dtype=bool)
+            for r in vault.get('s_team', []): f_sell &= s_dict.get(r, ones_mask)
+        else:
+            f_sell = np.zeros(n_len, dtype=bool)
+            for r in vault.get('s_team', []): f_sell |= s_dict.get(r, default_f)
 
     df_strat = df_global.copy()
     df_strat['Signal_Buy'], df_strat['Signal_Sell'], df_strat['Active_TP'], df_strat['Active_SL'] = f_buy, f_sell, f_tp, f_sl
     eq_curve, divs, cap_act, t_log, en_pos, total_comms = simular_visual(df_strat, cap_ini, float(vault.get('reinv', 20.0)), com_pct, 0.0, is_calib)
     return df_strat, eq_curve, t_log, total_comms
 
-def build_pine_cond(team):
+def build_pine_cond(team, operator):
     if not team: return "false"
-    return " or ".join([pine_map.get(x, 'false') for x in team])
+    joiner = " and " if operator == '&' else " or "
+    return joiner.join([pine_map.get(x, 'false') for x in team])
 
 def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj, is_calib=False):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0); v_adx = vault.get('adx_th', 25.0); v_wf = vault.get('whale_f', 2.5)
     v_tp = vault.get('tp_pct', 3.0); v_sl = vault.get('sl_pct', 1.5)
     
-    b_cond = build_pine_cond(vault.get('b_team', []))
-    s_cond = build_pine_cond(vault.get('s_team', []))
+    b_cond = build_pine_cond(vault.get('b_team', []), vault.get('b_op', '|'))
+    s_cond = build_pine_cond(vault.get('s_team', []), vault.get('s_op', '|'))
     
     json_buy = f'{{"passphrase": "ASTRONAUTA", "action": "buy", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {buy_pct}, "order_type": "limit", "limit_price": {{{{close}}}}, "slippage_pct": 1.0, "side": "🟢 COMPRA LIMIT"}}'
     json_sell = f'{{"passphrase": "ASTRONAUTA", "action": "sell", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {sell_pct}, "order_type": "market", "side": "🔴 VENTA MARKET"}}'
@@ -981,17 +1031,19 @@ is_hard_wall = ceil_w >= therm_wall
 is_struct_sup = floor_w > 0
 is_struct_res = ceil_w > 0
 
-neon_break_up = squeeze_on and (close >= bbu * 0.999) and vela_verde
-neon_break_dn = squeeze_on and (close <= bbl * 1.001) and vela_roja
+neon_up = squeeze_on and (close >= bbu * 0.999) and vela_verde
+neon_up_trig = neon_up and not nz(neon_up[1])
+neon_dn = squeeze_on and (close <= bbl * 1.001) and vela_roja
+neon_dn_trig = neon_dn and not nz(neon_dn[1])
 
-river_push_up = (low <= river_top) and (close > river_top) and not neon_break_dn
-river_push_dn = (high >= river_bot) and (close < river_bot) and not neon_break_up
+river_push_up = (low <= river_top) and (close > river_top) and not neon_dn
+river_push_dn = (high >= river_bot) and (close < river_bot) and not neon_up
 river_entry_up = (close > river_bot) and (nz(close[1]) <= nz(river_bot[1]))
 river_entry_dn = (close < river_top) and (nz(close[1]) >= nz(river_top[1]))
 
 [di_plus, di_minus, adx] = ta.dmi(14, 14)
 defcon_level = 5
-if neon_break_up or neon_break_dn
+if neon_up or neon_dn
     defcon_level := 4
     if bb_delta > 0
         defcon_level := 3
@@ -1000,11 +1052,11 @@ if neon_break_up or neon_break_dn
             if bb_delta > (bb_delta_avg * 1.5) and adx > (adx_trend + 5) and rvol > 1.2
                 defcon_level := 1
 
-cond_defcon_buy = defcon_level <= 2 and neon_break_up
-cond_defcon_sell = defcon_level <= 2 and neon_break_dn
+cond_defcon_buy = defcon_level <= 2 and neon_up_trig
+cond_defcon_sell = defcon_level <= 2 and neon_dn_trig
 cond_therm_buy_bounce = (floor_w >= therm_wall) and rsi_cross_up and not is_hard_wall
 cond_therm_sell_wall = (ceil_w >= therm_wall) and rsi_cross_dn
-cond_therm_buy_vacuum = (ceil_w <= 3) and neon_break_up and not is_abyss
+cond_therm_buy_vacuum = (ceil_w <= 3) and neon_up_trig and not is_abyss
 cond_therm_sell_panic = is_abyss and vela_roja
 
 tol = atr_val * 0.5
@@ -1039,6 +1091,8 @@ k_break_dn = (rsi_v < (rsi_bb_basis - rsi_bb_dev)) and (nz(rsi_v[1]) >= (nz(rsi_
 
 div_bull = nz(low[1]) < nz(low[5]) and nz(rsi_v[1]) > nz(rsi_v[5]) and (rsi_v < 35)
 div_bear = nz(high[1]) > nz(high[5]) and nz(rsi_v[1]) < nz(rsi_v[5]) and (rsi_v > 65)
+div_bull_trig = div_bull and not nz(div_bull[1])
+div_bear_trig = div_bear and not nz(div_bear[1])
 
 macro_bull = close >= ta.ema(close, 200)
 
@@ -1077,6 +1131,8 @@ wt_cross_up = (wt1 > wt2) and (nz(wt1[1]) <= nz(wt2[1]))
 wt_cross_dn = (wt1 < wt2) and (nz(wt1[1]) >= nz(wt2[1]))
 wt_oversold = wt1 < -60
 wt_overbought = wt1 > 60
+wt_oversold_trig = wt_oversold and wt_cross_up
+wt_overbought_trig = wt_overbought and wt_cross_dn
 
 dyn_wick_req = adx < 40 ? 0.4 : 0.5 
 matrix_active = is_struct_sup or is_struct_res or is_grav_sup or is_grav_res
@@ -1141,7 +1197,7 @@ plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=locatio
 plot(strategy.position_size > 0 ? locked_tp : na, color=color.green, style=plot.style_linebr, linewidth=2)
 plot(strategy.position_size > 0 ? locked_sl : na, color=color.red, style=plot.style_linebr, linewidth=2)
 """
-    return ps_base + ps_indicators
+    return ps_base
 
 # ==========================================
 # 🛑 EJECUCIÓN GLOBAL
@@ -1150,7 +1206,7 @@ if st.session_state.get('run_global', False):
     time.sleep(0.1) 
     if len(st.session_state['global_queue']) > 0:
         s_id = st.session_state['global_queue'].pop(0)
-        ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid cyan; border-radius: 10px;'><h2 style='color:cyan;'>⚙️ Forjando Evolución: {s_id}...</h2><h4 style='color:lime;'>Quedan {len(st.session_state['global_queue'])} mutantes en incubación.</h4></div>", unsafe_allow_html=True)
+        ph_holograma.markdown(f"<div style='text-align:center; padding: 20px; background: rgba(0,0,0,0.8); border: 2px solid cyan; border-radius: 10px;'><h2 style='color:cyan;'>⚙️ Forjando Evolución Estricta: {s_id}...</h2><h4 style='color:lime;'>Quedan {len(st.session_state['global_queue'])} mutantes en incubación.</h4></div>", unsafe_allow_html=True)
         time.sleep(0.1)
         
         v = get_safe_vault(s_id)
@@ -1163,7 +1219,7 @@ if st.session_state.get('run_global', False):
     else:
         st.session_state['run_global'] = False
         ph_holograma.empty()
-        st.sidebar.success("✅ ¡Evolución Genética Completada!")
+        st.sidebar.success("✅ ¡Evolución Estricta Completada!")
         time.sleep(2)
         if st.session_state.get('ai_algos'):
             st.session_state['selected_mutant'] = st.session_state['ai_algos'][-1]
@@ -1200,7 +1256,7 @@ if deep_state and not deep_state.get('paused', False) and deep_state.get('curren
 # ==========================================
 # 🛑 UI Y RENDERIZADO
 # ==========================================
-st.title("🛡️ OMNI-BRAIN LAB (V320 Evolución)")
+st.title("🛡️ OMNI-BRAIN LAB (V320 PREDATOR)")
 
 with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA", expanded=True):
     leaderboard_data = []
@@ -1234,18 +1290,18 @@ if len(tab_names) > 0:
     selected_tab_name = st.selectbox("Selecciona un Espécimen:", tab_names, index=default_idx)
     s_id = tab_id_map[selected_tab_name]
     is_opt = st.session_state.get(f'opt_status_{s_id}', False)
-    opt_badge = "<span style='color: lime;'>✅ ADN OMNI OPTIMIZADO</span>" if is_opt else "<span style='color: gray;'>➖ ADN VIRGEN</span>"
+    opt_badge = "<span style='color: lime;'>✅ ADN PREDATOR OPTIMIZADO</span>" if is_opt else "<span style='color: gray;'>➖ ADN VIRGEN</span>"
     
     vault = get_safe_vault(s_id) 
 
     st.markdown(f"### {selected_tab_name} {opt_badge}", unsafe_allow_html=True)
 
     with st.expander("🧬 VER ADN DEL MUTANTE Y ARMAS TÁCTICAS", expanded=True):
-        st.markdown(f"**🟢 Escuadrón de Compra (V320 Core):** {', '.join(vault.get('b_team', []))} (Táctica: OR)")
-        st.markdown(f"**🔴 Escuadrón de Venta (V320 Core):** {', '.join(vault.get('s_team', []))} (Táctica: OR)")
+        st.markdown(f"**🟢 Escuadrón de Compra (V320 Core):** {', '.join(vault.get('b_team', []))} (Táctica: {vault.get('b_op', '&')})")
+        st.markdown(f"**🔴 Escuadrón de Venta (V320 Core):** {', '.join(vault.get('s_team', []))} (Táctica: {vault.get('s_op', '&')})")
         st.markdown(f"**📡 Densidad Radial:** Hitbox: `{vault.get('hitbox',0):.2f}%` | Muro Térmico: `{vault.get('therm_w',0)}`")
         st.markdown(f"**🐋 Anomalías:** Fuerza ADX: `{vault.get('adx_th',0):.1f}` | Factor Ballena: `{vault.get('whale_f',0):.1f}x`")
-        st.markdown(f"**🎯 Target Asimétrico:** TP Limit: `{vault.get('tp_pct',0):.2f}%` | SL Market: `{vault.get('sl_pct',0):.2f}%`")
+        st.markdown(f"**🎯 Redes de Seguridad Macro:** TP: `{vault.get('tp_pct',0):.2f}%` | SL: `{vault.get('sl_pct',0):.2f}%`")
 
     c_ia1, c_ia2, c_ia3 = st.columns([1, 1, 3])
     ado_val_ui = float(vault.get('ado', 4.0)) if vault.get('ado') is not None else 4.0
@@ -1327,7 +1383,7 @@ if len(tab_names) > 0:
         fig_mc.update_layout(template='plotly_dark', height=300, margin=dict(l=10, r=10, t=30, b=10), showlegend=False)
         c_mc2.plotly_chart(fig_mc, use_container_width=True)
 
-    with st.expander("📝 CÓDIGO PINE SCRIPT OMNI-BRAIN (LISTO PARA TRADINGVIEW)", expanded=False):
+    with st.expander("📝 CÓDIGO PINE SCRIPT PREDATOR (LISTO PARA TRADINGVIEW)", expanded=False):
         st.info("Traducción Matemática Exacta. Pégalo en TradingView.")
         st.code(generar_pine_script(s_id, vault, ticker.split('/')[0], iv_download, ps_buy_pct, ps_sell_pct, comision_pct, df_strat.index[0], is_calib_mode), language="pine")
 
