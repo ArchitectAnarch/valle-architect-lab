@@ -24,7 +24,7 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Brain", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-APP_VERSION = 'V320_OMNI_PATCHED'
+APP_VERSION = 'V320_OMNI_CLEAN'
 
 # ==========================================
 # ☢️ PROTOCOLO DE PURGA Y RECUPERACIÓN
@@ -498,7 +498,7 @@ a_wt1_s1, a_wt2_s1 = npshift(a_wt1, 1, 0.0), npshift(a_wt2, 1, 0.0)
 def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     n_len = len(a_c); s_dict = {}
     
-    # MATRIX 3D GRAVITY (Ignorando Micro-30 por regla V320)
+    # MATRIX 3D GRAVITY
     a_tsup = np.maximum(a_pl100_l, np.maximum(a_pl300_l, a_pl800_l))
     a_tres = np.minimum(a_ph100_l, np.minimum(a_ph300_l, a_ph800_l))
     a_dsup = np.where(a_c == 0, 0, np.abs(a_c - a_tsup) / a_c * 100)
@@ -641,6 +641,9 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['PA_Pinbar_Buy'] = a_pa_pin_b; s_dict['PA_Pinbar_Sell'] = a_pa_pin_s
     s_dict['PA_3_Soldiers_Buy'] = a_pa_3sol_b; s_dict['PA_3_Crows_Sell'] = a_pa_3cro_s
 
+    f_calib_buy = np.zeros(n_len, dtype=bool)
+    for i in range(0, n_len, 50): f_calib_buy[i] = True
+    s_dict['Calibrador'] = f_calib_buy
     return s_dict
 
 # 🔥 EL MOTOR EVOLUTIVO 🔥
@@ -684,11 +687,11 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             f_sell_tactical = np.zeros(n_len, dtype=bool)
             for r in dna_s_team: f_sell_tactical |= s_dict.get(r, default_f)
             
-            # 🛑 1. SIMULACIÓN IN-SAMPLE
+            # 🛑 1. SIMULACIÓN IN-SAMPLE (Usando nueva sintaxis)
             net_is, pf_is, nt_is, mdd_is, wr_is = simular_core_rapido(
-                a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx], a_atr[:split_idx], 
+                a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx],
                 f_buy_tactical[:split_idx], f_sell_tactical[:split_idx], 
-                r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
+                r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0
             )
 
             ado_actual = nt_is / max(1, dias_entrenamiento)
@@ -720,15 +723,15 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             # 🛑 2. SIMULACIÓN OUT-OF-SAMPLE
             if fit_score > best_fit_live:
                 net_oos, pf_oos, nt_oos, mdd_oos, wr_oos = simular_core_rapido(
-                    a_h[split_idx:], a_l[split_idx:], a_c[split_idx:], a_o[split_idx:], a_atr[split_idx:], 
+                    a_h[split_idx:], a_l[split_idx:], a_c[split_idx:], a_o[split_idx:],
                     f_buy_tactical[split_idx:], f_sell_tactical[split_idx:], 
-                    r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
+                    r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0
                 )
                 
                 # REVALIDACIÓN TOTAL
                 net_tot, pf_tot, nt_tot, mdd_tot, wr_tot = simular_core_rapido(
-                    a_h, a_l, a_c, a_o, a_atr, f_buy_tactical, f_sell_tactical, 
-                    r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
+                    a_h, a_l, a_c, a_o, f_buy_tactical, f_sell_tactical, 
+                    r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0
                 )
                 
                 best_fit_live = fit_score
