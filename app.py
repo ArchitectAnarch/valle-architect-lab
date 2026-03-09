@@ -24,7 +24,7 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Omni-Brain", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-APP_VERSION = 'V320_OMNI_FINAL'
+APP_VERSION = 'V320_OMNI_PATCHED'
 
 # ==========================================
 # ☢️ PROTOCOLO DE PURGA Y RECUPERACIÓN
@@ -32,7 +32,6 @@ APP_VERSION = 'V320_OMNI_FINAL'
 def purga_nuclear():
     st.cache_data.clear()
     st.session_state.clear()
-    # Destruir archivos en disco de versiones anteriores
     for f in glob.glob("champ_*.json"):
         try: os.remove(f)
         except: pass
@@ -57,14 +56,14 @@ todas_las_armas_b = [
     'Q_Pink_Whale_Buy', 'Q_Nuclear_Buy', 'Q_Climax_Buy', 'Q_Early_Buy',
     'Q_Defcon_Buy', 'Q_Neon_Up', 'Q_Therm_Bounce', 'Q_Therm_Vacuum',
     'Q_Lock_Bounce', 'Q_Lock_Break', 'Q_Rebound_Buy',
-    'Q_River_Push_Buy', 'Q_River_Entry_Buy', # <-- AÑADIDOS AL CEREBRO
+    'Q_River_Push_Buy', 'Q_River_Entry_Buy',
     'PA_Engulfing_Buy', 'PA_Pinbar_Buy', 'PA_3_Soldiers_Buy'
 ]
 todas_las_armas_s = [
     'Q_Nuclear_Sell', 'Q_Climax_Sell', 'Q_Early_Sell',
     'Q_Defcon_Sell', 'Q_Neon_Dn', 'Q_Therm_Wall_Sell', 'Q_Therm_Panic_Sell',
     'Q_Lock_Reject', 'Q_Lock_Breakd', 'Q_Pullback_Sell',
-    'Q_River_Push_Sell', 'Q_River_Entry_Sell', # <-- AÑADIDOS AL CEREBRO
+    'Q_River_Push_Sell', 'Q_River_Entry_Sell',
     'PA_Engulfing_Sell', 'PA_Pinbar_Sell', 'PA_3_Crows_Sell'
 ]
 
@@ -275,6 +274,44 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0):
         else: curva[i] = cap_act
             
     return curva.tolist(), 0.0, cap_act, registro_trades, en_pos, total_comms
+
+def simular_monte_carlo(trades_list, cap_ini, num_simulations=1000):
+    if not trades_list or len(trades_list) < 5: return None, 0.0
+    rets = [t['Ganancia_$'] for t in trades_list if t['Tipo'] in ['TP', 'SL', 'DYN_WIN', 'DYN_LOSS']]
+    if not rets: return None, 0.0
+    rets_arr = np.array(rets)
+    n_trades = len(rets_arr)
+    mc_curves = np.zeros((num_simulations, n_trades + 1))
+    mc_curves[:, 0] = cap_ini
+    ruined_count = 0
+    for i in range(num_simulations):
+        np.random.shuffle(rets_arr)
+        for j in range(n_trades):
+            mc_curves[i, j+1] = mc_curves[i, j] + rets_arr[j]
+            if mc_curves[i, j+1] <= 0:
+                mc_curves[i, j+1:] = 0; ruined_count += 1
+                break
+    risk_of_ruin = (ruined_count / num_simulations) * 100.0
+    return mc_curves, risk_of_ruin
+
+def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
+    fig = go.Figure()
+    norm_wr = min(wr * 2, 100) 
+    norm_pf = min(pf * 25, 100) 
+    norm_ado = min((ado / max(0.1, target_ado)) * 100, 100) 
+    norm_ret = min(max(ret_pct / 30, 0), 100) 
+    norm_alpha = min(max(alpha_pct / 30, 0), 100)
+    
+    real_texts = [f"{wr:.1f}% WR", f"{pf:.2f}x PF", f"{ado:.2f} ADO", f"{ret_pct:.1f}% Neto", f"{alpha_pct:.1f}% Alpha", f"{wr:.1f}% WR"]
+    
+    fig.add_trace(go.Scatterpolar(
+        r=[norm_wr, norm_pf, norm_ado, norm_ret, norm_alpha, norm_wr],
+        theta=['Win Rate', 'Profit Factor', 'Trades/Día (ADO)', 'Rentabilidad', 'Alpha (vs Hold)', 'Win Rate'],
+        mode='lines+markers+text', text=real_texts, textposition="top center", textfont=dict(color='white', size=11, family="Arial Black"),
+        fill='toself', name='Perfil de Depredador IA', line_color='#00FFFF', fillcolor='rgba(0, 255, 255, 0.2)'
+    ))
+    fig.update_layout(polar=dict(radialaxis=dict(visible=True, showticklabels=False, range=[0, 100], color='gray', gridcolor='rgba(255, 255, 255, 0.1)')), showlegend=False, template='plotly_dark', height=350, margin=dict(l=40, r=40, t=30, b=30), title=dict(text="🧬 Escáner de Poder de la IA", x=0.5, font=dict(color="cyan")))
+    return fig
 
 # ==========================================
 # 🌍 SIDEBAR UI & DATOS
@@ -529,7 +566,6 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     dump_memory = pre_dump | npshift_bool(pre_dump, 1) | npshift_bool(pre_dump, 2)
 
     # 🌸 VELA ROSA (SCORING V320)
-    rsi_bb_basis = ta.sma(rsi_v, 14); rsi_bb_dev = ta.stdev(rsi_v, 14) * 2.0
     retro_peak_buy = (a_rsi < 30) & (a_c < a_bbl)
     retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
