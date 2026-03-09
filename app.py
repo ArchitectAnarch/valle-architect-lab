@@ -150,6 +150,7 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 hit_sl = l_arr[i] <= sl_p
                 hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
+                    # 🔥 EMULADOR INTRABARRA TV Y CALIBRACIÓN 🔥
                     if c_arr[i] >= o_arr[i]:
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent
                     else:
@@ -181,6 +182,7 @@ def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, atr_arr,
                 comm_in = invest_amt * com_pct; pos_size = invest_amt - comm_in 
                 p_ent = o_arr[i+1] * slip_in 
                 
+                # 🔥 FIX DE ANCLAJE: Imitando el "strategy.position_avg_price" + "atr[1]" 🔥
                 if is_calib:
                     tp_p = round(p_ent * 1.002, 5); sl_p = round(p_ent * 0.998, 5)
                 else:
@@ -223,6 +225,7 @@ def simular_visual(df_sim, cap_ini, invest_pct, com_pct, slippage_pct=0.0, is_ca
             if bars_in_trade >= 1:
                 hit_sl = l_arr[i] <= sl_p; hit_tp = h_arr[i] >= tp_p
                 if hit_sl and hit_tp:
+                    # 🔥 EMULADOR INTRABARRA TV VISUAL Y CALIBRACIÓN 🔥
                     if c_arr[i] >= o_arr[i]:
                         exec_p = sl_p if o_arr[i] > sl_p else o_arr[i]; ret = (exec_p - p_ent) / p_ent; p_type = 'SL'
                     else:
@@ -409,6 +412,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df.index = df.index + timedelta(hours=offset); df = df[~df.index.duplicated(keep='first')]
         if len(df) < 50: return pd.DataFrame(), f"❌ Solo {len(df)} velas. Intenta ampliar el rango de fechas."
         
+        # 🔥 FIX DE SINCRONIZACIÓN: RELLENADOR DE BARRAS FANTASMAS (Para igualar Nro de Trades a TV) 🔥
         freq_map = {'1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min', '1h': '1h', '4h': '4h', '1d': '1D'}
         pd_freq = freq_map.get(iv_down, '15min')
         df = df.resample(pd_freq).asfreq()
@@ -479,8 +483,10 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         
         df['PA_Engulfing_Buy'] = (df['Vela_Verde']) & (df['Vela_Roja'].shift(1)) & (df['Close'] > df['Open'].shift(1)) & (df['Open'] < df['Close'].shift(1))
         df['PA_Engulfing_Sell'] = (df['Vela_Roja']) & (df['Vela_Verde'].shift(1)) & (df['Close'] < df['Open'].shift(1)) & (df['Open'] > df['Close'].shift(1))
+        
         df['PA_Pinbar_Buy'] = (df['lower_wick'] > df['body_size'] * 2.5) & (df['upper_wick'] < df['body_size'])
         df['PA_Pinbar_Sell'] = (df['upper_wick'] > df['body_size'] * 2.5) & (df['lower_wick'] < df['body_size'])
+        
         df['PA_3_Soldiers'] = (df['Vela_Verde']) & (df['Vela_Verde'].shift(1)) & (df['Vela_Verde'].shift(2)) & (df['Close'] > df['Close'].shift(1)) & (df['Close'].shift(1) > df['Close'].shift(2))
         df['PA_3_Crows'] = (df['Vela_Roja']) & (df['Vela_Roja'].shift(1)) & (df['Vela_Roja'].shift(2)) & (df['Close'] < df['Close'].shift(1)) & (df['Close'].shift(1) < df['Close'].shift(2))
 
@@ -629,6 +635,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Calibrador'] = f_calib_buy
     return s_dict
 
+# 🔥 RECONECTANDO CABLES: SALVANDO SIEMPRE AL CAMPEÓN CON SINCRONIZACIÓN PERFECTA 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None, greed_factor=0.8):
     vault = get_safe_vault(s_id)
     best_fit_live = vault.get('fit', -float('inf'))
@@ -701,7 +708,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             f_buy_final = (f_buy_tactical | (score_arr > r_th_b)) & m_mask & v_mask
             f_sell_final = f_sell_tactical | (score_arr < r_th_s)
 
-            # 🛑 SIMULACIÓN IN-SAMPLE (Entrenamiento)
+            # 🛑 1. SIMULACIÓN IN-SAMPLE (Entrenamiento)
             net_is, pf_is, nt_is, mdd_is, wr_is = simular_core_rapido(
                 a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx], a_atr[:split_idx], 
                 f_buy_final[:split_idx], f_sell_final[:split_idx], 
@@ -734,7 +741,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             else:
                 fit_score = net_is - 1000.0 
 
-            # 🛑 SIMULACIÓN OUT-OF-SAMPLE
+            # 🛑 2. SIMULACIÓN OOS & PASADA GLOBAL PARA SINCRONIZAR UI
             if fit_score > best_fit_live:
                 net_oos, pf_oos, nt_oos, mdd_oos, wr_oos = simular_core_rapido(
                     a_h[split_idx:], a_l[split_idx:], a_c[split_idx:], a_o[split_idx:], a_atr[split_idx:], 
@@ -742,6 +749,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
                 )
                 
+                # 🔥 TERCERA PASADA: Simulamos todo el dataset para que el Net final coincida con los KPI Visuales del panel
                 net_tot, pf_tot, nt_tot, mdd_tot, wr_tot = simular_core_rapido(
                     a_h, a_l, a_c, a_o, a_atr, f_buy_final, f_sell_final, 
                     r_atr_tp, r_atr_sl, float(cap_ini), float(com_pct), float(invest_pct), 0.0, False
@@ -863,15 +871,11 @@ def build_pine_cond(team, op):
 
 def generar_pine_script(s_id, vault, sym, tf, buy_pct, sell_pct, com_pct, start_date_obj, is_calib=False):
     v_hb = vault.get('hitbox', 1.5); v_tw = vault.get('therm_w', 4.0); v_adx = vault.get('adx_th', 25.0); v_wf = vault.get('whale_f', 2.5)
-    
-    # 🔥 JSON CORREGIDO PARA EVITAR EL ERROR 422 Y FORZAR ORDEN TIPO MARKET 🔥
-    json_buy = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {buy_pct}, "order_type": "market", "price": {{{{close}}}}, "side": "🟢 COMPRA"}}'
-    json_sell = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {sell_pct}, "order_type": "market", "price": {{{{close}}}}, "side": "🔴 VENTA"}}'
+    json_buy = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {buy_pct}, "limit_price": {{{{close}}}}, "side": "🟢 COMPRA"}}'
+    json_sell = f'{{"passphrase": "ASTRONAUTA", "action": "{{{{strategy.order.action}}}}", "ticker": "{{{{syminfo.basecurrency}}}}/{{{{syminfo.currency}}}}", "reinvest_pct": {sell_pct}, "limit_price": {{{{close}}}}, "side": "🔴 VENTA"}}'
 
     ps_base = f"""//@version=5
-strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value={buy_pct}, commission_type=strategy.commission.percent, commission_value={com_pct*100}, slippage=0, process_orders_on_close=true)
-
-// 1. WEBHOOKS DE ALTA PRIORIDAD
+strategy("{s_id} MATRIX - {sym} [{tf}]", overlay=true, initial_capital=1000, default_qty_type=strategy.percent_of_equity, default_qty_value={buy_pct}, commission_type=strategy.commission.percent, commission_value={com_pct*100}, slippage=0)
 wt_enter_long = input.text_area(defval='{json_buy}', title="🟢 WT: Mensaje Enter Long")
 wt_exit_long  = input.text_area(defval='{json_sell}', title="🔴 WT: Mensaje Exit Long")
 
@@ -897,15 +901,12 @@ if just_entered
     tp_price := math.round(strategy.position_avg_price * 1.002, 5)
     sl_price := math.round(strategy.position_avg_price * 0.998, 5)
 
-// 2. NUEVO MOTOR DE SALIDA MANUAL (Para el Calibrador)
-bool hit_tp = high >= tp_price
-bool hit_sl = low <= sl_price
-
 if strategy.position_size > 0
-    if hit_tp or hit_sl
-        strategy.close("In", comment= hit_tp ? "TP_Hit" : "SL_Hit", alert_message=wt_exit_long)
-        tp_price := na
-        sl_price := na
+    strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
+
+if strategy.position_size == 0
+    tp_price := na
+    sl_price := na
 
 plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.belowbar, color=color.yellow, size=size.tiny)
 """
@@ -1176,29 +1177,25 @@ bool just_entered = ta.change(strategy.position_size) > 0
 if signal_buy and strategy.position_size == 0 and window
     strategy.entry("In", strategy.long, alert_message=wt_enter_long)
 
+// 🔥 TRASPLANTE: El mismo anclaje de C++ llevado a Pine Script 🔥
 if just_entered
     locked_atr := atr[1] 
     tp_price := math.round(strategy.position_avg_price + (locked_atr * atr_tp_mult), 5)
     sl_price := math.round(strategy.position_avg_price - (locked_atr * atr_sl_mult), 5)
 
-// 🔥 NUEVO MOTOR DE SALIDA (Control Manual Matemático para Webhooks) 🔥
-bool hit_tp = high >= tp_price
-bool hit_sl = low <= sl_price
-bool dynamic_exit = signal_sell
-
 if strategy.position_size > 0
-    if hit_tp or hit_sl or dynamic_exit
-        strategy.close("In", comment= hit_tp ? "TP_Hit" : hit_sl ? "SL_Hit" : "Dyn_Exit", alert_message=wt_exit_long)
-        locked_atr := na
-        tp_price := na
-        sl_price := na
+    strategy.exit("TP/SL", "In", limit=tp_price, stop=sl_price, alert_profit=wt_exit_long, alert_loss=wt_exit_long)
+
+if signal_sell and strategy.position_size > 0
+    strategy.close("In", comment="Dyn_Exit", alert_message=wt_exit_long)
+
+if strategy.position_size == 0
+    locked_atr := na
+    tp_price := na
+    sl_price := na
 
 plotshape(signal_buy, title="COMPRA", style=shape.triangleup, location=location.belowbar, color=color.aqua, size=size.tiny)
 plotshape(signal_sell, title="VENTA", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
-
-// Visualización de niveles para auditoría
-plot(strategy.position_size > 0 ? tp_price : na, color=color.green, style=plot.style_linebr, linewidth=2, title="Take Profit")
-plot(strategy.position_size > 0 ? sl_price : na, color=color.red, style=plot.style_linebr, linewidth=2, title="Stop Loss")
 """
     return ps_base + ps_indicators + ps_logic + ps_exec
 
@@ -1226,6 +1223,7 @@ if st.session_state.get('run_global', False):
         ph_holograma.empty()
         st.sidebar.success("✅ ¡Incubación Genética Completada!")
         time.sleep(2)
+        # Obligar al UI a mostrar el último mutante en el carrusel al terminar
         if st.session_state.get('ai_algos'):
             st.session_state['selected_mutant'] = st.session_state['ai_algos'][-1]
         st.rerun()
