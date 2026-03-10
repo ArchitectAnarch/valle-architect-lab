@@ -24,7 +24,7 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Predator Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-APP_VERSION = 'V320_PREDATOR_ADO_BONUS'
+APP_VERSION = 'V320_PREDATOR_MASTER'
 
 # ==========================================
 # ☢️ PROTOCOLO DE PURGA Y RECUPERACIÓN
@@ -32,6 +32,7 @@ APP_VERSION = 'V320_PREDATOR_ADO_BONUS'
 def purga_nuclear():
     st.cache_data.clear()
     st.session_state.clear()
+    # Exterminio de archivos JSON de versiones antiguas en disco
     for f in glob.glob("champ_*.json"):
         try: os.remove(f)
         except: pass
@@ -90,7 +91,7 @@ def get_default_dna():
     return {
         'b_team': random.sample(todas_las_armas_b, 2), 
         's_team': random.sample(todas_las_armas_s, 2), 
-        'b_op': '&', 's_op': '|', 'hitbox': 1.5, 'therm_w': 4.0, 
+        'b_op': '|', 's_op': '|', 'hitbox': 1.5, 'therm_w': 4.0, 
         'adx_th': 25.0, 'whale_f': 2.5, 'ado': 4.0, 'reinv': 20.0, 'fit': -float('inf'), 
         'net': 0.0, 'net_is': 0.0, 'net_oos': 0.0, 'winrate': 0.0, 'pf': 0.0, 'nt': 0, 
         'tp_pct': 25.0, 'sl_pct': 10.0
@@ -334,7 +335,7 @@ def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
 # ==========================================
 # 🌍 SIDEBAR UI & DATOS
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 PREDATOR LAB V320</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 OMNI-BRAIN LAB</h2>", unsafe_allow_html=True)
 
 with st.sidebar.expander("⚙️ SISTEMA (EMERGENCIAS)", expanded=True):
     if st.button("🛑 ABORTAR RUN GLOBAL", use_container_width=True, key="btn_abort"):
@@ -518,6 +519,7 @@ a_wt1_s1, a_wt2_s1 = npshift(a_wt1, 1, 0.0), npshift(a_wt2, 1, 0.0)
 def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     n_len = len(a_c); s_dict = {}
     
+    # MATRIX 3D GRAVITY
     a_tsup = np.maximum(a_pl100_l, np.maximum(a_pl300_l, a_pl800_l))
     a_tres = np.minimum(a_ph100_l, np.minimum(a_ph300_l, a_ph800_l))
     a_dsup = np.where(a_c == 0, 0, np.abs(a_c - a_tsup) / a_c * 100)
@@ -535,6 +537,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     rsi_cross_up = (a_rsi > a_rsi_ma) & (a_rsi_s1 <= npshift(a_rsi_ma, 1))
     rsi_cross_dn = (a_rsi < a_rsi_ma) & (a_rsi_s1 >= npshift(a_rsi_ma, 1))
     
+    # 🌊 QUANTUM RIVER (V320 VECTOR)
     rsi_vel = a_rsi - a_rsi_s1
     river_w = a_atr * (1.2 + (np.abs(rsi_vel) / 10.0))
     river_top = a_ema20 + (river_w * 0.5)
@@ -551,6 +554,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     river_entry_up = (a_c > river_bot) & (a_c_s1 <= npshift(river_bot, 1))
     river_entry_dn = (a_c < river_top) & (a_c_s1 >= npshift(river_top, 1))
     
+    # 🚀 DEFCON
     defcon_level = np.full(n_len, 5)
     m4 = neon_up | neon_dn; defcon_level[m4] = 4
     m3 = m4 & (a_bb_delta > 0); defcon_level[m3] = 3
@@ -564,6 +568,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     cond_therm_buy_vacuum = (ceil_w <= 3) & neon_up_trig & ~is_abyss
     cond_therm_sell_panic = is_abyss & a_vr
 
+    # 🎯 TARGET LOCK
     tol = a_atr * 0.5
     is_grav_sup = (a_c - a_tsup) < (a_atr * 3.0)
     is_grav_res = (a_tres - a_c) < (a_atr * 3.0)
@@ -573,6 +578,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     cond_lock_sell_reject = is_grav_res & (a_h >= a_tres - tol) & (a_c < a_tres) & a_vr
     cond_lock_sell_breakd = is_grav_sup & (a_c < a_tsup) & (a_c_s1 >= npshift(a_tsup, 1)) & a_vr
 
+    # 🐋 WHALE & PUMP/DUMP MEMORY
     flash_vol = (a_rvol > whale_f * 0.8) & (a_bs > a_atr * 0.3)
     whale_buy, whale_sell = flash_vol & a_vv, flash_vol & a_vr
     whale_memory = whale_buy | npshift_bool(whale_buy, 1) | npshift_bool(whale_buy, 2) | whale_sell | npshift_bool(whale_sell, 1) | npshift_bool(whale_sell, 2)
@@ -583,6 +589,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     pre_dump = ((a_l < a_bbl) | (rsi_vel < -5)) & flash_vol & a_vr
     dump_memory = pre_dump | npshift_bool(pre_dump, 1) | npshift_bool(pre_dump, 2)
 
+    # 🌸 VELA ROSA (SCORING V320)
     retro_peak_buy = (a_rsi < 30) & (a_c < a_bbl)
     retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
@@ -630,6 +637,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     nuclear_buy = climax_buy & (wt_oversold | wt_cross_up)
     nuclear_sell = climax_sell & (wt_overbought | wt_cross_dn)
     
+    # MAPEO AL DICCIONARIO
     s_dict['Q_Pink_Whale_Buy'] = cond_pink_whale_buy
     s_dict['Q_Nuclear_Buy'] = nuclear_buy
     s_dict['Q_Climax_Buy'] = climax_buy
@@ -671,7 +679,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['Calibrador'] = f_calib_buy
     return s_dict
 
-# 🔥 EL MOTOR EVOLUTIVO GENÉTICO REAL (ELÁSTICO Y PUNTUADO) 🔥
+# 🔥 EL MOTOR EVOLUTIVO GENÉTICO REAL (MUTACIÓN ELÁSTICA) 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None, greed_factor=0.8):
     vault = get_safe_vault(s_id)
     best_fit_live = vault.get('fit', -float('inf'))
@@ -776,14 +784,14 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             # 🔥 FITNESS ELÁSTICA (Crecimiento Exponencial) 🔥
             if nt_is >= 3 and net_is > 0: 
                 avg_trade_net_pct = (net_is / cap_ini) / nt_is * 100.0
-                if avg_trade_net_pct < 0.15: # Flexibilizado
+                if avg_trade_net_pct < 0.15: 
                     fit_score = net_is - 5000.0 
                 else:
                     fit_score = net_is
                     if pf_is > 1.0: fit_score *= min(pf_is, 3.0)
                     else: fit_score *= 0.5
                     
-                    if mdd_is > 25.0: fit_score -= (mdd_is * 5.0) # Penaliza suavemente, no mata
+                    if mdd_is > 25.0: fit_score -= (mdd_is * 5.0) 
                     
                     # 🎯 LA FÓRMULA DE CAMPANA DEL ADO (Bonificación o Castigo)
                     target_trades = target_ado * dias_entrenamiento
@@ -799,7 +807,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                             fit_score -= (abs(fit_score) * min(penalty, 0.8)) 
 
             elif nt_is > 0:
-                fit_score = net_is - 1000.0 - (abs(ado_actual - target_ado) * 50.0) # Se penaliza fuertemente pero da una base a mejorar
+                fit_score = net_is - 1000.0 - (abs(ado_actual - target_ado) * 50.0) 
 
             # 🛑 2. SIMULACIÓN OUT-OF-SAMPLE
             if fit_score > best_fit_live:
@@ -810,7 +818,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 )
                 
                 # Se guarda si OOS es positivo O si es el primer ADN generado (para sacar a la IA del -inf)
-                if net_oos > 0 or is_calib or best_fit_live == -float('inf'): 
+                if net_oos > -(cap_ini*0.1) or is_calib or best_fit_live == -float('inf'): 
                     net_tot, pf_tot, nt_tot, mdd_tot, wr_tot = simular_core_rapido(
                         a_h, a_l, a_c, a_o, f_buy_tactical, f_sell_tactical, 
                         r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0, is_calib
@@ -1166,7 +1174,6 @@ pa_3_crows = vela_roja and nz(vela_roja[1]) and nz(vela_roja[2]) and close < nz(
 bool raw_buy = ({b_cond})
 bool raw_sell = ({s_cond})
 
-// Filtro anti-colisión matemático: La venta anula la compra si ocurren simultáneamente
 bool signal_buy = raw_buy and not raw_sell
 bool signal_sell = raw_sell
 """
