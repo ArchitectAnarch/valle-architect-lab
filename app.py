@@ -24,7 +24,7 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Predator Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-APP_VERSION = 'V320_PREDATOR_ELASTIC'
+APP_VERSION = 'V320_PREDATOR_FIXED'
 
 # ==========================================
 # ☢️ PROTOCOLO DE PURGA Y RECUPERACIÓN
@@ -32,6 +32,7 @@ APP_VERSION = 'V320_PREDATOR_ELASTIC'
 def purga_nuclear():
     st.cache_data.clear()
     st.session_state.clear()
+    # Exterminio de archivos JSON de versiones antiguas en disco
     for f in glob.glob("champ_*.json"):
         try: os.remove(f)
         except: pass
@@ -334,7 +335,7 @@ def generar_radar(wr, pf, ado, ret_pct, alpha_pct, target_ado):
 # ==========================================
 # 🌍 SIDEBAR UI & DATOS
 # ==========================================
-st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 PREDATOR LAB V320</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<h2 style='text-align: center; color: cyan;'>🧬 OMNI-BRAIN LAB</h2>", unsafe_allow_html=True)
 
 with st.sidebar.expander("⚙️ SISTEMA (EMERGENCIAS)", expanded=True):
     if st.button("🛑 ABORTAR RUN GLOBAL", use_container_width=True, key="btn_abort"):
@@ -358,7 +359,7 @@ with st.sidebar.expander("🌍 DATOS Y EXCHANGE", expanded=False):
 
 with st.sidebar.expander("💼 CAPITAL Y COMISIONES", expanded=False):
     capital_inicial = st.number_input("Capital Inicial (USD)", value=1000.0, step=100.0)
-    comision_pct = st.number_input("Comisión (%)", value=0.25, step=0.05) / 100.0 
+    comision_pct = st.number_input("Comisión (%)", value=0.15, step=0.05) / 100.0 
     is_calib_mode = st.checkbox("🛠️ MODO CALIBRACIÓN TV", value=False) 
 
 with st.sidebar.expander("🤖 INTELIGENCIA Y FORJA", expanded=False):
@@ -369,7 +370,7 @@ with st.sidebar.expander("🤖 INTELIGENCIA Y FORJA", expanded=False):
     if st.button(f"🧠 DEEP MINE GLOBAL", type="primary", use_container_width=True, key="btn_global"):
         st.session_state['global_queue'] = target_strats.copy(); st.session_state['abort_opt'] = False; st.session_state['run_global'] = True; st.rerun()
     if st.button("🤖 CREAR NUEVO MUTANTE IA", type="secondary", use_container_width=True, key="btn_mutant"):
-        new_id = f"PREDATOR_{int(time.time())}_{random.randint(10, 99)}"
+        new_id = f"OMNI_{int(time.time())}_{random.randint(10, 99)}"
         if new_id not in st.session_state['ai_algos']:
             st.session_state['ai_algos'].append(new_id); get_safe_vault(new_id); st.session_state['global_queue'] = [new_id]; st.session_state['run_global'] = True; st.rerun()
 
@@ -553,6 +554,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     river_entry_up = (a_c > river_bot) & (a_c_s1 <= npshift(river_bot, 1))
     river_entry_dn = (a_c < river_top) & (a_c_s1 >= npshift(river_top, 1))
     
+    # 🚀 DEFCON
     defcon_level = np.full(n_len, 5)
     m4 = neon_up | neon_dn; defcon_level[m4] = 4
     m3 = m4 & (a_bb_delta > 0); defcon_level[m3] = 3
@@ -566,6 +568,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     cond_therm_buy_vacuum = (ceil_w <= 3) & neon_up_trig & ~is_abyss
     cond_therm_sell_panic = is_abyss & a_vr
 
+    # 🎯 TARGET LOCK
     tol = a_atr * 0.5
     is_grav_sup = (a_c - a_tsup) < (a_atr * 3.0)
     is_grav_res = (a_tres - a_c) < (a_atr * 3.0)
@@ -575,6 +578,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     cond_lock_sell_reject = is_grav_res & (a_h >= a_tres - tol) & (a_c < a_tres) & a_vr
     cond_lock_sell_breakd = is_grav_sup & (a_c < a_tsup) & (a_c_s1 >= npshift(a_tsup, 1)) & a_vr
 
+    # 🐋 WHALE & PUMP/DUMP MEMORY
     flash_vol = (a_rvol > whale_f * 0.8) & (a_bs > a_atr * 0.3)
     whale_buy, whale_sell = flash_vol & a_vv, flash_vol & a_vr
     whale_memory = whale_buy | npshift_bool(whale_buy, 1) | npshift_bool(whale_buy, 2) | whale_sell | npshift_bool(whale_sell, 1) | npshift_bool(whale_sell, 2)
@@ -585,6 +589,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     pre_dump = ((a_l < a_bbl) | (rsi_vel < -5)) & flash_vol & a_vr
     dump_memory = pre_dump | npshift_bool(pre_dump, 1) | npshift_bool(pre_dump, 2)
 
+    # 🌸 VELA ROSA (SCORING V320)
     retro_peak_buy = (a_rsi < 30) & (a_c < a_bbl)
     retro_peak_sell = (a_rsi > 70) & (a_c > a_bbu)
     k_break_up = (a_rsi > (a_rsi_bb_b + a_rsi_bb_d)) & (a_rsi_s1 <= npshift(a_rsi_bb_b + a_rsi_bb_d, 1))
@@ -632,6 +637,7 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     nuclear_buy = climax_buy & (wt_oversold | wt_cross_up)
     nuclear_sell = climax_sell & (wt_overbought | wt_cross_dn)
     
+    # MAPEO AL DICCIONARIO
     s_dict['Q_Pink_Whale_Buy'] = cond_pink_whale_buy
     s_dict['Q_Nuclear_Buy'] = nuclear_buy
     s_dict['Q_Climax_Buy'] = climax_buy
@@ -667,12 +673,13 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['PA_Pinbar_Buy'] = a_pa_pin_b; s_dict['PA_Pinbar_Sell'] = a_pa_pin_s
     s_dict['PA_3_Soldiers_Buy'] = a_pa_3sol_b; s_dict['PA_3_Crows_Sell'] = a_pa_3cro_s
 
+    # MODO CALIBRACIÓN (Control Group TV)
     f_calib_buy = np.zeros(n_len, dtype=bool)
     for i in range(0, n_len, 50): f_calib_buy[i] = True
     s_dict['Calibrador'] = f_calib_buy
     return s_dict
 
-# 🔥 EL MOTOR EVOLUTIVO GENÉTICO REAL (MUTACIÓN ELASTICA) 🔥
+# 🔥 EL MOTOR EVOLUTIVO GENÉTICO REAL (MUTACIÓN MARKOV CON ANTI-COLISIÓN) 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None, greed_factor=0.8):
     vault = get_safe_vault(s_id)
     best_fit_live = vault.get('fit', -float('inf'))
@@ -693,15 +700,15 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         if st.session_state.get('abort_opt', False): break
 
         for _ in range(chunk_size): 
-            # EVOLUCIÓN (75% Mutar al campeón, 25% Explorar azar puro)
+            # EVOLUCIÓN GENÉTICA (75% Mutar al campeón actual, 25% Explorar azar puro)
             if best_fit_live != -float('inf') and random.random() < 0.75:
                 dna_b_team = vault.get('b_team', []).copy()
                 dna_s_team = vault.get('s_team', []).copy()
                 dna_b_op = vault.get('b_op', '|')
                 dna_s_op = vault.get('s_op', '|')
                 
-                if random.random() < 0.15: dna_b_op = random.choice(['&', '|'])
-                if random.random() < 0.15: dna_s_op = random.choice(['&', '|'])
+                if random.random() < 0.1: dna_b_op = random.choice(['&', '|'])
+                if random.random() < 0.1: dna_s_op = random.choice(['&', '|'])
 
                 if random.random() < 0.3 and len(todas_las_armas_b) > 0:
                     if random.random() < 0.5 and len(dna_b_team) > 1:
@@ -726,20 +733,20 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 if random.random() < 0.15: r_hitbox = random.choice([1.0, 1.5, 2.0, 2.5])
                 if random.random() < 0.15: r_adx = random.choice([20.0, 25.0, 30.0])
                 
-                # TP Y SL AMPLIOS (Redes de seguridad catastrofica, NO estrategia principal)
                 r_tp_pct = round(max(5.0, vault.get('tp_pct', 25.0) + random.uniform(-1.0, 1.0)), 2)
                 r_sl_pct = round(max(2.0, vault.get('sl_pct', 10.0) + random.uniform(-0.5, 0.5)), 2)
                 
             else:
+                # Generación Aleatoria
                 dna_b_op = random.choice(['&', '|'])
                 dna_s_op = random.choice(['&', '|'])
-                dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 2 if dna_b_op == '&' else 4))
-                dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 2 if dna_s_op == '&' else 4))
+                dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 2 if dna_b_op == '&' else 3))
+                dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 2 if dna_s_op == '&' else 3))
                 r_hitbox = random.choice([1.0, 1.5, 2.0, 2.5])
                 r_therm = random.choice([3.0, 4.0, 5.0, 6.0])
                 r_adx = random.choice([20.0, 25.0, 30.0])
                 r_whale = random.choice([2.0, 2.5, 3.0])
-                r_tp_pct = round(random.uniform(10.0, 30.0), 2) 
+                r_tp_pct = round(random.uniform(10.0, 40.0), 2) 
                 r_sl_pct = round(random.uniform(5.0, 15.0), 2)  
             
             s_dict = calcular_señales_numpy(r_hitbox, r_therm, r_adx, r_whale)
@@ -758,11 +765,16 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 f_sell_tactical = np.zeros(n_len, dtype=bool)
                 for r in dna_s_team: f_sell_tactical |= s_dict.get(r, default_f)
 
-            # 🔥 FILTRO ANTI-COLISIÓN (Obliga a comprar en valles y vender en picos) 🔥
+            # 🔥 FILTRO ANTI-COLISIÓN 🔥
             overlap = f_buy_tactical & f_sell_tactical
+            
+            # Predefinir variables para evitar UnboundLocalError
+            net_is = 0.0; pf_is = 0.0; nt_is = 0; mdd_is = 0.0; wr_is = 0.0; ado_actual = 0.0
+            
             if np.any(overlap) and not is_calib:
-                fit_score = -9999.0
+                fit_score = -float('inf') 
             else:
+                # 🛑 1. SIMULACIÓN IN-SAMPLE
                 net_is, pf_is, nt_is, mdd_is, wr_is = simular_core_rapido(
                     a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx],
                     f_buy_tactical[:split_idx], f_sell_tactical[:split_idx], 
@@ -772,23 +784,28 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 ado_actual = nt_is / max(1, dias_entrenamiento)
                 fit_score = -float('inf') 
                 
-                # 🔥 FITNESS ELÁSTICA (Crecimiento exponencial) 🔥
-                if nt_is >= 3: 
-                    fit_score = net_is
-                    if pf_is > 1.0: fit_score *= min(pf_is, 3.0)
-                    else: fit_score *= 0.5
-                    
-                    if mdd_is > 20.0: fit_score -= (mdd_is * 5.0) # Penaliza pero no asesina
-                    
-                    # Gravedad ADO
-                    ado_diff = abs(ado_actual - target_ado)
-                    ado_penalty_pct = min(ado_diff / target_ado, 1.0) * 0.5 
-                    if fit_score > 0: fit_score -= (fit_score * ado_penalty_pct)
-                    else: fit_score -= (abs(fit_score) * ado_penalty_pct)
-
+                if nt_is >= 3 and net_is > 0 and mdd_is <= 20.0: 
+                    avg_trade_net_pct = (net_is / cap_ini) / nt_is * 100.0
+                    if avg_trade_net_pct < 0.25:
+                        fit_score = net_is - 5000.0 
+                    else:
+                        if greed_factor >= 0.7:
+                            pf_mod = 1.0 if pf_is > 1.1 else 0.5
+                            dd_penalty = 1.0 if mdd_is <= 15.0 else (mdd_is / 15.0)
+                            fit_score = (net_is * (1.0 + np.log10(nt_is)) * pf_mod) / dd_penalty
+                        elif greed_factor <= 0.3:
+                            pf_mod = pf_is ** 2.0
+                            wr_mod = (wr_is / 40.0) ** 2.0
+                            dd_penalty = np.exp(mdd_is / 10.0)
+                            fit_score = (net_is * pf_mod * wr_mod) / dd_penalty
+                        else:
+                            pf_mod = min(pf_is, 5.0)
+                            dd_penalty = 1.0 if mdd_is <= 12.0 else (mdd_is / 12.0)
+                            fit_score = (net_is * pf_mod) / dd_penalty
                 elif nt_is > 0:
-                    fit_score = net_is - 1000.0 - (abs(ado_actual - target_ado) * 50.0)
+                    fit_score = -9999.0 
 
+            # 🛑 2. SIMULACIÓN OUT-OF-SAMPLE
             if fit_score > best_fit_live:
                 net_oos, pf_oos, nt_oos, mdd_oos, wr_oos = simular_core_rapido(
                     a_h[split_idx:], a_l[split_idx:], a_c[split_idx:], a_o[split_idx:],
@@ -796,7 +813,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0, is_calib
                 )
                 
-                if net_oos > -(cap_ini*0.1) or is_calib: # Se permite un pequeño OOS loss en exploración
+                if net_oos > 0 or is_calib: 
                     net_tot, pf_tot, nt_tot, mdd_tot, wr_tot = simular_core_rapido(
                         a_h, a_l, a_c, a_o, f_buy_tactical, f_sell_tactical, 
                         r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0, is_calib
@@ -822,7 +839,6 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         current_best_net = v.get('net', 0)
         current_best_nt = v.get('nt', 0)
         current_best_pf = v.get('pf', 0)
-        current_best_ado = v.get('ado', 0.0)
 
         if deep_info:
             current_epoch_val = deep_info['current'] + (c+1)*(chunk_size); macro_pct = int((current_epoch_val / deep_info['total']) * 100)
@@ -842,8 +858,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             <div style="color: {color}; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">{title}</div>
             <div style="color: white; font-size: 1.3rem;">{subtitle}</div>
             <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Récord Global: ${current_best_net:.2f}</div>
-            <div style="color: cyan; font-size: 1.0rem;">Trades: {current_best_nt} | PF: {current_best_pf:.2f}x</div>
-            <div style="color: yellow; font-size: 0.9rem;">ADO Objetivo: {target_ado:.1f} | ADO Actual: {current_best_ado:.2f}</div>
+            <div style="color: cyan; font-size: 1.0rem;">Trades Totales: {current_best_nt} | Win Rate: {current_best_pf:.2f}x PF</div>
         </div>
         """
         ph_holograma.markdown(html_str, unsafe_allow_html=True)
