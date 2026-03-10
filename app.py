@@ -24,7 +24,7 @@ except ImportError:
 st.set_page_config(page_title="ROCKET PROTOCOL | Predator Lab", layout="wide", initial_sidebar_state="expanded")
 ph_holograma = st.empty()
 
-APP_VERSION = 'V320_PREDATOR_FIXED_FINAL'
+APP_VERSION = 'V320_PREDATOR_ADO_BONUS'
 
 # ==========================================
 # ☢️ PROTOCOLO DE PURGA Y RECUPERACIÓN
@@ -665,12 +665,13 @@ def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
     s_dict['PA_Pinbar_Buy'] = a_pa_pin_b; s_dict['PA_Pinbar_Sell'] = a_pa_pin_s
     s_dict['PA_3_Soldiers_Buy'] = a_pa_3sol_b; s_dict['PA_3_Crows_Sell'] = a_pa_3cro_s
 
+    # MODO CALIBRACIÓN (Control Group TV)
     f_calib_buy = np.zeros(n_len, dtype=bool)
     for i in range(0, n_len, 50): f_calib_buy[i] = True
     s_dict['Calibrador'] = f_calib_buy
     return s_dict
 
-# 🔥 EL MOTOR EVOLUTIVO GENÉTICO REAL 🔥
+# 🔥 EL MOTOR EVOLUTIVO GENÉTICO REAL (ELÁSTICO Y PUNTUADO) 🔥
 def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_reales, buy_hold_money, epochs=1, cur_net=-float('inf'), cur_fit=-float('inf'), deep_info=None, greed_factor=0.8):
     vault = get_safe_vault(s_id)
     best_fit_live = vault.get('fit', -float('inf'))
@@ -691,14 +692,15 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         if st.session_state.get('abort_opt', False): break
 
         for _ in range(chunk_size): 
+            # EVOLUCIÓN (75% Mutar al campeón, 25% Explorar azar puro)
             if best_fit_live != -float('inf') and random.random() < 0.75:
                 dna_b_team = vault.get('b_team', []).copy()
                 dna_s_team = vault.get('s_team', []).copy()
                 dna_b_op = vault.get('b_op', '|')
                 dna_s_op = vault.get('s_op', '|')
                 
-                if random.random() < 0.1: dna_b_op = random.choice(['&', '|'])
-                if random.random() < 0.1: dna_s_op = random.choice(['&', '|'])
+                if random.random() < 0.15: dna_b_op = random.choice(['&', '|'])
+                if random.random() < 0.15: dna_s_op = random.choice(['&', '|'])
 
                 if random.random() < 0.3 and len(todas_las_armas_b) > 0:
                     if random.random() < 0.5 and len(dna_b_team) > 1:
@@ -723,19 +725,20 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 if random.random() < 0.15: r_hitbox = random.choice([1.0, 1.5, 2.0, 2.5])
                 if random.random() < 0.15: r_adx = random.choice([20.0, 25.0, 30.0])
                 
+                # TP Y SL AMPLIOS (Redes de seguridad catastrofica, NO estrategia principal)
                 r_tp_pct = round(max(5.0, vault.get('tp_pct', 25.0) + random.uniform(-1.0, 1.0)), 2)
                 r_sl_pct = round(max(2.0, vault.get('sl_pct', 10.0) + random.uniform(-0.5, 0.5)), 2)
                 
             else:
                 dna_b_op = random.choice(['&', '|'])
                 dna_s_op = random.choice(['&', '|'])
-                dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 2 if dna_b_op == '&' else 3))
-                dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 2 if dna_s_op == '&' else 3))
+                dna_b_team = random.sample(todas_las_armas_b, random.randint(1, 2 if dna_b_op == '&' else 4))
+                dna_s_team = random.sample(todas_las_armas_s, random.randint(1, 2 if dna_s_op == '&' else 4))
                 r_hitbox = random.choice([1.0, 1.5, 2.0, 2.5])
                 r_therm = random.choice([3.0, 4.0, 5.0, 6.0])
                 r_adx = random.choice([20.0, 25.0, 30.0])
                 r_whale = random.choice([2.0, 2.5, 3.0])
-                r_tp_pct = round(random.uniform(10.0, 40.0), 2) 
+                r_tp_pct = round(random.uniform(10.0, 30.0), 2) 
                 r_sl_pct = round(random.uniform(5.0, 15.0), 2)  
             
             s_dict = calcular_señales_numpy(r_hitbox, r_therm, r_adx, r_whale)
@@ -754,44 +757,51 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                 f_sell_tactical = np.zeros(n_len, dtype=bool)
                 for r in dna_s_team: f_sell_tactical |= s_dict.get(r, default_f)
 
-            # Pre-declarar variables para evitar UnboundLocalError
+            # 🔥 REGLA ANTI-COLISIÓN: Si chocan, prioriza la Venta y anula la Compra (No lo mata) 🔥
+            f_buy_tactical = f_buy_tactical & ~f_sell_tactical
+
+            # Predefinir variables por seguridad extrema
             net_is = 0.0; pf_is = 0.0; nt_is = 0; mdd_is = 0.0; wr_is = 0.0; ado_actual = 0.0
 
-            # 🔥 FILTRO ANTI-COLISIÓN 🔥
-            overlap = f_buy_tactical & f_sell_tactical
-            if np.any(overlap) and not is_calib:
-                fit_score = -float('inf') 
-            else:
-                net_is, pf_is, nt_is, mdd_is, wr_is = simular_core_rapido(
-                    a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx],
-                    f_buy_tactical[:split_idx], f_sell_tactical[:split_idx], 
-                    r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0, is_calib
-                )
+            # 🛑 1. SIMULACIÓN IN-SAMPLE
+            net_is, pf_is, nt_is, mdd_is, wr_is = simular_core_rapido(
+                a_h[:split_idx], a_l[:split_idx], a_c[:split_idx], a_o[:split_idx],
+                f_buy_tactical[:split_idx], f_sell_tactical[:split_idx], 
+                r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0, is_calib
+            )
 
-                ado_actual = nt_is / max(1, dias_entrenamiento)
-                fit_score = -float('inf') 
-                
-                if nt_is >= 3 and net_is > 0 and mdd_is <= 20.0: 
-                    avg_trade_net_pct = (net_is / cap_ini) / nt_is * 100.0
-                    if avg_trade_net_pct < 0.25:
-                        fit_score = net_is - 5000.0 
-                    else:
-                        if greed_factor >= 0.7:
-                            pf_mod = 1.0 if pf_is > 1.1 else 0.5
-                            dd_penalty = 1.0 if mdd_is <= 15.0 else (mdd_is / 15.0)
-                            fit_score = (net_is * (1.0 + np.log10(nt_is)) * pf_mod) / dd_penalty
-                        elif greed_factor <= 0.3:
-                            pf_mod = pf_is ** 2.0
-                            wr_mod = (wr_is / 40.0) ** 2.0
-                            dd_penalty = np.exp(mdd_is / 10.0)
-                            fit_score = (net_is * pf_mod * wr_mod) / dd_penalty
+            ado_actual = nt_is / max(1, dias_entrenamiento)
+            fit_score = -float('inf') 
+            
+            # 🔥 FITNESS ELÁSTICA (Crecimiento Exponencial) 🔥
+            if nt_is >= 3 and net_is > 0: 
+                avg_trade_net_pct = (net_is / cap_ini) / nt_is * 100.0
+                if avg_trade_net_pct < 0.15: # Flexibilizado
+                    fit_score = net_is - 5000.0 
+                else:
+                    fit_score = net_is
+                    if pf_is > 1.0: fit_score *= min(pf_is, 3.0)
+                    else: fit_score *= 0.5
+                    
+                    if mdd_is > 25.0: fit_score -= (mdd_is * 5.0) # Penaliza suavemente, no mata
+                    
+                    # 🎯 LA FÓRMULA DE CAMPANA DEL ADO (Bonificación o Castigo)
+                    target_trades = target_ado * dias_entrenamiento
+                    if target_trades > 0:
+                        trade_ratio = nt_is / target_trades
+                        if 0.5 <= trade_ratio <= 1.5:
+                            # Bonificación dorada (+50% si acierta exacto)
+                            bonus = 1.0 + (0.5 * (1.0 - abs(1.0 - trade_ratio)))
+                            fit_score *= bonus
                         else:
-                            pf_mod = min(pf_is, 5.0)
-                            dd_penalty = 1.0 if mdd_is <= 12.0 else (mdd_is / 12.0)
-                            fit_score = (net_is * pf_mod) / dd_penalty
-                elif nt_is > 0:
-                    fit_score = -9999.0 
+                            # Castigo si se vuelve un bot ametralladora o no opera nada
+                            penalty = abs(1.0 - trade_ratio) * 0.2
+                            fit_score -= (abs(fit_score) * min(penalty, 0.8)) 
 
+            elif nt_is > 0:
+                fit_score = net_is - 1000.0 - (abs(ado_actual - target_ado) * 50.0) # Se penaliza fuertemente pero da una base a mejorar
+
+            # 🛑 2. SIMULACIÓN OUT-OF-SAMPLE
             if fit_score > best_fit_live:
                 net_oos, pf_oos, nt_oos, mdd_oos, wr_oos = simular_core_rapido(
                     a_h[split_idx:], a_l[split_idx:], a_c[split_idx:], a_o[split_idx:],
@@ -799,16 +809,20 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
                     r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0, is_calib
                 )
                 
-                if net_oos > 0 or is_calib: 
+                # Se guarda si OOS es positivo O si es el primer ADN generado (para sacar a la IA del -inf)
+                if net_oos > 0 or is_calib or best_fit_live == -float('inf'): 
                     net_tot, pf_tot, nt_tot, mdd_tot, wr_tot = simular_core_rapido(
                         a_h, a_l, a_c, a_o, f_buy_tactical, f_sell_tactical, 
                         r_tp_pct, r_sl_pct, float(cap_ini), float(com_pct), float(invest_pct), 0.0, is_calib
                     )
                     
-                    best_fit_live = fit_score
+                    # Si OOS fue malo, reducimos artificialmente el fit_score para que otra mutación lo borre pronto
+                    final_fit = fit_score if net_oos > 0 else (fit_score * 0.1)
+
+                    best_fit_live = final_fit
                     vault = {
                         'b_team': dna_b_team, 's_team': dna_s_team, 'b_op': dna_b_op, 's_op': dna_s_op,
-                        'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': fit_score, 
+                        'hitbox': r_hitbox, 'therm_w': r_therm, 'adx_th': r_adx, 'whale_f': r_whale, 'fit': final_fit, 
                         'net': net_tot, 'net_is': net_is, 'net_oos': net_oos,
                         'winrate': wr_tot, 'pf': pf_tot, 'nt': nt_tot, 'reinv': invest_pct, 'ado': ado_actual, 
                         'tp_pct': r_tp_pct, 'sl_pct': r_sl_pct
@@ -825,6 +839,7 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
         current_best_net = v.get('net', 0)
         current_best_nt = v.get('nt', 0)
         current_best_pf = v.get('pf', 0)
+        current_best_ado = v.get('ado', 0.0)
 
         if deep_info:
             current_epoch_val = deep_info['current'] + (c+1)*(chunk_size); macro_pct = int((current_epoch_val / deep_info['total']) * 100)
@@ -844,7 +859,8 @@ def optimizar_ia_tracker(s_id, cap_ini, com_pct, invest_pct, target_ado, dias_re
             <div style="color: {color}; font-size: 1.8rem; font-weight: bold; margin-top: 15px;">{title}</div>
             <div style="color: white; font-size: 1.3rem;">{subtitle}</div>
             <div style="color: #00FF00; font-weight: bold; font-size: 1.5rem; margin-top: 15px;">🏆 Récord Global: ${current_best_net:.2f}</div>
-            <div style="color: cyan; font-size: 1.0rem;">Trades Totales: {current_best_nt} | Win Rate: {current_best_pf:.2f}x PF</div>
+            <div style="color: cyan; font-size: 1.0rem;">Trades: {current_best_nt} | PF: {current_best_pf:.2f}x</div>
+            <div style="color: yellow; font-size: 0.9rem;">ADO Objetivo: {target_ado:.1f} | ADO Actual: {current_best_ado:.2f}</div>
         </div>
         """
         ph_holograma.markdown(html_str, unsafe_allow_html=True)
@@ -884,6 +900,8 @@ def run_backtest_eval(s_id, cap_ini, com_pct):
         else:
             f_sell = np.zeros(n_len, dtype=bool)
             for r in vault.get('s_team', []): f_sell |= s_dict.get(r, default_f)
+            
+        f_buy = f_buy & ~f_sell # Anti-colisión final para el gráfico visual
 
     df_strat = df_global.copy()
     df_strat['Signal_Buy'], df_strat['Signal_Sell'], df_strat['Active_TP'], df_strat['Active_SL'] = f_buy, f_sell, f_tp, f_sl
@@ -1145,8 +1163,12 @@ pa_3_crows = vela_roja and nz(vela_roja[1]) and nz(vela_roja[2]) and close < nz(
 """
 
     ps_logic = f"""
-bool signal_buy = ({b_cond})
-bool signal_sell = ({s_cond})
+bool raw_buy = ({b_cond})
+bool raw_sell = ({s_cond})
+
+// Filtro anti-colisión matemático: La venta anula la compra si ocurren simultáneamente
+bool signal_buy = raw_buy and not raw_sell
+bool signal_sell = raw_sell
 """
 
     ps_exec = """
