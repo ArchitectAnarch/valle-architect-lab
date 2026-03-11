@@ -475,7 +475,15 @@ df_global, status_api = cargar_matriz(dp['ex'], dp['sym'], dp['start'], dp['end'
 if df_global.empty: st.error(status_api); st.stop()
 dias_reales = max((df_global.index[-1] - df_global.index[0]).days, 1)
 st.success(f"📊 Matrix V320 Extraída: **{len(df_global):,} velas** | **{dias_reales} días**")
-
+# --- BOTÓN DE EXTRACCIÓN PARA GENESIS IA ---
+csv_data = df_global.to_csv().encode('utf-8')
+st.download_button(
+    label="🤖 DESCARGAR MATRIX PARA IA (.CSV)",
+    data=csv_data,
+    file_name='matrix_v320_entrenamiento.csv',
+    mime='text/csv',
+)
+# -------------------------------------------
 # ==========================================
 # 🧠 CREACIÓN DE MATRICES NUMPY V320 CORE
 # ==========================================
