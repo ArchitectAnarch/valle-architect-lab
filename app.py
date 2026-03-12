@@ -1268,90 +1268,80 @@ st.markdown("<h3 style='text-align: center; color: #00FF00;'>🌐 CENTRO DE MAND
 tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENESIS V2 (Live Trader)"])
 
 with tab_live:
-    # 1. SEGURIDAD: Detectamos las variables del Sidebar
-    tf_actual = temporalidad if 'temporalidad' in locals() else '15m'
+    st.markdown("## 💹 GENESIS V2: LIVE TRADER (15M)")
     
-    st.markdown(f"## 🧠 Centro de Mando: GENESIS V2 ({tf_actual})")
+    # 1. Bóveda de persistencia para no saturar la API
+    if 'df_live_15m' not in st.session_state:
+        # Descargamos la base histórica de 15m (usando tu función del Lab)
+        st.session_state['df_live_15m'] = descargar_datos(ticker, '15m', 100)
     
-    # 2. SINCRONIZACIÓN DE BASE DE DATOS
-    sync_key = f"{ticker}-{tf_actual}"
-    
-    # Intentamos obtener la función desde el espacio global si no se ve directamente
-    f_descargar = globals().get('descargar_datos')
-
-    if f_descargar:
-        if 'last_ticker_sync' not in st.session_state or st.session_state['last_ticker_sync'] != sync_key:
-            try:
-                st.session_state['df_live_trade'] = f_descargar(ticker, tf_actual, 100)
-                st.session_state['last_ticker_sync'] = sync_key
-                st.success(f"✅ Base de datos {tf_actual} sincronizada")
-            except Exception as e:
-                st.error(f"Error en descarga: {e}")
-    else:
-        st.warning("🚀 GENESIS espera a que el motor de datos del Laboratorio se inicialice...")
-
     if 'radar_on' not in st.session_state: st.session_state['radar_on'] = False
 
     col_ctrl, col_data = st.columns([1, 4])
     
-    btn_label = "🔴 DETENER RADAR" if st.session_state['radar_on'] else "🚀 CONECTAR GRÁFICA LIVE"
-    if col_ctrl.button(btn_label, use_container_width=True, key="btn_v2_final"):
+    if col_ctrl.button("🚀 CONECTAR GRÁFICA EN VIVO", use_container_width=True):
         st.session_state['radar_on'] = not st.session_state['radar_on']
         st.rerun()
 
-    # 3. EL MONITOR DE RENDERIZADO (Fragmento)
+    # 2. EL MOTOR DE ACTUALIZACIÓN CUÁNTICA
     @st.fragment(run_every=1)
-    def render_grafica_viva_v2():
-        if st.session_state.get('radar_on') and 'df_live_trade' in st.session_state:
+    def render_grafica_viva():
+        if st.session_state['radar_on']:
             try:
                 import ccxt
                 import plotly.graph_objects as go
                 
-                # Obtener el precio actual
+                # Obtener el precio actual (el "latido")
                 ex_radar = ccxt.coinbase()
                 tick = ex_radar.fetch_ticker(ticker.replace('/', '-'))
                 precio_actual = float(tick['last'])
                 
-                df = st.session_state['df_live_trade'].copy()
+                # Actualizamos la última vela del DataFrame histórico con el precio real
+                df = st.session_state['df_live_15m'].copy()
                 
-                # Actualizar última vela
+                # Actualizar el 'Close' de la última fila y ajustar High/Low
                 idx_ultima = df.index[-1]
                 df.at[idx_ultima, 'Close'] = precio_actual
                 if precio_actual > df.at[idx_ultima, 'High']: df.at[idx_ultima, 'High'] = precio_actual
                 if precio_actual < df.at[idx_ultima, 'Low']: df.at[idx_ultima, 'Low'] = precio_actual
 
-                # RENDER GRÁFICO PROFESIONAL
+                # 3. RENDERIZADO TÉCNICO (Velas reales de 15m)
                 fig = go.Figure(data=[go.Candlestick(
-                    x=df['Timestamp'], open=df['Open'], high=df['High'],
+                    x=df['Timestamp'],
+                    open=df['Open'], high=df['High'],
                     low=df['Low'], close=df['Close'],
-                    increasing_line_color='#00ffcc', decreasing_line_color='#ff00ff'
+                    increasing_line_color='cyan', decreasing_line_color='magenta',
+                    name="Market Data"
                 )])
 
+                # Diseño de Terminal Bloomberg/Exchange
                 fig.update_layout(
-                    template='plotly_dark', height=500,
-                    margin=dict(l=0, r=60, t=10, b=0),
+                    template='plotly_dark',
+                    height=500,
+                    margin=dict(l=0, r=50, t=0, b=0),
                     xaxis_rangeslider_visible=False,
-                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.05)", tickformat=".6f")
+                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.05)", fixedrange=False),
+                    xaxis=dict(gridcolor="rgba(255,255,255,0.05)")
                 )
 
-                # Etiqueta de precio viva
+                # Anotación del precio actual flotante
                 fig.add_annotation(
                     x=df['Timestamp'].iloc[-1], y=precio_actual,
-                    text=f"  ${precio_actual:.6f}", showarrow=False,
-                    bgcolor="#00ffcc" if precio_actual >= df.at[idx_ultima, 'Open'] else "#ff00ff",
-                    font=dict(color="black", size=12, bold=True), xanchor="left", xshift=10
+                    text=f"  ${precio_actual:.6f}",
+                    showarrow=False, align="left", bgcolor="cyan" if precio_actual >= df.at[idx_ultima, 'Open'] else "magenta",
+                    font=dict(color="black", size=12), xanchor="left"
                 )
 
-                st.metric("PRECIO ACTUAL", f"${precio_actual:.6f}")
+                st.metric(label=f"💰 PRECIO ACTUAL {ticker}", value=f"${precio_actual:.6f}")
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                 
             except Exception as e:
-                st.info("Sincronizando flujo...")
+                st.info("Reconectando con el flujo de datos...")
         else:
-            st.info(f"📡 Radar en espera. Sintonizado a {ticker} en {tf_actual}.")
+            st.info("📡 Presiona el botón para sincronizar la gráfica de 15m con el precio en vivo.")
 
     with col_data:
-        render_grafica_viva_v2()
+        render_grafica_viva()
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
     tab_names = list(tab_id_map.keys())
