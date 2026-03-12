@@ -1270,52 +1270,68 @@ tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENE
 with tab_live:
     st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
     
-    # 1. Bóveda de Memoria de Corto Plazo
+    # 1. Variables de Estado blindadas
     if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
-    if 'historico_live' not in st.session_state: st.session_state['historico_live'] = []
+    if 'last_price' not in st.session_state: st.session_state['last_price'] = 0.0
+    if 'memoria_ticks' not in st.session_state: st.session_state['memoria_ticks'] = []
 
     col_ctrl, col_data = st.columns([1, 2])
-    # Limpiamos el ticker para Coinbase (Acepta USDC o USD)
     ticker_ws = ticker.replace('/', '-')
 
-    if col_ctrl.button("🚀 TRANSMISIÓN EN VIVO", key="v2_ignite"):
+    # BOTÓN DE CONTROL DE ENERGÍA
+    if col_ctrl.button("🚀 INICIAR / DETENER RADAR", key="v5_ignite", use_container_width=True):
         st.session_state['ws_run'] = not st.session_state['ws_run']
+        if not st.session_state['ws_run']:
+            st.session_state['last_price'] = 0.0 # Reset al apagar
+        st.rerun()
 
-    @st.fragment(run_every=1)
-    def motor_genesis_v2():
-        if st.session_state['ws_run']:
-            import websocket, json
+    # 2. Lógica de Captura (Solo corre si el radar está ON)
+    if st.session_state['ws_run']:
+        import websocket, json
+        
+        # Función para un solo tick rápido
+        def capturar_tick(sym):
             try:
-                ws = websocket.create_connection("wss://ws-feed.exchange.coinbase.com", timeout=2)
-                sub_msg = {"type": "subscribe", "product_ids": [ticker_ws], "channels": ["ticker"]}
-                ws.send(json.dumps(sub_msg))
+                # Conexión ultra-rápida con timeout corto para no congelar la UI
+                ws = websocket.create_connection("wss://ws-feed.exchange.coinbase.com", timeout=0.8)
+                ws.send(json.dumps({"type": "subscribe", "product_ids": [sym], "channels": ["ticker"]}))
                 
-                # Capturamos el tick
-                for _ in range(2):
-                    data = json.loads(ws.recv())
-                    if 'price' in data:
-                        p_actual = float(data['price'])
-                        # Guardamos en la memoria (máximo 50 puntos)
-                        st.session_state['historico_live'].append(p_actual)
-                        if len(st.session_state['historico_live']) > 50:
-                            st.session_state['historico_live'].pop(0)
-                        
-                        # UI TÁCTICA
-                        st.metric(f"📡 {ticker_ws}", f"${p_actual:.6f}")
-                        
-                        # CALCULO DE MOMENTUM (Simulado para la IA)
-                        if len(st.session_state['historico_live']) > 1:
-                            diff = st.session_state['historico_live'][-1] - st.session_state['historico_live'][-2]
-                            color_trend = "🟢" if diff >= 0 else "🔴"
-                            st.markdown(f"**Impulso:** {color_trend} | **Muestras en RAM:** {len(st.session_state['historico_live'])}")
+                # Buscamos el mensaje del ticker entre los primeros 3 (ignorar heartbeats/subscriptions)
+                for _ in range(3):
+                    msg = json.loads(ws.recv())
+                    if msg.get('type') == 'ticker' and 'price' in msg:
+                        ws.close()
+                        return float(msg['price'])
                 ws.close()
             except:
-                st.error("📡 Buscando señal...")
+                return None
+            return None
+
+        # Intentamos capturar el dato
+        nuevo_precio = capturar_tick(ticker_ws)
+        if nuevo_precio:
+            st.session_state['last_price'] = nuevo_precio
+            st.session_state['memoria_ticks'].append(nuevo_precio)
+            if len(st.session_state['memoria_ticks']) > 30:
+                st.session_state['memoria_ticks'].pop(0)
+
+    # 3. MONITOR VISUAL AISLADO
+    @st.fragment(run_every=1)
+    def monitor_v5():
+        if st.session_state['ws_run']:
+            p = st.session_state['last_price']
+            if p > 0:
+                st.metric(f"📡 {ticker_ws} (LIVE)", f"${p:.6f}")
+                # Barra de progreso de memoria
+                progreso = len(st.session_state['memoria_ticks']) / 30
+                st.progress(progreso, text=f"Memoria de IA: {len(st.session_state['memoria_ticks'])}/30 muestras")
+            else:
+                st.warning("📡 Sincronizando con Coinbase...")
         else:
-            st.info("Sistema en Standby.")
+            st.info("Sistema en Standby. Radar Apagado.")
 
     with col_data:
-        motor_genesis_v2()
+        monitor_v5()
 
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
