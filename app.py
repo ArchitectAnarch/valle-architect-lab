@@ -1276,22 +1276,25 @@ with tab_live:
     if 'memoria_ticks' not in st.session_state: st.session_state['memoria_ticks'] = []
 
     col_ctrl, col_data = st.columns([1, 2])
-    # Ticker formateado para API REST (IOTX/USD)
+    # Ticker formateado
     ticker_rest = ticker.split('/')[0] + "/USD"
 
     # BOTÓN DE CONTROL
-    if col_ctrl.button("🚀 ACTIVAR TELEMETRÍA V6", key="v6_ignite", use_container_width=True):
+    if col_ctrl.button("🚀 ACTIVAR TELEMETRÍA V6.1", key="v6_ignite", use_container_width=True):
         st.session_state['ws_run'] = not st.session_state['ws_run']
         st.rerun()
 
     # 2. MONITOR DE ALTA FRECUENCIA (@st.fragment)
-    @st.fragment(run_every=1) # Se ejecuta cada 1 segundo exacto
+    @st.fragment(run_every=1)
     def monitor_v6():
         if st.session_state['ws_run']:
             try:
-                # Pedimos el precio actual de forma ultrarrápida (Ticker REST)
-                # Usamos el exchange que ya tienes definido arriba (coinbase)
-                data_tick = exchange.fetch_ticker(ticker_rest)
+                # IMPORTANTE: Definimos un mini-exchange local para el radar
+                import ccxt
+                ex_radar = ccxt.coinbase() 
+                
+                # Pedimos el precio actual
+                data_tick = ex_radar.fetch_ticker(ticker_rest)
                 nuevo_p = float(data_tick['last'])
                 
                 # Guardamos en memoria
@@ -1300,7 +1303,7 @@ with tab_live:
                 if len(st.session_state['memoria_ticks']) > 50:
                     st.session_state['memoria_ticks'].pop(0)
 
-                # DIBUJAMOS LA INTERFAZ EN TIEMPO REAL
+                # DIBUJAMOS LA INTERFAZ
                 st.metric(f"📡 {ticker_rest} (LIVE)", f"${nuevo_p:.6f}")
                 
                 # Mini Gráfica de Latido (Sparkline)
