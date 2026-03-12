@@ -1268,36 +1268,27 @@ st.markdown("<h3 style='text-align: center; color: #00FF00;'>🌐 CENTRO DE MAND
 tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENESIS V2 (Live Trader)"])
 
 with tab_live:
-    st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
-    
-    # 1. Variables Globales Seguras
+    # 1. Variables Globales y Sincronización del Sidebar
     if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
     
-    # Sincronizamos con las variables de tu Menú Lateral
     tf_actual = iv_download if 'iv_download' in locals() else '1m'
     offset_actual = utc_offset if 'utc_offset' in locals() else -5.0
     ticker_rest = ticker.split('/')[0] + "/USD"
 
-    # Sensor de Cambio (Si cambias moneda/tiempo, reseteamos la memoria)
-    if 'radar_config' not in st.session_state:
-        st.session_state['radar_config'] = f"{ticker_rest}_{tf_actual}"
-        
-    if st.session_state['radar_config'] != f"{ticker_rest}_{tf_actual}":
+    # Sensor de Cambio: Resetea la gráfica si cambias de moneda o temporalidad
+    if 'radar_config' not in st.session_state or st.session_state['radar_config'] != f"{ticker_rest}_{tf_actual}":
         st.session_state['ohlc_live'] = pd.DataFrame()
         st.session_state['radar_config'] = f"{ticker_rest}_{tf_actual}"
 
-    if 'ohlc_live' not in st.session_state: 
-        st.session_state['ohlc_live'] = pd.DataFrame()
-
-    # 2. BOTÓN PRINCIPAL (Ancho Completo)
-    btn_label = f"🔴 DETENER STREAMING" if st.session_state['ws_run'] else f"🚀 INICIAR STREAMING VELAS ({tf_actual})"
+    # BOTÓN PRINCIPAL (Ancho completo, arriba de la gráfica)
+    btn_label = f"🔴 DETENER RADAR" if st.session_state['ws_run'] else f"🚀 INICIAR STREAMING VELAS ({tf_actual})"
     if st.button(btn_label, key="v6_ignite", use_container_width=True):
         st.session_state['ws_run'] = not st.session_state['ws_run']
         if st.session_state['ws_run']:
-            st.session_state['ohlc_live'] = pd.DataFrame() # Forzar recarga fresca
+            st.session_state['ohlc_live'] = pd.DataFrame()
         st.rerun()
 
-    # 3. EL RADAR (Renderizado debajo del botón para Full Width)
+    # 2. EL MOTOR DE RENDERIZADO (Fragmento)
     @st.fragment(run_every=1)
     def monitor_velas_v2():
         if st.session_state['ws_run']:
@@ -1307,81 +1298,97 @@ with tab_live:
                 import pandas as pd
                 from datetime import timedelta
                 
-                ex_radar = ccxt.coinbase() 
+                ex_radar = ccxt.coinbase({'enableRateLimit': False})
                 
-                # --- 🕯️ DESCARGA HISTÓRICA PROFUNDA ---
+                # --- 🕯️ LÓGICA PERFECTA DE TIEMPO (Delegada al Exchange) ---
                 if st.session_state['ohlc_live'].empty:
-                    velas_hist = ex_radar.fetch_ohlcv(ticker_rest, tf_actual, limit=200)
-                    df_hist = pd.DataFrame(velas_hist, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
-                    # FIX: Formato de tiempo Datetime nativo + Zona Horaria del Sidebar
-                    df_hist['Time'] = pd.to_datetime(df_hist['Time'], unit='ms') + timedelta(hours=offset_actual)
-                    st.session_state['ohlc_live'] = df_hist
+                    # Descarga inicial profunda (150 velas)
+                    velas = ex_radar.fetch_ohlcv(ticker_rest, tf_actual, limit=150)
+                    df = pd.DataFrame(velas, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
+                    # Aplicamos tu Zona Horaria
+                    df['Time'] = pd.to_datetime(df['Time'], unit='ms') + timedelta(hours=offset_actual)
+                    df.set_index('Time', inplace=True)
+                    st.session_state['ohlc_live'] = df
+                else:
+                    # Actualización en vivo: Solo pedimos las últimas 2 velas
+                    velas = ex_radar.fetch_ohlcv(ticker_rest, tf_actual, limit=2)
+                    df_new = pd.DataFrame(velas, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
+                    df_new['Time'] = pd.to_datetime(df_new['Time'], unit='ms') + timedelta(hours=offset_actual)
+                    df_new.set_index('Time', inplace=True)
+                    
+                    # Actualizamos las velas existentes
+                    st.session_state['ohlc_live'].update(df_new)
+                    
+                    # Si Coinbase detecta que pasó el minuto/hora, creará una fila nueva. La añadimos:
+                    nuevas_filas = df_new[~df_new.index.isin(st.session_state['ohlc_live'].index)]
+                    if not nuevas_filas.empty:
+                        st.session_state['ohlc_live'] = pd.concat([st.session_state['ohlc_live'], nuevas_filas])
+                        # Limpiamos el historial viejo para no saturar RAM
+                        if len(st.session_state['ohlc_live']) > 200:
+                            st.session_state['ohlc_live'] = st.session_state['ohlc_live'].iloc[-200:]
 
-                # --- 📡 PRECIO EN VIVO ---
-                data_tick = ex_radar.fetch_ticker(ticker_rest)
-                p_actual = float(data_tick['last'])
-                
-                # --- 🧬 ACTUALIZACIÓN DE LA ÚLTIMA VELA ---
                 df = st.session_state['ohlc_live']
-                idx = df.index[-1]
-                df.at[idx, 'Close'] = p_actual
-                
-                if p_actual > df.at[idx, 'High']: df.at[idx, 'High'] = p_actual
-                if p_actual < df.at[idx, 'Low']: df.at[idx, 'Low'] = p_actual
+                p_actual = df['Close'].iloc[-1]
 
-                # --- 📊 RENDERIZADO DEL GRÁFICO TIPO EXCHANGE ---
+                # --- 📊 RENDERIZADO ESTILO TRADINGVIEW ---
                 fig_live = go.Figure(data=[go.Candlestick(
-                    x=df['Time'],
+                    x=df.index,
                     open=df['Open'], high=df['High'],
                     low=df['Low'], close=df['Close'],
-                    increasing_line_color='#00ffcc',
-                    decreasing_line_color='#ff00ff',
-                    name='Market'
+                    increasing_line_color='#00ffcc', # Cyan
+                    decreasing_line_color='#ff00ff', # Magenta
+                    name='Precio',
+                    showlegend=False
                 )])
 
-                # LÍNEA DE PRECIO VIVA
+                # LÍNEA DEL PRECIO ACTUAL (Atraviesa el gráfico de lado a lado)
                 fig_live.add_hline(
-                    y=p_actual, 
-                    line_dash="dot", 
-                    line_color="yellow", 
-                    line_width=1,
-                    annotation_text=f"  ${p_actual:.6f}", 
-                    annotation_position="bottom right",
-                    annotation_font_color="black",
-                    annotation_bgcolor="yellow"
+                    y=p_actual, line_dash="dot", line_color="yellow", line_width=1,
+                    annotation_text=f"${p_actual:.4f}", annotation_position="bottom right",
+                    annotation_font=dict(color="black", size=12), annotation_bgcolor="yellow"
                 )
 
                 fig_live.update_layout(
                     template='plotly_dark',
-                    height=650, # Altura institucional
+                    height=600,
                     margin=dict(l=10, r=60, t=10, b=10),
                     xaxis_rangeslider_visible=False,
-                    uirevision='constant', # 🔥 FIX: EVITA QUE TITILEE Y RESETEE EL ZOOM 🔥
-                    hovermode='closest',
+                    uirevision='constant', # 🔥 ANCLA EL ZOOM Y EVITA SALTOS 🔥
+                    
+                    # 🔥 CROSSHAIR ESTILO TRADINGVIEW 🔥
+                    hovermode='x unified', 
+                    hoverlabel=dict(bgcolor="rgba(0,0,0,0.8)", font_size=13, font_family="Courier New"),
                     yaxis=dict(
-                        side="right", 
-                        gridcolor="rgba(255,255,255,0.05)",
-                        tickformat=".6f",
-                        fixedrange=False, # 🔥 FIX: PERMITE ESTIRAR/ZOOM EJE Y 🔥
-                        showspikes=True, spikemode="across", spikesnap="cursor", spikecolor="rgba(255,255,255,0.4)", spikethickness=1 # 🔥 CROSSHAIR LIBRE Y 🔥
+                        side="right",
+                        tickformat=".4f",
+                        fixedrange=False,
+                        showline=True, linecolor='rgba(255,255,255,0.2)',
+                        showgrid=True, gridcolor='rgba(255,255,255,0.05)',
+                        showspikes=True, spikemode="across", spikesnap="cursor", spikecolor="rgba(255,255,255,0.5)", spikethickness=1
                     ),
                     xaxis=dict(
-                        gridcolor="rgba(255,255,255,0.05)",
-                        fixedrange=False, # 🔥 FIX: PERMITE ESTIRAR/ZOOM EJE X 🔥
-                        showspikes=True, spikemode="across", spikesnap="cursor", spikecolor="rgba(255,255,255,0.4)", spikethickness=1 # 🔥 CROSSHAIR LIBRE X 🔥
+                        type='date',
+                        tickformat="%H:%M\n%d %b", # Etiqueta de hora limpia
+                        nticks=6, # 🔥 No satura el eje X, deja espacios limpios 🔥
+                        fixedrange=False,
+                        showline=True, linecolor='rgba(255,255,255,0.2)',
+                        showgrid=True, gridcolor='rgba(255,255,255,0.05)',
+                        showspikes=True, spikemode="across", spikesnap="cursor", spikecolor="rgba(255,255,255,0.5)", spikethickness=1
                     )
                 )
 
-                st.metric(f"📡 {ticker_rest} (Velas {tf_actual}) | Zona: UTC {offset_actual}", f"${p_actual:.6f}")
-                # 🔥 FIX: config={'scrollZoom': True} ACTIVA LA RUEDA DEL RATÓN 🔥
+                # Título integrado como HTML (evita el repintado de st.metric)
+                st.markdown(f"<h3 style='text-align:center; color:#00ffcc;'>{ticker_rest} | Temporalidad: {tf_actual} | UTC {offset_actual} | Precio: ${p_actual:.6f}</h3>", unsafe_allow_html=True)
+                
+                # Render final con zoom del ratón activado
                 st.plotly_chart(fig_live, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
                     
             except Exception as e:
-                st.error(f"⚠️ Error de enlace: {e}")
+                st.error(f"⚠️ Sincronizando datos... {e}")
         else:
-            st.info(f"Sistema en Standby. Telemetría lista para {ticker_rest} en {tf_actual}.")
+            st.info(f"Sistema en Standby. Telemetría lista para {ticker_rest} en {tf_actual}. Pulsa Iniciar.")
 
-    # Ejecución sin columnas para Full Width
+    # Ejecución sin columnas extra (Full Width)
     monitor_velas_v2()
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
