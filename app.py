@@ -1270,13 +1270,13 @@ tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENE
 with tab_live:
     st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
     
-    # 1. Bóveda de Datos (Simplificada)
+    # 1. Bóveda de Datos
     if 'precio_wss' not in st.session_state:
         st.session_state['precio_wss'] = 0.0
     if 'ws_activo' not in st.session_state:
         st.session_state['ws_activo'] = False
 
-    # 2. El Motor de Escucha
+    # 2. El Motor de Escucha (Alineación corregida)
     def motor_wss_pro(simbolo_ws):
         import websocket
         import json
@@ -1286,12 +1286,12 @@ with tab_live:
             if 'price' in data:
                 st.session_state['precio_wss'] = float(data['price'])
 
-       def on_open(ws):
-            # Suscripción reforzada para forzar la llegada de datos
+        def on_open(ws):
+            # Suscripción reforzada
             sub_msg = {
                 "type": "subscribe",
                 "product_ids": [simbolo_ws],
-                "channels": ["ticker", "level2_batch"] 
+                "channels": ["ticker"]
             }
             ws.send(json.dumps(sub_msg))
 
@@ -1301,21 +1301,17 @@ with tab_live:
 
     # 3. Interfaz de Control
     col_ctrl, col_data = st.columns([1, 2])
-
-    # Forzamos que el ticker sea el correcto (USD en lugar de USDC si es necesario)
     ticker_limpio = ticker.replace('/', '-').replace('USDC', 'USD')
 
     if col_ctrl.button("🚀 FORZAR IGNICIÓN", key="ignicion_final", use_container_width=True):
-        st.session_state['ws_activo'] = True # Encendemos el radar visualmente de inmediato
-        
+        st.session_state['ws_activo'] = True
         hilo = threading.Thread(target=motor_wss_pro, args=(ticker_limpio,), daemon=True)
         hilo.start()
-        
         st.toast(f"Enlazando con Matrix: {ticker_limpio}")
         time.sleep(1)
         st.rerun()
 
-    # 4. Monitor de Telemetría
+    # 4. Monitor de Telemetría (Fragmento aislado)
     @st.fragment(run_every=0.5)
     def monitor_live():
         if st.session_state['ws_activo']:
