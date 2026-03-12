@@ -1268,27 +1268,32 @@ st.markdown("<h3 style='text-align: center; color: #00FF00;'>🌐 CENTRO DE MAND
 tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENESIS V2 (Live Trader)"])
 
 with tab_live:
-    st.markdown(f"## 💹 GENESIS V2: LIVE TRADER ({temporalidad})")
+    # 1. SEGURIDAD: Detectamos la temporalidad del Sidebar
+    # Si tu variable se llama distinto (ej. 'intervalo'), cámbiala aquí:
+    tf_actual = temporalidad if 'temporalidad' in locals() else '15m'
     
-    # 1. Sincronización dinámica con el Menú Lateral
-    # Si cambias el ticker o la temporalidad, reseteamos la memoria para recargar
-    if 'last_ticker_sync' not in st.session_state or st.session_state['last_ticker_sync'] != f"{ticker}-{temporalidad}":
+    st.markdown(f"## 💹 GENESIS V2: LIVE TRADER ({tf_actual})")
+    
+    # 2. Sincronización dinámica con el Menú Lateral
+    sync_key = f"{ticker}-{tf_actual}"
+    if 'last_ticker_sync' not in st.session_state or st.session_state['last_ticker_sync'] != sync_key:
         try:
-            st.session_state['df_live_trade'] = descargar_datos(ticker, temporalidad, 100)
-            st.session_state['last_ticker_sync'] = f"{ticker}-{temporalidad}"
-        except:
-            st.warning("Aguardando conexión con el servidor de datos...")
+            # Forzamos la descarga inicial
+            st.session_state['df_live_trade'] = descargar_datos(ticker, tf_actual, 100)
+            st.session_state['last_ticker_sync'] = sync_key
+        except Exception as e:
+            st.warning(f"Sincronizando base de datos: {e}")
 
     if 'radar_on' not in st.session_state: st.session_state['radar_on'] = False
 
     col_ctrl, col_data = st.columns([1, 4])
     
     btn_label = "🔴 DETENER RADAR" if st.session_state['radar_on'] else "🚀 CONECTAR GRÁFICA LIVE"
-    if col_ctrl.button(btn_label, use_container_width=True):
+    if col_ctrl.button(btn_label, use_container_width=True, key="pestaña_v2_btn"):
         st.session_state['radar_on'] = not st.session_state['radar_on']
         st.rerun()
 
-    # 2. EL MOTOR DE RENDERIZADO EN TIEMPO REAL
+    # 3. EL MOTOR DE RENDERIZADO EN TIEMPO REAL
     @st.fragment(run_every=1)
     def render_grafica_viva_v2():
         if st.session_state['radar_on'] and 'df_live_trade' in st.session_state:
@@ -1312,7 +1317,7 @@ with tab_live:
                 if precio_actual > df.at[idx_ultima, 'High']: df.at[idx_ultima, 'High'] = precio_actual
                 if precio_actual < df.at[idx_ultima, 'Low']: df.at[idx_ultima, 'Low'] = precio_actual
 
-                # 3. DISEÑO DE LA GRÁFICA PROFESIONAL
+                # 4. DISEÑO DE LA GRÁFICA PROFESIONAL
                 fig = go.Figure(data=[go.Candlestick(
                     x=df['Timestamp'],
                     open=df['Open'], high=df['High'],
@@ -1342,22 +1347,22 @@ with tab_live:
                     text=f"  ${precio_actual:.6f}",
                     showarrow=False, align="left", 
                     bgcolor="#00ffcc" if precio_actual >= df.at[idx_ultima, 'Open'] else "#ff00ff",
-                    font=dict(color="black", size=12, family="Courier New"),
+                    font=dict(color="black", size=12, family="Courier New", bold=True),
                     xanchor="left", xshift=10
                 )
 
                 # Panel de Control Superior
-                c1, c2, c3 = st.columns(3)
-                c1.metric("PRECIO", f"${precio_actual:.6f}")
-                c2.write(f"**Vela:** {temporalidad}")
-                c3.write(f"**Estado:** 🟢 Conectado")
+                met1, met2, met3 = st.columns(3)
+                met1.metric("PRECIO ACTUAL", f"${precio_actual:.6f}")
+                met2.write(f"**Temporalidad:** {tf_actual}")
+                met3.write(f"**Estado:** 📡 Streaming OK")
 
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                 
             except Exception as e:
-                st.info("Sincronizando flujo de datos con Coinbase...")
+                st.info("Esperando señal de Coinbase...")
         else:
-            st.info(f"📡 Radar en espera. Sintonizado a {ticker} en {temporalidad}.")
+            st.info(f"📡 Sistema en espera. Sintonizado a {ticker} en {tf_actual}.")
 
     with col_data:
         render_grafica_viva_v2()
