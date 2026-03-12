@@ -11,6 +11,8 @@ import json
 import os
 import glob
 from datetime import datetime, timedelta
+import websocket
+import threading
 
 # --- MOTOR DE HIPER-VELOCIDAD (NUMBA JIT) ---
 try:
@@ -1267,7 +1269,51 @@ tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENE
 
 with tab_live:
     st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
-    st.info("📡 Radar Apagado. Esperando conexión WebSocket al Order Book...")
+    
+    # 1. Variables de memoria para el radar
+    if 'live_price' not in st.session_state:
+        st.session_state['live_price'] = 0.0
+    if 'ws_connected' not in st.session_state:
+        st.session_state['ws_connected'] = False
+
+    # 2. Las funciones de escucha del túnel (Callbacks)
+    def on_message(ws, message):
+        data = json.loads(message)
+        if 'price' in data:
+            st.session_state['live_price'] = float(data['price'])
+
+    def on_open(ws):
+        st.session_state['ws_connected'] = True
+        # Adaptamos el ticker (ej. IOTX/USD -> IOTX-USD para Coinbase)
+        sym_ws = ticker.replace('/', '-') 
+        sub_msg = {"type": "subscribe", "product_ids": [sym_ws], "channels": ["ticker"]}
+        ws.send(json.dumps(sub_msg))
+
+    def on_close(ws, close_status_code, close_msg):
+        st.session_state['ws_connected'] = False
+
+    def iniciar_radar():
+        ws_url = "wss://ws-feed.exchange.coinbase.com"
+        ws = websocket.WebSocketApp(ws_url, on_open=on_open, on_message=on_message, on_close=on_close)
+        ws.run_forever()
+
+    # 3. Interfaz del Centro de Mando
+    c_live1, c_live2 = st.columns([1, 2])
+    
+    if c_live1.button("🟢 ENCENDER RADAR WEBSOCKET", use_container_width=True):
+        if not st.session_state['ws_connected']:
+            hilo_ws = threading.Thread(target=iniciar_radar, daemon=True)
+            hilo_ws.start()
+            time.sleep(1) # Un segundo para que conecte la válvula
+            st.rerun()
+            
+    if st.session_state['ws_connected']:
+        c_live2.metric(f"🔥 Streaming en Vivo ({ticker})", f"${st.session_state['live_price']:.6f}")
+        # Bucle de Auto-Refresco visual (1 frame por segundo)
+        time.sleep(1)
+        st.rerun()
+    else:
+        c_live2.info("📡 Radar Apagado. Pulsa el botón para abrir el túnel al Order Book.")
 
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
