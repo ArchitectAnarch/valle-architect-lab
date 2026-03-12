@@ -1270,28 +1270,31 @@ tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENE
 with tab_live:
     st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
     
-    # 1. Bóveda de Datos
+    # 1. Bóveda de Datos de Alta Velocidad
     if 'precio_wss' not in st.session_state:
         st.session_state['precio_wss'] = 0.0
     if 'ws_activo' not in st.session_state:
         st.session_state['ws_activo'] = False
 
-    # 2. El Motor de Escucha (Alineación corregida)
+    # 2. El Motor de Escucha Profesional
     def motor_wss_pro(simbolo_ws):
         import websocket
         import json
         
         def on_message(ws, message):
             data = json.loads(message)
+            # Capturamos el precio tanto del canal 'ticker' como de 'l2update'
             if 'price' in data:
                 st.session_state['precio_wss'] = float(data['price'])
+            elif 'changes' in data: # Canal Level 2 (más agresivo)
+                st.session_state['precio_wss'] = float(data['changes'][0][1])
 
         def on_open(ws):
-            # Suscripción reforzada
+            # Suscripción Multi-Canal para forzar el flujo de datos
             sub_msg = {
                 "type": "subscribe",
                 "product_ids": [simbolo_ws],
-                "channels": ["ticker"]
+                "channels": ["ticker", "heartbeat"]
             }
             ws.send(json.dumps(sub_msg))
 
@@ -1301,26 +1304,37 @@ with tab_live:
 
     # 3. Interfaz de Control
     col_ctrl, col_data = st.columns([1, 2])
-    ticker_limpio = ticker.replace('/', '-').replace('USDC', 'USD')
+    
+    # Normalización del Ticker: Coinbase WSS necesita GUION
+    ticker_ws = ticker.replace('/', '-').split('-')[0] + "-USD"
 
-    if col_ctrl.button("🚀 FORZAR IGNICIÓN", key="ignicion_final", use_container_width=True):
+    if col_ctrl.button("🚀 FORZAR IGNICIÓN V4", key="ignicion_v4", use_container_width=True):
         st.session_state['ws_activo'] = True
-        hilo = threading.Thread(target=motor_wss_pro, args=(ticker_limpio,), daemon=True)
+        # Limpiamos el precio antes de arrancar
+        st.session_state['precio_wss'] = 0.0
+        
+        hilo = threading.Thread(target=motor_wss_pro, args=(ticker_ws,), daemon=True)
         hilo.start()
-        st.toast(f"Enlazando con Matrix: {ticker_limpio}")
+        st.toast(f"Enlazando con Matrix: {ticker_ws}")
         time.sleep(1)
         st.rerun()
 
-    # 4. Monitor de Telemetría (Fragmento aislado)
+    # 4. MONITOR DE TELEMETRÍA (Fragmento)
     @st.fragment(run_every=0.5)
     def monitor_live():
         if st.session_state['ws_activo']:
-            if st.session_state['precio_wss'] == 0:
-                st.warning(f"📡 Buscando señal de {ticker_limpio}...")
+            precio = st.session_state['precio_wss']
+            if precio == 0:
+                st.warning(f"📡 Buscando señal de {ticker_ws}...")
+                # Botón de rescate si el par está muerto
+                if st.button("🔄 PROBAR CON BTC-USD (TEST)"):
+                    st.session_state['precio_wss'] = 0.0
+                    hilo_test = threading.Thread(target=motor_wss_pro, args=("BTC-USD",), daemon=True)
+                    hilo_test.start()
             else:
                 st.metric(
-                    label=f"🔥 LIVE: {ticker_limpio}", 
-                    value=f"${st.session_state['precio_wss']:.6f}",
+                    label=f"🔥 LIVE: {ticker_ws}", 
+                    value=f"${precio:.6f}",
                     delta="TÚNEL ABIERTO"
                 )
         else:
