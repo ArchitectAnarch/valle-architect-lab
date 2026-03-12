@@ -1261,8 +1261,18 @@ with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA", expanded=True):
             st.rerun()
     st.markdown("---")
 
-st.markdown("<h3 style='text-align: center; color: #00FF00;'>🎡 CARRUSEL DE MUTANTES IA</h3>", unsafe_allow_html=True)
-tab_names = list(tab_id_map.keys())
+st.markdown("<h3 style='text-align: center; color: #00FF00;'>🌐 CENTRO DE MANDO INSTITUCIONAL</h3>", unsafe_allow_html=True)
+
+tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENESIS V2 (Live Trader)"])
+
+with tab_live:
+    st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
+    st.info("📡 Radar Apagado. Esperando conexión WebSocket al Order Book...")
+
+with tab_forja:
+    # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
+    tab_names = list(tab_id_map.keys())
+    tab_names = list(tab_id_map.keys())
 
 if len(tab_names) > 0:
     default_idx = len(tab_names) - 1
