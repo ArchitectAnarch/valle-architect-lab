@@ -1278,8 +1278,6 @@ with tab_live:
     if 'ws_ticker' not in st.session_state:
         st.session_state['ws_ticker'] = "Desconocido"
 
-    pantalla_radar = st.empty() # Contenedor visual
-
     # 2. Las funciones de escucha del túnel
     def radar_worker(simbolo_ws):
         import websocket
@@ -1287,12 +1285,10 @@ with tab_live:
         
         def on_message(ws, message):
             data = json.loads(message)
-            # Coinbase envía el precio en la etiqueta 'price'
             if 'price' in data:
                 st.session_state['live_price'] = float(data['price'])
 
         def on_open(ws):
-            # 🔥 Usamos el símbolo exacto del Comandante 🔥
             sub_msg = {"type": "subscribe", "product_ids": [simbolo_ws], "channels": ["ticker"]}
             ws.send(json.dumps(sub_msg))
 
@@ -1306,25 +1302,28 @@ with tab_live:
     # 3. Interfaz del Centro de Mando
     c_live1, c_live2 = st.columns([1, 2])
     
-    # 🔥 AÑADIMOS KEY="btn_radar_ws" PARA QUE STREAMLIT NO SE CONFUNDA 🔥
     if c_live1.button("🟢 ENCENDER RADAR WEBSOCKET", key="btn_radar_ws", use_container_width=True):
         if not st.session_state['ws_connected']:
-            # Convertimos IOTX/USD a IOTX-USD (El formato secreto de Coinbase WSS)
             simbolo_formateado = ticker.replace('/', '-')
             st.session_state['ws_ticker'] = simbolo_formateado
             st.session_state['ws_connected'] = True
             
             hilo_ws = threading.Thread(target=radar_worker, args=(simbolo_formateado,), daemon=True)
             hilo_ws.start()
-            st.rerun()
+            st.rerun() # Hacemos un solo rerun general para inicializar el botón
             
-    if st.session_state['ws_connected']:
-        # Mostramos el precio en vivo
-        pantalla_radar.metric(f"🔥 Streaming en Vivo ({st.session_state['ws_ticker']})", f"${st.session_state['live_price']:,.6f}")
-        time.sleep(1.5)
-        st.rerun()
-    else:
-        pantalla_radar.info("📡 Radar Apagado. Pulsa el botón para abrir el túnel al Order Book.")
+    # 🔥 MAGIA ANTI-GLITCH: El Fragmento Aislado 🔥
+    # Esto le dice a Streamlit: "Actualiza SOLO esta función cada 1 segundo exacto"
+    @st.fragment(run_every=1)
+    def mostrar_radar_aislado():
+        if st.session_state['ws_connected']:
+            st.metric(f"🔥 Streaming en Vivo ({st.session_state['ws_ticker']})", f"${st.session_state['live_price']:,.6f}")
+        else:
+            st.info("📡 Radar Apagado. Pulsa el botón para abrir el túnel al Order Book.")
+
+    # 4. Inyectamos el fragmento en la columna derecha
+    with c_live2:
+        mostrar_radar_aislado()
 
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
