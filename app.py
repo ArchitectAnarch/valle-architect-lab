@@ -1273,16 +1273,26 @@ with tab_live:
     # 1. Bóveda de Datos OHLC en Vivo
     if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
     
-    # 🔥 CORRECCIÓN: Agregamos la columna 'Volume' para que coincida con Coinbase (6 columnas)
+    # Capturamos la temporalidad de tu menú lateral (iv_download)
+    tf_actual = iv_download if 'iv_download' in locals() else '15m'
+    ticker_rest = ticker.split('/')[0] + "/USD"
+
+    # 🔥 SENSOR DE CAMBIO: Si cambias de moneda o temporalidad, reseteamos el radar
+    if 'radar_config' not in st.session_state:
+        st.session_state['radar_config'] = f"{ticker_rest}_{tf_actual}"
+        
+    if st.session_state['radar_config'] != f"{ticker_rest}_{tf_actual}":
+        st.session_state['ohlc_live'] = pd.DataFrame(columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
+        st.session_state['radar_config'] = f"{ticker_rest}_{tf_actual}"
+
     if 'ohlc_live' not in st.session_state: 
         st.session_state['ohlc_live'] = pd.DataFrame(columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
 
-    col_ctrl, col_data = st.columns([1, 3]) # Más espacio para el gráfico
-    ticker_rest = ticker.split('/')[0] + "/USD"
+    col_ctrl, col_data = st.columns([1, 3]) 
 
-    if col_ctrl.button("🚀 INICIAR STREAMING VELAS", key="v6_ignite", use_container_width=True):
+    if col_ctrl.button(f"🚀 INICIAR STREAMING VELAS ({tf_actual})", key="v6_ignite", use_container_width=True):
         st.session_state['ws_run'] = not st.session_state['ws_run']
-        # Limpiamos la memoria al apagar/encender para descargar velas frescas
+        # Limpiamos al encender para forzar descarga fresca
         if st.session_state['ws_run']:
             st.session_state['ohlc_live'] = pd.DataFrame(columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
         st.rerun()
@@ -1297,13 +1307,13 @@ with tab_live:
                 
                 ex_radar = ccxt.coinbase() 
                 
-                # --- 🕯️ DESCARGA INICIAL DE VELAS REALES (Solo ocurre una vez) ---
+                # --- 🕯️ DESCARGA HISTÓRICA PROFUNDA ---
                 if st.session_state['ohlc_live'].empty:
-                    # Descargamos 40 velas de 15 minutos. (Trae 6 columnas por defecto)
-                    velas_15m = ex_radar.fetch_ohlcv(ticker_rest, '15m', limit=40)
-                    df_hist = pd.DataFrame(velas_15m, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
-                    # Convertimos el tiempo a formato legible
-                    df_hist['Time'] = pd.to_datetime(df_hist['Time'], unit='ms').dt.strftime('%H:%M:%S')
+                    # Usamos tf_actual (dinámico) y subimos el límite a 200 velas (máximo seguro)
+                    velas_hist = ex_radar.fetch_ohlcv(ticker_rest, tf_actual, limit=200)
+                    df_hist = pd.DataFrame(velas_hist, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
+                    # Formato de tiempo ajustado para ver días en temporalidades altas
+                    df_hist['Time'] = pd.to_datetime(df_hist['Time'], unit='ms').dt.strftime('%m-%d %H:%M')
                     st.session_state['ohlc_live'] = df_hist
 
                 # --- 📡 PRECIO EN VIVO ---
@@ -1311,11 +1321,9 @@ with tab_live:
                 p_actual = float(data_tick['last'])
                 
                 # --- 🧬 ACTUALIZACIÓN DE LA ÚLTIMA VELA ---
-                # En lugar de agregar una vela nueva, modificamos la última de la tabla
                 idx = st.session_state['ohlc_live'].index[-1]
                 st.session_state['ohlc_live'].at[idx, 'Close'] = p_actual
                 
-                # Si el precio actual supera el máximo o mínimo, la mecha crece
                 if p_actual > st.session_state['ohlc_live'].at[idx, 'High']:
                     st.session_state['ohlc_live'].at[idx, 'High'] = p_actual
                 if p_actual < st.session_state['ohlc_live'].at[idx, 'Low']:
@@ -1328,27 +1336,56 @@ with tab_live:
                     high=st.session_state['ohlc_live']['High'],
                     low=st.session_state['ohlc_live']['Low'],
                     close=st.session_state['ohlc_live']['Close'],
-                    increasing_line_color='cyan', 
-                    decreasing_line_color='magenta'
+                    increasing_line_color='#00ffcc', # Cyan eléctrico
+                    decreasing_line_color='#ff00ff'  # Magenta neón
                 )])
+
+                # 🔥 LÍNEA DE PRECIO HORIZONTAL VIVA 🔥
+                fig_live.add_hline(
+                    y=p_actual, 
+                    line_dash="dot", 
+                    line_color="yellow", 
+                    line_width=1,
+                    annotation_text=f"  ${p_actual:.6f}", 
+                    annotation_position="bottom right",
+                    annotation_font_color="black",
+                    annotation_bgcolor="yellow"
+                )
 
                 fig_live.update_layout(
                     template='plotly_dark',
-                    height=400,
-                    margin=dict(l=10, r=10, t=10, b=10),
+                    height=550, # Más alto
+                    margin=dict(l=10, r=60, t=10, b=10),
                     xaxis_rangeslider_visible=False,
-                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.1)"),
-                    xaxis=dict(gridcolor="rgba(255,255,255,0.1)")
+                    hovermode='x unified', # 🔥 CROSSHAIR ACTIVADO 🔥
+                    yaxis=dict(
+                        side="right", 
+                        gridcolor="rgba(255,255,255,0.05)",
+                        tickformat=".6f",
+                        showspikes=True, # Líneas del crosshair
+                        spikemode="across",
+                        spikedash="solid",
+                        spikecolor="rgba(255,255,255,0.3)",
+                        spikethickness=1
+                    ),
+                    xaxis=dict(
+                        gridcolor="rgba(255,255,255,0.05)",
+                        showspikes=True, # Líneas del crosshair
+                        spikemode="across",
+                        spikedash="solid",
+                        spikecolor="rgba(255,255,255,0.3)",
+                        spikethickness=1
+                    )
                 )
 
                 # Mostrar métrica y gráfico
-                st.metric(f"📡 {ticker_rest} (Velas 15m)", f"${p_actual:.6f}")
+                st.metric(f"📡 {ticker_rest} (Velas {tf_actual})", f"${p_actual:.6f}")
                 st.plotly_chart(fig_live, use_container_width=True, config={'displayModeBar': False})
                     
             except Exception as e:
                 st.error(f"⚠️ Error de enlace: {e}")
         else:
-            st.info("Sistema en Standby. Telemetría de velas lista.")
+            st.info(f"Sistema en Standby. Telemetría lista para {ticker_rest} en {tf_actual}.")
 
     with col_data:
         monitor_velas_v2()
