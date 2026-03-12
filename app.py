@@ -1286,12 +1286,12 @@ with tab_live:
             if 'price' in data:
                 st.session_state['precio_wss'] = float(data['price'])
 
-        def on_open(ws):
-            # Suscripción Estándar Coinbase
+       def on_open(ws):
+            # Suscripción reforzada para forzar la llegada de datos
             sub_msg = {
                 "type": "subscribe",
                 "product_ids": [simbolo_ws],
-                "channels": ["ticker"]
+                "channels": ["ticker", "level2_batch"] 
             }
             ws.send(json.dumps(sub_msg))
 
