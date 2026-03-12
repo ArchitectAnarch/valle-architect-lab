@@ -1270,15 +1270,27 @@ tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENE
 with tab_live:
     st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
     
-    # 1. Bóveda de Datos OHLC en Vivo
-    if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
-    if 'ohlc_live' not in st.session_state: 
-        st.session_state['ohlc_live'] = pd.DataFrame(columns=['Open', 'High', 'Low', 'Close'])
+    # 1. Bóveda de Datos (Sincronizada con Sidebar)
+    # Usamos la temporalidad que elegiste en el menú lateral para definir la vela
+    tf_minutos = 15 # Valor por defecto
+    if 'temporalidad' in locals():
+        if 'm' in temporalidad: tf_minutos = int(temporalidad.replace('m',''))
+        if 'h' in temporalidad: tf_minutos = int(temporalidad.replace('h','')) * 60
 
-    col_ctrl, col_data = st.columns([1, 3]) # Más espacio para el gráfico
+    if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
+    
+    # Aquí guardamos las velas "reales" que se van formando
+    if 'ohlc_real' not in st.session_state:
+        # Intentamos precargar el histórico para que no empiece de cero
+        try:
+            st.session_state['ohlc_real'] = descargar_datos(ticker, temporalidad, 50)
+        except:
+            st.session_state['ohlc_real'] = pd.DataFrame(columns=['Timestamp', 'Open', 'High', 'Low', 'Close'])
+
+    col_ctrl, col_data = st.columns([1, 3])
     ticker_rest = ticker.split('/')[0] + "/USD"
 
-    if col_ctrl.button("🚀 INICIAR STREAMING VELAS", key="v6_ignite", use_container_width=True):
+    if col_ctrl.button("🚀 INICIAR RADAR REALISTA", key="v6_ignite", use_container_width=True):
         st.session_state['ws_run'] = not st.session_state['ws_run']
         st.rerun()
 
@@ -1292,52 +1304,43 @@ with tab_live:
                 data_tick = ex_radar.fetch_ticker(ticker_rest)
                 p_actual = float(data_tick['last'])
                 
-                # --- 🕯️ LÓGICA DE CONSTRUCCIÓN DE VELAS ---
-                # Creamos una nueva fila con el precio actual
-                nueva_vela = {
-                    'Open': p_actual, # Simplificado para ticks de 1s
-                    'High': p_actual,
-                    'Low': p_actual,
-                    'Close': p_actual,
-                    'Time': datetime.now().strftime('%H:%M:%S')
-                }
+                # --- 🕯️ LÓGICA DE ACTUALIZACIÓN DE VELA ACTUAL ---
+                df = st.session_state['ohlc_real']
                 
-                # Actualizamos el DataFrame en memoria
-                temp_df = pd.DataFrame([nueva_vela])
-                st.session_state['ohlc_live'] = pd.concat([st.session_state['ohlc_live'], temp_df], ignore_index=True)
+                # Actualizamos el precio de CIERRE de la última vela en tiempo real
+                idx_last = df.index[-1]
+                df.at[idx_last, 'Close'] = p_actual
                 
-                # Mantener solo las últimas 40 velas para no saturar la RAM
-                if len(st.session_state['ohlc_live']) > 40:
-                    st.session_state['ohlc_live'] = st.session_state['ohlc_live'].iloc[1:].reset_index(drop=True)
-
-                # --- 📊 RENDERIZADO DEL GRÁFICO PROFESIONAL ---
+                # Si el precio actual supera el máximo o mínimo de la vela, lo expandimos
+                if p_actual > df.at[idx_last, 'High']: df.at[idx_last, 'High'] = p_actual
+                if p_actual < df.at[idx_last, 'Low']: df.at[idx_last, 'Low'] = p_actual
+                
+                # --- 📊 RENDERIZADO ESTILO EXCHANGE ---
                 fig_live = go.Figure(data=[go.Candlestick(
-                    x=st.session_state['ohlc_live']['Time'],
-                    open=st.session_state['ohlc_live']['Open'],
-                    high=st.session_state['ohlc_live']['High'],
-                    low=st.session_state['ohlc_live']['Low'],
-                    close=st.session_state['ohlc_live']['Close'],
-                    increasing_line_color='cyan', 
-                    decreasing_line_color='magenta'
+                    x=df['Timestamp'] if 'Timestamp' in df.columns else df.index,
+                    open=df['Open'], high=df['High'],
+                    low=df['Low'], close=df['Close'],
+                    increasing_line_color='#00ffcc', # Cyan
+                    decreasing_line_color='#ff00ff'  # Magenta
                 )])
 
                 fig_live.update_layout(
                     template='plotly_dark',
-                    height=400,
-                    margin=dict(l=10, r=10, t=10, b=10),
+                    height=500,
+                    margin=dict(l=10, r=50, t=10, b=10),
                     xaxis_rangeslider_visible=False,
-                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.1)"),
-                    xaxis=dict(gridcolor="rgba(255,255,255,0.1)")
+                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.05)", tickformat=".6f"),
+                    xaxis=dict(gridcolor="rgba(255,255,255,0.05)")
                 )
 
-                # Mostrar métrica y gráfico
-                st.metric(f"📡 {ticker_rest}", f"${p_actual:.6f}")
+                # Métrica y Gráfico
+                st.metric(f"💰 {ticker_rest} (LIVE)", f"${p_actual:.6f}")
                 st.plotly_chart(fig_live, use_container_width=True, config={'displayModeBar': False})
                     
             except Exception as e:
-                st.error(f"⚠️ Error de enlace: {e}")
+                st.info("Sincronizando flujo de velas...")
         else:
-            st.info("Sistema en Standby. Telemetría de velas lista.")
+            st.info(f"Radar en Standby. Sintonizado a {ticker} en {temporalidad}.")
 
     with col_data:
         monitor_velas_v2()
