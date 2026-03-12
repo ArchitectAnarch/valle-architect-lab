@@ -1273,17 +1273,18 @@ with tab_live:
     # 1. Bóveda de Datos OHLC en Vivo
     if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
     
-    # Reseteamos la memoria si apagamos el radar
-    if not st.session_state['ws_run']:
-        st.session_state['ohlc_live'] = pd.DataFrame(columns=['Time', 'Open', 'High', 'Low', 'Close'])
+    # 🔥 CORRECCIÓN: Agregamos la columna 'Volume' para que coincida con Coinbase (6 columnas)
+    if 'ohlc_live' not in st.session_state: 
+        st.session_state['ohlc_live'] = pd.DataFrame(columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
 
     col_ctrl, col_data = st.columns([1, 3]) # Más espacio para el gráfico
     ticker_rest = ticker.split('/')[0] + "/USD"
 
-    # Botón dinámico
-    btn_label = "🔴 DETENER STREAMING" if st.session_state['ws_run'] else "🚀 INICIAR STREAMING VELAS (15m)"
-    if col_ctrl.button(btn_label, key="v6_ignite", use_container_width=True):
+    if col_ctrl.button("🚀 INICIAR STREAMING VELAS", key="v6_ignite", use_container_width=True):
         st.session_state['ws_run'] = not st.session_state['ws_run']
+        # Limpiamos la memoria al apagar/encender para descargar velas frescas
+        if st.session_state['ws_run']:
+            st.session_state['ohlc_live'] = pd.DataFrame(columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
         st.rerun()
 
     @st.fragment(run_every=1)
@@ -1293,67 +1294,61 @@ with tab_live:
                 import ccxt
                 import plotly.graph_objects as go
                 import pandas as pd
-                from datetime import datetime
                 
                 ex_radar = ccxt.coinbase() 
                 
-                # --- 🕯️ INYECCIÓN: PRECARGA HISTÓRICA AUTÓNOMA ---
-                # Si la tabla está vacía, descargamos 50 velas reales de 15m para tener contexto
-                if st.session_state['ohlc_live'].empty or len(st.session_state['ohlc_live']) < 2:
-                    st.info("Sincronizando base de datos 15m...")
-                    velas_hist = ex_radar.fetch_ohlcv(ticker_rest, '15m', limit=50)
-                    df_hist = pd.DataFrame(velas_hist, columns=['Time', 'Open', 'High', 'Low', 'Close'])
+                # --- 🕯️ DESCARGA INICIAL DE VELAS REALES (Solo ocurre una vez) ---
+                if st.session_state['ohlc_live'].empty:
+                    # Descargamos 40 velas de 15 minutos. (Trae 6 columnas por defecto)
+                    velas_15m = ex_radar.fetch_ohlcv(ticker_rest, '15m', limit=40)
+                    df_hist = pd.DataFrame(velas_15m, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
+                    # Convertimos el tiempo a formato legible
                     df_hist['Time'] = pd.to_datetime(df_hist['Time'], unit='ms').dt.strftime('%H:%M:%S')
                     st.session_state['ohlc_live'] = df_hist
 
-                # --- 📡 LATIDO DEL MERCADO ---
+                # --- 📡 PRECIO EN VIVO ---
                 data_tick = ex_radar.fetch_ticker(ticker_rest)
                 p_actual = float(data_tick['last'])
                 
-                # --- 🧬 LÓGICA DE FUSIÓN DE VELAS ---
-                df = st.session_state['ohlc_live']
-                idx_ultima = df.index[-1]
+                # --- 🧬 ACTUALIZACIÓN DE LA ÚLTIMA VELA ---
+                # En lugar de agregar una vela nueva, modificamos la última de la tabla
+                idx = st.session_state['ohlc_live'].index[-1]
+                st.session_state['ohlc_live'].at[idx, 'Close'] = p_actual
                 
-                # En lugar de crear una raya nueva, actualizamos el Cierre de la vela actual
-                df.at[idx_ultima, 'Close'] = p_actual
-                
-                # Expandimos las mechas si el precio sube o baja más de lo previsto
-                if p_actual > df.at[idx_ultima, 'High']: df.at[idx_ultima, 'High'] = p_actual
-                if p_actual < df.at[idx_ultima, 'Low']: df.at[idx_ultima, 'Low'] = p_actual
+                # Si el precio actual supera el máximo o mínimo, la mecha crece
+                if p_actual > st.session_state['ohlc_live'].at[idx, 'High']:
+                    st.session_state['ohlc_live'].at[idx, 'High'] = p_actual
+                if p_actual < st.session_state['ohlc_live'].at[idx, 'Low']:
+                    st.session_state['ohlc_live'].at[idx, 'Low'] = p_actual
 
                 # --- 📊 RENDERIZADO DEL GRÁFICO PROFESIONAL ---
                 fig_live = go.Figure(data=[go.Candlestick(
-                    x=df['Time'],
-                    open=df['Open'], high=df['High'],
-                    low=df['Low'], close=df['Close'],
-                    increasing_line_color='#00ffcc', # Cyan eléctrico
-                    decreasing_line_color='#ff00ff'  # Magenta Neón
+                    x=st.session_state['ohlc_live']['Time'],
+                    open=st.session_state['ohlc_live']['Open'],
+                    high=st.session_state['ohlc_live']['High'],
+                    low=st.session_state['ohlc_live']['Low'],
+                    close=st.session_state['ohlc_live']['Close'],
+                    increasing_line_color='cyan', 
+                    decreasing_line_color='magenta'
                 )])
 
                 fig_live.update_layout(
-                    template='plotly_dark', height=500,
-                    margin=dict(l=10, r=60, t=10, b=10),
+                    template='plotly_dark',
+                    height=400,
+                    margin=dict(l=10, r=10, t=10, b=10),
                     xaxis_rangeslider_visible=False,
-                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.05)", tickformat=".6f", fixedrange=False),
-                    xaxis=dict(gridcolor="rgba(255,255,255,0.05)")
-                )
-                
-                # Etiqueta de precio viva en el gráfico
-                fig_live.add_annotation(
-                    x=df['Time'].iloc[-1], y=p_actual, text=f"  ${p_actual:.6f}",
-                    showarrow=False, align="left", 
-                    bgcolor="#00ffcc" if p_actual >= df.at[idx_ultima, 'Open'] else "#ff00ff",
-                    font=dict(color="black", size=12, bold=True), xanchor="left", xshift=10
+                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.1)"),
+                    xaxis=dict(gridcolor="rgba(255,255,255,0.1)")
                 )
 
                 # Mostrar métrica y gráfico
-                st.metric(f"📡 {ticker_rest} (LIVE 15m)", f"${p_actual:.6f}")
+                st.metric(f"📡 {ticker_rest} (Velas 15m)", f"${p_actual:.6f}")
                 st.plotly_chart(fig_live, use_container_width=True, config={'displayModeBar': False})
                     
             except Exception as e:
-                st.info(f"⚠️ Sincronizando túnel de datos... ({e})")
+                st.error(f"⚠️ Error de enlace: {e}")
         else:
-            st.info("Sistema en Standby. Telemetría de velas lista para ignición.")
+            st.info("Sistema en Standby. Telemetría de velas lista.")
 
     with col_data:
         monitor_velas_v2()
