@@ -1270,46 +1270,52 @@ tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENE
 with tab_live:
     st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
     
-    # 1. Variable de control simple
-    if 'ws_run' not in st.session_state:
-        st.session_state['ws_run'] = False
+    # 1. Bóveda de Memoria de Corto Plazo
+    if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
+    if 'historico_live' not in st.session_state: st.session_state['historico_live'] = []
 
     col_ctrl, col_data = st.columns([1, 2])
-    ticker_ws = ticker.replace('/', '-').split('-')[0] + "-USD"
+    # Limpiamos el ticker para Coinbase (Acepta USDC o USD)
+    ticker_ws = ticker.replace('/', '-')
 
-    if col_ctrl.button("🚀 INICIAR RADAR DIRECTO", key="direct_ws"):
+    if col_ctrl.button("🚀 TRANSMISIÓN EN VIVO", key="v2_ignite"):
         st.session_state['ws_run'] = not st.session_state['ws_run']
 
-    # 2. El Fragmento que toma el control
     @st.fragment(run_every=1)
-    def monitor_directo():
+    def motor_genesis_v2():
         if st.session_state['ws_run']:
-            import websocket
-            import json
-            
-            # Abrimos una conexión rápida (Síncrona)
+            import websocket, json
             try:
                 ws = websocket.create_connection("wss://ws-feed.exchange.coinbase.com", timeout=2)
                 sub_msg = {"type": "subscribe", "product_ids": [ticker_ws], "channels": ["ticker"]}
                 ws.send(json.dumps(sub_msg))
                 
-                # Escuchamos los primeros 2 mensajes (Suscripción + Ticker)
+                # Capturamos el tick
                 for _ in range(2):
-                    result = ws.recv()
-                    data = json.loads(result)
+                    data = json.loads(ws.recv())
                     if 'price' in data:
-                        precio = float(data['price'])
-                        st.metric(f"🔥 {ticker_ws} (LIVE)", f"${precio:.6f}")
-                        st.success("✅ Datos capturados en tiempo real")
+                        p_actual = float(data['price'])
+                        # Guardamos en la memoria (máximo 50 puntos)
+                        st.session_state['historico_live'].append(p_actual)
+                        if len(st.session_state['historico_live']) > 50:
+                            st.session_state['historico_live'].pop(0)
+                        
+                        # UI TÁCTICA
+                        st.metric(f"📡 {ticker_ws}", f"${p_actual:.6f}")
+                        
+                        # CALCULO DE MOMENTUM (Simulado para la IA)
+                        if len(st.session_state['historico_live']) > 1:
+                            diff = st.session_state['historico_live'][-1] - st.session_state['historico_live'][-2]
+                            color_trend = "🟢" if diff >= 0 else "🔴"
+                            st.markdown(f"**Impulso:** {color_trend} | **Muestras en RAM:** {len(st.session_state['historico_live'])}")
                 ws.close()
-            except Exception as e:
-                st.error(f"📡 Buscando señal... (Reintentando)")
-                # Si falla, es normal al principio mientras Coinbase negocia
+            except:
+                st.error("📡 Buscando señal...")
         else:
-            st.info("Radar en Standby.")
+            st.info("Sistema en Standby.")
 
     with col_data:
-        monitor_directo()
+        motor_genesis_v2()
 
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
