@@ -1270,87 +1270,68 @@ tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENE
 with tab_live:
     st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
     
-    # 1. Puente de Datos Global (Fuera del estado de sesión para máxima velocidad)
-    if 'puente_wss' not in st.session_state:
-        st.session_state['puente_wss'] = {'precio': 0.0, 'activo': False, 'error': ''}
+    # 1. Bóveda de Datos (Simplificada)
+    if 'precio_wss' not in st.session_state:
+        st.session_state['precio_wss'] = 0.0
+    if 'ws_activo' not in st.session_state:
+        st.session_state['ws_activo'] = False
 
-    # 2. El Motor de Escucha con Depuración Forzada
-    def radar_coinbase_v3(simbolo_ws):
+    # 2. El Motor de Escucha
+    def motor_wss_pro(simbolo_ws):
         import websocket
         import json
         
         def on_message(ws, message):
-            try:
-                data = json.loads(message)
-                # Coinbase envía 'price' en el canal 'ticker'
-                if 'price' in data:
-                    st.session_state['puente_wss']['precio'] = float(data['price'])
-                # Si llega un error del exchange, lo capturamos
-                if data.get('type') == 'error':
-                    st.session_state['puente_wss']['error'] = data.get('message')
-            except Exception as e:
-                print(f"❌ Error en mensaje: {e}")
+            data = json.loads(message)
+            if 'price' in data:
+                st.session_state['precio_wss'] = float(data['price'])
 
         def on_open(ws):
-            st.session_state['puente_wss']['activo'] = True
-            # Mensaje oficial de suscripción Coinbase Pro/Advanced
+            # Suscripción Estándar Coinbase
             sub_msg = {
                 "type": "subscribe",
                 "product_ids": [simbolo_ws],
-                "channels": ["ticker", "heartbeat"]
+                "channels": ["ticker"]
             }
             ws.send(json.dumps(sub_msg))
-            print(f"📡 Suscrito a: {simbolo_ws}")
-
-        def on_error(ws, error):
-            st.session_state['puente_wss']['error'] = str(error)
 
         ws_url = "wss://ws-feed.exchange.coinbase.com"
-        ws = websocket.WebSocketApp(
-            ws_url, 
-            on_open=on_open, 
-            on_message=on_message, 
-            on_error=on_error
-        )
+        ws = websocket.WebSocketApp(ws_url, on_open=on_open, on_message=on_message)
         ws.run_forever()
 
     # 3. Interfaz de Control
     col_ctrl, col_data = st.columns([1, 2])
 
-    if col_ctrl.button("🚀 FORZAR CONEXIÓN", key="btn_v3", use_container_width=True):
-        # Limpiamos errores previos
-        st.session_state['puente_wss']['error'] = ''
-        ticker_ws = ticker.replace('/', '-') # IOTX/USD -> IOTX-USD
+    # Forzamos que el ticker sea el correcto (USD en lugar de USDC si es necesario)
+    ticker_limpio = ticker.replace('/', '-').replace('USDC', 'USD')
+
+    if col_ctrl.button("🚀 FORZAR IGNICIÓN", key="ignicion_final", use_container_width=True):
+        st.session_state['ws_activo'] = True # Encendemos el radar visualmente de inmediato
         
-        # Lanzamos el proceso
-        hilo = threading.Thread(target=radar_coinbase_v3, args=(ticker_ws,), daemon=True)
+        hilo = threading.Thread(target=motor_wss_pro, args=(ticker_limpio,), daemon=True)
         hilo.start()
-        st.toast(f"Intentando enlace con {ticker_ws}...")
+        
+        st.toast(f"Enlazando con Matrix: {ticker_limpio}")
         time.sleep(1)
         st.rerun()
 
-    # 4. MONITOR DE ALTA FRECUENCIA (Fragmento)
+    # 4. Monitor de Telemetría
     @st.fragment(run_every=0.5)
-    def monitor_v3():
-        datos = st.session_state['puente_wss']
-        if datos['error']:
-            st.error(f"❌ Error del Exchange: {datos['error']}")
-        
-        if datos['activo']:
-            # Si el precio sigue en 0, mostramos un aviso de espera
-            if datos['precio'] == 0:
-                st.warning("⏳ Conectado. Esperando primer tick de precio...")
+    def monitor_live():
+        if st.session_state['ws_activo']:
+            if st.session_state['precio_wss'] == 0:
+                st.warning(f"📡 Buscando señal de {ticker_limpio}...")
             else:
                 st.metric(
-                    label=f"🔥 LIVE: {ticker}", 
-                    value=f"${datos['precio']:.6f}",
-                    delta="TÚNEL WSS ABIERTO"
+                    label=f"🔥 LIVE: {ticker_limpio}", 
+                    value=f"${st.session_state['precio_wss']:.6f}",
+                    delta="TÚNEL ABIERTO"
                 )
         else:
-            st.info("📡 Radar en Standby.")
+            st.info("📡 Radar en Standby. Presiona para conectar.")
 
     with col_data:
-        monitor_v3()
+        monitor_live()
 
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
