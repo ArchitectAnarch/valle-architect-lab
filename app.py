@@ -1268,152 +1268,87 @@ st.markdown("<h3 style='text-align: center; color: #00FF00;'>🌐 CENTRO DE MAND
 tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENESIS V2 (Live Trader)"])
 
 with tab_live:
-
-    st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
-
+    st.markdown(f"## 🧠 Centro de Mando: GENESIS V2 ({intervalo_sel})")
     
-
-    # 1. Bóveda de Datos OHLC en Vivo
-
+    # 1. Variables de Estado
     if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
-
-    if 'ohlc_live' not in st.session_state: 
-
-        st.session_state['ohlc_live'] = pd.DataFrame(columns=['Open', 'High', 'Low', 'Close'])
-
-
-
-    col_ctrl, col_data = st.columns([1, 3]) # Más espacio para el gráfico
-
+    
+    col_ctrl, col_data = st.columns([1, 4])
+    
+    # Formateamos el ticker para que la API de Coinbase lo entienda (IOTX/USDT -> IOTX/USD)
     ticker_rest = ticker.split('/')[0] + "/USD"
-
-
-
-    if col_ctrl.button("🚀 INICIAR STREAMING VELAS", key="v6_ignite", use_container_width=True):
-
+    
+    btn_label = "🔴 DETENER RADAR" if st.session_state['ws_run'] else "🚀 CONECTAR GRÁFICA LIVE"
+    if col_ctrl.button(btn_label, use_container_width=True, key="btn_v2_live"):
         st.session_state['ws_run'] = not st.session_state['ws_run']
-
         st.rerun()
 
-
-
+    # 2. EL MOTOR DE ACTUALIZACIÓN CUÁNTICA
     @st.fragment(run_every=1)
-
-    def monitor_velas_v2():
-
+    def render_grafica_viva():
         if st.session_state['ws_run']:
-
             try:
-
                 import ccxt
-
                 import plotly.graph_objects as go
-
-                ex_radar = ccxt.coinbase() 
-
-                data_tick = ex_radar.fetch_ticker(ticker_rest)
-
-                p_actual = float(data_tick['last'])
-
                 
-
-                # --- 🕯️ LÓGICA DE CONSTRUCCIÓN DE VELAS ---
-
-                # Creamos una nueva fila con el precio actual
-
-                nueva_vela = {
-
-                    'Open': p_actual, # Simplificado para ticks de 1s
-
-                    'High': p_actual,
-
-                    'Low': p_actual,
-
-                    'Close': p_actual,
-
-                    'Time': datetime.now().strftime('%H:%M:%S')
-
-                }
-
+                # A. Obtener el precio actual (el latido del mercado)
+                ex_radar = ccxt.coinbase()
+                tick = ex_radar.fetch_ticker(ticker_rest)
+                p_actual = float(tick['last'])
                 
-
-                # Actualizamos el DataFrame en memoria
-
-                temp_df = pd.DataFrame([nueva_vela])
-
-                st.session_state['ohlc_live'] = pd.concat([st.session_state['ohlc_live'], temp_df], ignore_index=True)
-
+                # B. Usamos tu MATRIZ GLOBAL (df_global) que ya tiene la temporalidad correcta
+                # Tomamos las últimas 100 velas para que la gráfica vuele y no se congele
+                df = df_global.tail(100).copy()
                 
+                # C. Magia Institucional: Modificamos el Cierre, High y Low de la vela ACTUAL
+                idx_ultima = df.index[-1]
+                df.at[idx_ultima, 'Close'] = p_actual
+                if p_actual > df.at[idx_ultima, 'High']: df.at[idx_ultima, 'High'] = p_actual
+                if p_actual < df.at[idx_ultima, 'Low']: df.at[idx_ultima, 'Low'] = p_actual
 
-                # Mantener solo las últimas 40 velas para no saturar la RAM
-
-                if len(st.session_state['ohlc_live']) > 40:
-
-                    st.session_state['ohlc_live'] = st.session_state['ohlc_live'].iloc[1:].reset_index(drop=True)
-
-
-
-                # --- 📊 RENDERIZADO DEL GRÁFICO PROFESIONAL ---
-
-                fig_live = go.Figure(data=[go.Candlestick(
-
-                    x=st.session_state['ohlc_live']['Time'],
-
-                    open=st.session_state['ohlc_live']['Open'],
-
-                    high=st.session_state['ohlc_live']['High'],
-
-                    low=st.session_state['ohlc_live']['Low'],
-
-                    close=st.session_state['ohlc_live']['Close'],
-
-                    increasing_line_color='cyan', 
-
-                    decreasing_line_color='magenta'
-
+                # D. RENDERIZADO DEL GRÁFICO TÉCNICO (Velas Reales)
+                fig = go.Figure(data=[go.Candlestick(
+                    x=df.index,
+                    open=df['Open'], high=df['High'],
+                    low=df['Low'], close=df['Close'],
+                    increasing_line_color='#00ffcc', # Cyan Neón
+                    decreasing_line_color='#ff00ff', # Magenta Neón
+                    name="Market Data"
                 )])
 
-
-
-                fig_live.update_layout(
-
+                fig.update_layout(
                     template='plotly_dark',
-
-                    height=400,
-
-                    margin=dict(l=10, r=10, t=10, b=10),
-
+                    height=550,
+                    margin=dict(l=0, r=60, t=10, b=0),
                     xaxis_rangeslider_visible=False,
-
-                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.1)"),
-
-                    xaxis=dict(gridcolor="rgba(255,255,255,0.1)")
-
+                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.05)", tickformat=".6f", fixedrange=False),
+                    xaxis=dict(gridcolor="rgba(255,255,255,0.05)")
                 )
 
+                # Etiqueta de Precio Dinámica (Sigue a la vela)
+                fig.add_annotation(
+                    x=df.index[-1], y=p_actual,
+                    text=f"  ${p_actual:.6f}",
+                    showarrow=False, align="left", 
+                    bgcolor="#00ffcc" if p_actual >= df.at[idx_ultima, 'Open'] else "#ff00ff",
+                    font=dict(color="black", size=13, bold=True), xanchor="left", xshift=10
+                )
 
+                # HUD Superior
+                c1, c2, c3 = st.columns(3)
+                c1.metric(f"💰 LIVE TICKER", f"${p_actual:.6f}")
+                c2.write(f"**Vela Activa:** {intervalo_sel}")
+                c3.write(f"**Conexión:** 🟢 Coinbase API")
 
-                # Mostrar métrica y gráfico
-
-                st.metric(f"📡 {ticker_rest}", f"${p_actual:.6f}")
-
-                st.plotly_chart(fig_live, use_container_width=True, config={'displayModeBar': False})
-
-                    
-
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                
             except Exception as e:
-
-                st.error(f"⚠️ Error de enlace: {e}")
-
+                st.info(f"📡 Sincronizando con {ticker_rest}... (Si este mensaje no desaparece, verifica que Coinbase soporte este par).")
         else:
-
-            st.info("Sistema en Standby. Telemetría de velas lista.")
-
-
+            st.info(f"📡 Radar Offline. Sintonizado a {ticker_rest} en {intervalo_sel}. Pulsa CONECTAR.")
 
     with col_data:
-
-        monitor_velas_v2()
+        render_grafica_viva()
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
     tab_names = list(tab_id_map.keys())
