@@ -1270,54 +1270,77 @@ tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENE
 with tab_live:
     st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
     
-    # 1. Variables de Memoria de la IA
+    # 1. Bóveda de Datos OHLC en Vivo
     if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
-    if 'last_price' not in st.session_state: st.session_state['last_price'] = 0.0
-    if 'memoria_ticks' not in st.session_state: st.session_state['memoria_ticks'] = []
+    if 'ohlc_live' not in st.session_state: 
+        st.session_state['ohlc_live'] = pd.DataFrame(columns=['Open', 'High', 'Low', 'Close'])
 
-    col_ctrl, col_data = st.columns([1, 2])
-    # Ticker formateado
+    col_ctrl, col_data = st.columns([1, 3]) # Más espacio para el gráfico
     ticker_rest = ticker.split('/')[0] + "/USD"
 
-    # BOTÓN DE CONTROL
-    if col_ctrl.button("🚀 ACTIVAR TELEMETRÍA V6.1", key="v6_ignite", use_container_width=True):
+    if col_ctrl.button("🚀 INICIAR STREAMING VELAS", key="v6_ignite", use_container_width=True):
         st.session_state['ws_run'] = not st.session_state['ws_run']
         st.rerun()
 
-    # 2. MONITOR DE ALTA FRECUENCIA (@st.fragment)
     @st.fragment(run_every=1)
-    def monitor_v6():
+    def monitor_velas_v2():
         if st.session_state['ws_run']:
             try:
-                # IMPORTANTE: Definimos un mini-exchange local para el radar
                 import ccxt
+                import plotly.graph_objects as go
                 ex_radar = ccxt.coinbase() 
-                
-                # Pedimos el precio actual
                 data_tick = ex_radar.fetch_ticker(ticker_rest)
-                nuevo_p = float(data_tick['last'])
+                p_actual = float(data_tick['last'])
                 
-                # Guardamos en memoria
-                st.session_state['last_price'] = nuevo_p
-                st.session_state['memoria_ticks'].append(nuevo_p)
-                if len(st.session_state['memoria_ticks']) > 50:
-                    st.session_state['memoria_ticks'].pop(0)
+                # --- 🕯️ LÓGICA DE CONSTRUCCIÓN DE VELAS ---
+                # Creamos una nueva fila con el precio actual
+                nueva_vela = {
+                    'Open': p_actual, # Simplificado para ticks de 1s
+                    'High': p_actual,
+                    'Low': p_actual,
+                    'Close': p_actual,
+                    'Time': datetime.now().strftime('%H:%M:%S')
+                }
+                
+                # Actualizamos el DataFrame en memoria
+                temp_df = pd.DataFrame([nueva_vela])
+                st.session_state['ohlc_live'] = pd.concat([st.session_state['ohlc_live'], temp_df], ignore_index=True)
+                
+                # Mantener solo las últimas 40 velas para no saturar la RAM
+                if len(st.session_state['ohlc_live']) > 40:
+                    st.session_state['ohlc_live'] = st.session_state['ohlc_live'].iloc[1:].reset_index(drop=True)
 
-                # DIBUJAMOS LA INTERFAZ
-                st.metric(f"📡 {ticker_rest} (LIVE)", f"${nuevo_p:.6f}")
-                
-                # Mini Gráfica de Latido (Sparkline)
-                if len(st.session_state['memoria_ticks']) > 2:
-                    df_viva = pd.DataFrame(st.session_state['memoria_ticks'], columns=['Price'])
-                    st.line_chart(df_viva, height=150, use_container_width=True)
+                # --- 📊 RENDERIZADO DEL GRÁFICO PROFESIONAL ---
+                fig_live = go.Figure(data=[go.Candlestick(
+                    x=st.session_state['ohlc_live']['Time'],
+                    open=st.session_state['ohlc_live']['Open'],
+                    high=st.session_state['ohlc_live']['High'],
+                    low=st.session_state['ohlc_live']['Low'],
+                    close=st.session_state['ohlc_live']['Close'],
+                    increasing_line_color='cyan', 
+                    decreasing_line_color='magenta'
+                )])
+
+                fig_live.update_layout(
+                    template='plotly_dark',
+                    height=400,
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    xaxis_rangeslider_visible=False,
+                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.1)"),
+                    xaxis=dict(gridcolor="rgba(255,255,255,0.1)")
+                )
+
+                # Mostrar métrica y gráfico
+                st.metric(f"📡 {ticker_rest}", f"${p_actual:.6f}")
+                st.plotly_chart(fig_live, use_container_width=True, config={'displayModeBar': False})
                     
             except Exception as e:
                 st.error(f"⚠️ Error de enlace: {e}")
         else:
-            st.info("Sistema en Standby. Presiona para iniciar telemetría.")
+            st.info("Sistema en Standby. Telemetría de velas lista.")
 
     with col_data:
-        monitor_v6()
+        monitor_velas_v2()
 
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
