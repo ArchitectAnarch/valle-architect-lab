@@ -1268,80 +1268,79 @@ st.markdown("<h3 style='text-align: center; color: #00FF00;'>🌐 CENTRO DE MAND
 tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENESIS V2 (Live Trader)"])
 
 with tab_live:
-    st.markdown("## 💹 GENESIS V2: LIVE TRADER (15M)")
+    st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
     
-    # 1. Bóveda de persistencia para no saturar la API
-    if 'df_live_15m' not in st.session_state:
-        # Descargamos la base histórica de 15m (usando tu función del Lab)
-        st.session_state['df_live_15m'] = descargar_datos(ticker, '15m', 100)
-    
-    if 'radar_on' not in st.session_state: st.session_state['radar_on'] = False
+    # 1. Bóveda de Datos OHLC en Vivo
+    if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
+    if 'ohlc_live' not in st.session_state: 
+        st.session_state['ohlc_live'] = pd.DataFrame(columns=['Open', 'High', 'Low', 'Close'])
 
-    col_ctrl, col_data = st.columns([1, 4])
-    
-    if col_ctrl.button("🚀 CONECTAR GRÁFICA EN VIVO", use_container_width=True):
-        st.session_state['radar_on'] = not st.session_state['radar_on']
+    col_ctrl, col_data = st.columns([1, 3]) # Más espacio para el gráfico
+    ticker_rest = ticker.split('/')[0] + "/USD"
+
+    if col_ctrl.button("🚀 INICIAR STREAMING VELAS", key="v6_ignite", use_container_width=True):
+        st.session_state['ws_run'] = not st.session_state['ws_run']
         st.rerun()
 
-    # 2. EL MOTOR DE ACTUALIZACIÓN CUÁNTICA
     @st.fragment(run_every=1)
-    def render_grafica_viva():
-        if st.session_state['radar_on']:
+    def monitor_velas_v2():
+        if st.session_state['ws_run']:
             try:
                 import ccxt
                 import plotly.graph_objects as go
+                ex_radar = ccxt.coinbase() 
+                data_tick = ex_radar.fetch_ticker(ticker_rest)
+                p_actual = float(data_tick['last'])
                 
-                # Obtener el precio actual (el "latido")
-                ex_radar = ccxt.coinbase()
-                tick = ex_radar.fetch_ticker(ticker.replace('/', '-'))
-                precio_actual = float(tick['last'])
+                # --- 🕯️ LÓGICA DE CONSTRUCCIÓN DE VELAS ---
+                # Creamos una nueva fila con el precio actual
+                nueva_vela = {
+                    'Open': p_actual, # Simplificado para ticks de 1s
+                    'High': p_actual,
+                    'Low': p_actual,
+                    'Close': p_actual,
+                    'Time': datetime.now().strftime('%H:%M:%S')
+                }
                 
-                # Actualizamos la última vela del DataFrame histórico con el precio real
-                df = st.session_state['df_live_15m'].copy()
+                # Actualizamos el DataFrame en memoria
+                temp_df = pd.DataFrame([nueva_vela])
+                st.session_state['ohlc_live'] = pd.concat([st.session_state['ohlc_live'], temp_df], ignore_index=True)
                 
-                # Actualizar el 'Close' de la última fila y ajustar High/Low
-                idx_ultima = df.index[-1]
-                df.at[idx_ultima, 'Close'] = precio_actual
-                if precio_actual > df.at[idx_ultima, 'High']: df.at[idx_ultima, 'High'] = precio_actual
-                if precio_actual < df.at[idx_ultima, 'Low']: df.at[idx_ultima, 'Low'] = precio_actual
+                # Mantener solo las últimas 40 velas para no saturar la RAM
+                if len(st.session_state['ohlc_live']) > 40:
+                    st.session_state['ohlc_live'] = st.session_state['ohlc_live'].iloc[1:].reset_index(drop=True)
 
-                # 3. RENDERIZADO TÉCNICO (Velas reales de 15m)
-                fig = go.Figure(data=[go.Candlestick(
-                    x=df['Timestamp'],
-                    open=df['Open'], high=df['High'],
-                    low=df['Low'], close=df['Close'],
-                    increasing_line_color='cyan', decreasing_line_color='magenta',
-                    name="Market Data"
+                # --- 📊 RENDERIZADO DEL GRÁFICO PROFESIONAL ---
+                fig_live = go.Figure(data=[go.Candlestick(
+                    x=st.session_state['ohlc_live']['Time'],
+                    open=st.session_state['ohlc_live']['Open'],
+                    high=st.session_state['ohlc_live']['High'],
+                    low=st.session_state['ohlc_live']['Low'],
+                    close=st.session_state['ohlc_live']['Close'],
+                    increasing_line_color='cyan', 
+                    decreasing_line_color='magenta'
                 )])
 
-                # Diseño de Terminal Bloomberg/Exchange
-                fig.update_layout(
+                fig_live.update_layout(
                     template='plotly_dark',
-                    height=500,
-                    margin=dict(l=0, r=50, t=0, b=0),
+                    height=400,
+                    margin=dict(l=10, r=10, t=10, b=10),
                     xaxis_rangeslider_visible=False,
-                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.05)", fixedrange=False),
-                    xaxis=dict(gridcolor="rgba(255,255,255,0.05)")
+                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.1)"),
+                    xaxis=dict(gridcolor="rgba(255,255,255,0.1)")
                 )
 
-                # Anotación del precio actual flotante
-                fig.add_annotation(
-                    x=df['Timestamp'].iloc[-1], y=precio_actual,
-                    text=f"  ${precio_actual:.6f}",
-                    showarrow=False, align="left", bgcolor="cyan" if precio_actual >= df.at[idx_ultima, 'Open'] else "magenta",
-                    font=dict(color="black", size=12), xanchor="left"
-                )
-
-                st.metric(label=f"💰 PRECIO ACTUAL {ticker}", value=f"${precio_actual:.6f}")
-                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-                
+                # Mostrar métrica y gráfico
+                st.metric(f"📡 {ticker_rest}", f"${p_actual:.6f}")
+                st.plotly_chart(fig_live, use_container_width=True, config={'displayModeBar': False})
+                    
             except Exception as e:
-                st.info("Reconectando con el flujo de datos...")
+                st.error(f"⚠️ Error de enlace: {e}")
         else:
-            st.info("📡 Presiona el botón para sincronizar la gráfica de 15m con el precio en vivo.")
+            st.info("Sistema en Standby. Telemetría de velas lista.")
 
     with col_data:
-        render_grafica_viva()
+        monitor_velas_v2()
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
     tab_names = list(tab_id_map.keys())
