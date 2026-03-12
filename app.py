@@ -1268,101 +1268,87 @@ st.markdown("<h3 style='text-align: center; color: #00FF00;'>🌐 CENTRO DE MAND
 tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENESIS V2 (Live Trader)"])
 
 with tab_live:
-    # 1. SEGURIDAD: Detectamos la temporalidad del Sidebar
-    # Si tu variable se llama distinto (ej. 'intervalo'), cámbiala aquí:
+    # 1. SEGURIDAD: Detectamos las variables del Sidebar
     tf_actual = temporalidad if 'temporalidad' in locals() else '15m'
     
-    st.markdown(f"## 💹 GENESIS V2: LIVE TRADER ({tf_actual})")
+    st.markdown(f"## 🧠 Centro de Mando: GENESIS V2 ({tf_actual})")
     
-    # 2. Sincronización dinámica con el Menú Lateral
+    # 2. SINCRONIZACIÓN DE BASE DE DATOS
     sync_key = f"{ticker}-{tf_actual}"
-    if 'last_ticker_sync' not in st.session_state or st.session_state['last_ticker_sync'] != sync_key:
-        try:
-            # Forzamos la descarga inicial
-            st.session_state['df_live_trade'] = descargar_datos(ticker, tf_actual, 100)
-            st.session_state['last_ticker_sync'] = sync_key
-        except Exception as e:
-            st.warning(f"Sincronizando base de datos: {e}")
+    
+    # Intentamos obtener la función desde el espacio global si no se ve directamente
+    f_descargar = globals().get('descargar_datos')
+
+    if f_descargar:
+        if 'last_ticker_sync' not in st.session_state or st.session_state['last_ticker_sync'] != sync_key:
+            try:
+                st.session_state['df_live_trade'] = f_descargar(ticker, tf_actual, 100)
+                st.session_state['last_ticker_sync'] = sync_key
+                st.success(f"✅ Base de datos {tf_actual} sincronizada")
+            except Exception as e:
+                st.error(f"Error en descarga: {e}")
+    else:
+        st.warning("🚀 GENESIS espera a que el motor de datos del Laboratorio se inicialice...")
 
     if 'radar_on' not in st.session_state: st.session_state['radar_on'] = False
 
     col_ctrl, col_data = st.columns([1, 4])
     
     btn_label = "🔴 DETENER RADAR" if st.session_state['radar_on'] else "🚀 CONECTAR GRÁFICA LIVE"
-    if col_ctrl.button(btn_label, use_container_width=True, key="pestaña_v2_btn"):
+    if col_ctrl.button(btn_label, use_container_width=True, key="btn_v2_final"):
         st.session_state['radar_on'] = not st.session_state['radar_on']
         st.rerun()
 
-    # 3. EL MOTOR DE RENDERIZADO EN TIEMPO REAL
+    # 3. EL MONITOR DE RENDERIZADO (Fragmento)
     @st.fragment(run_every=1)
     def render_grafica_viva_v2():
-        if st.session_state['radar_on'] and 'df_live_trade' in st.session_state:
+        if st.session_state.get('radar_on') and 'df_live_trade' in st.session_state:
             try:
                 import ccxt
                 import plotly.graph_objects as go
                 
-                # Obtener el latido del mercado (Coinbase Público)
+                # Obtener el precio actual
                 ex_radar = ccxt.coinbase()
                 tick = ex_radar.fetch_ticker(ticker.replace('/', '-'))
                 precio_actual = float(tick['last'])
                 
-                # Trabajamos sobre la base histórica sincronizada
                 df = st.session_state['df_live_trade'].copy()
                 
-                # Actualizamos la vela actual (la última de la derecha)
+                # Actualizar última vela
                 idx_ultima = df.index[-1]
                 df.at[idx_ultima, 'Close'] = precio_actual
-                
-                # Ajustamos máximos y mínimos de la vela actual en vivo
                 if precio_actual > df.at[idx_ultima, 'High']: df.at[idx_ultima, 'High'] = precio_actual
                 if precio_actual < df.at[idx_ultima, 'Low']: df.at[idx_ultima, 'Low'] = precio_actual
 
-                # 4. DISEÑO DE LA GRÁFICA PROFESIONAL
+                # RENDER GRÁFICO PROFESIONAL
                 fig = go.Figure(data=[go.Candlestick(
-                    x=df['Timestamp'],
-                    open=df['Open'], high=df['High'],
+                    x=df['Timestamp'], open=df['Open'], high=df['High'],
                     low=df['Low'], close=df['Close'],
-                    increasing_line_color='#00ffcc', # Cyan Eléctrico
-                    decreasing_line_color='#ff00ff', # Magenta Neón
-                    name=ticker
+                    increasing_line_color='#00ffcc', decreasing_line_color='#ff00ff'
                 )])
 
                 fig.update_layout(
-                    template='plotly_dark',
-                    height=550,
+                    template='plotly_dark', height=500,
                     margin=dict(l=0, r=60, t=10, b=0),
                     xaxis_rangeslider_visible=False,
-                    yaxis=dict(
-                        side="right", 
-                        gridcolor="rgba(255,255,255,0.05)",
-                        tickformat=".6f",
-                        fixedrange=False
-                    ),
-                    xaxis=dict(gridcolor="rgba(255,255,255,0.05)")
+                    yaxis=dict(side="right", gridcolor="rgba(255,255,255,0.05)", tickformat=".6f")
                 )
 
-                # Marcador de Precio Flotante (Price Tag)
+                # Etiqueta de precio viva
                 fig.add_annotation(
                     x=df['Timestamp'].iloc[-1], y=precio_actual,
-                    text=f"  ${precio_actual:.6f}",
-                    showarrow=False, align="left", 
+                    text=f"  ${precio_actual:.6f}", showarrow=False,
                     bgcolor="#00ffcc" if precio_actual >= df.at[idx_ultima, 'Open'] else "#ff00ff",
-                    font=dict(color="black", size=12, family="Courier New", bold=True),
-                    xanchor="left", xshift=10
+                    font=dict(color="black", size=12, bold=True), xanchor="left", xshift=10
                 )
 
-                # Panel de Control Superior
-                met1, met2, met3 = st.columns(3)
-                met1.metric("PRECIO ACTUAL", f"${precio_actual:.6f}")
-                met2.write(f"**Temporalidad:** {tf_actual}")
-                met3.write(f"**Estado:** 📡 Streaming OK")
-
+                st.metric("PRECIO ACTUAL", f"${precio_actual:.6f}")
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                 
             except Exception as e:
-                st.info("Esperando señal de Coinbase...")
+                st.info("Sincronizando flujo...")
         else:
-            st.info(f"📡 Sistema en espera. Sintonizado a {ticker} en {tf_actual}.")
+            st.info(f"📡 Radar en espera. Sintonizado a {ticker} en {tf_actual}.")
 
     with col_data:
         render_grafica_viva_v2()
