@@ -1270,33 +1270,34 @@ tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENE
 with tab_live:
     st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
     
-    # 1. Bóveda de Datos OHLC en Vivo
+    # 1. Variables Globales Seguras
     if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
     
-    # Capturamos la temporalidad de tu menú lateral (iv_download)
-    tf_actual = iv_download if 'iv_download' in locals() else '15m'
+    # Sincronizamos con las variables de tu Menú Lateral
+    tf_actual = iv_download if 'iv_download' in locals() else '1m'
+    offset_actual = utc_offset if 'utc_offset' in locals() else -5.0
     ticker_rest = ticker.split('/')[0] + "/USD"
 
-    # 🔥 SENSOR DE CAMBIO: Si cambias de moneda o temporalidad, reseteamos el radar
+    # Sensor de Cambio (Si cambias moneda/tiempo, reseteamos la memoria)
     if 'radar_config' not in st.session_state:
         st.session_state['radar_config'] = f"{ticker_rest}_{tf_actual}"
         
     if st.session_state['radar_config'] != f"{ticker_rest}_{tf_actual}":
-        st.session_state['ohlc_live'] = pd.DataFrame(columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
+        st.session_state['ohlc_live'] = pd.DataFrame()
         st.session_state['radar_config'] = f"{ticker_rest}_{tf_actual}"
 
     if 'ohlc_live' not in st.session_state: 
-        st.session_state['ohlc_live'] = pd.DataFrame(columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
+        st.session_state['ohlc_live'] = pd.DataFrame()
 
-    col_ctrl, col_data = st.columns([1, 3]) 
-
-    if col_ctrl.button(f"🚀 INICIAR STREAMING VELAS ({tf_actual})", key="v6_ignite", use_container_width=True):
+    # 2. BOTÓN PRINCIPAL (Ancho Completo)
+    btn_label = f"🔴 DETENER STREAMING" if st.session_state['ws_run'] else f"🚀 INICIAR STREAMING VELAS ({tf_actual})"
+    if st.button(btn_label, key="v6_ignite", use_container_width=True):
         st.session_state['ws_run'] = not st.session_state['ws_run']
-        # Limpiamos al encender para forzar descarga fresca
         if st.session_state['ws_run']:
-            st.session_state['ohlc_live'] = pd.DataFrame(columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
+            st.session_state['ohlc_live'] = pd.DataFrame() # Forzar recarga fresca
         st.rerun()
 
+    # 3. EL RADAR (Renderizado debajo del botón para Full Width)
     @st.fragment(run_every=1)
     def monitor_velas_v2():
         if st.session_state['ws_run']:
@@ -1304,16 +1305,16 @@ with tab_live:
                 import ccxt
                 import plotly.graph_objects as go
                 import pandas as pd
+                from datetime import timedelta
                 
                 ex_radar = ccxt.coinbase() 
                 
                 # --- 🕯️ DESCARGA HISTÓRICA PROFUNDA ---
                 if st.session_state['ohlc_live'].empty:
-                    # Usamos tf_actual (dinámico) y subimos el límite a 200 velas (máximo seguro)
                     velas_hist = ex_radar.fetch_ohlcv(ticker_rest, tf_actual, limit=200)
                     df_hist = pd.DataFrame(velas_hist, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
-                    # Formato de tiempo ajustado para ver días en temporalidades altas
-                    df_hist['Time'] = pd.to_datetime(df_hist['Time'], unit='ms').dt.strftime('%m-%d %H:%M')
+                    # FIX: Formato de tiempo Datetime nativo + Zona Horaria del Sidebar
+                    df_hist['Time'] = pd.to_datetime(df_hist['Time'], unit='ms') + timedelta(hours=offset_actual)
                     st.session_state['ohlc_live'] = df_hist
 
                 # --- 📡 PRECIO EN VIVO ---
@@ -1321,26 +1322,24 @@ with tab_live:
                 p_actual = float(data_tick['last'])
                 
                 # --- 🧬 ACTUALIZACIÓN DE LA ÚLTIMA VELA ---
-                idx = st.session_state['ohlc_live'].index[-1]
-                st.session_state['ohlc_live'].at[idx, 'Close'] = p_actual
+                df = st.session_state['ohlc_live']
+                idx = df.index[-1]
+                df.at[idx, 'Close'] = p_actual
                 
-                if p_actual > st.session_state['ohlc_live'].at[idx, 'High']:
-                    st.session_state['ohlc_live'].at[idx, 'High'] = p_actual
-                if p_actual < st.session_state['ohlc_live'].at[idx, 'Low']:
-                    st.session_state['ohlc_live'].at[idx, 'Low'] = p_actual
+                if p_actual > df.at[idx, 'High']: df.at[idx, 'High'] = p_actual
+                if p_actual < df.at[idx, 'Low']: df.at[idx, 'Low'] = p_actual
 
-                # --- 📊 RENDERIZADO DEL GRÁFICO PROFESIONAL ---
+                # --- 📊 RENDERIZADO DEL GRÁFICO TIPO EXCHANGE ---
                 fig_live = go.Figure(data=[go.Candlestick(
-                    x=st.session_state['ohlc_live']['Time'],
-                    open=st.session_state['ohlc_live']['Open'],
-                    high=st.session_state['ohlc_live']['High'],
-                    low=st.session_state['ohlc_live']['Low'],
-                    close=st.session_state['ohlc_live']['Close'],
-                    increasing_line_color='#00ffcc', # Cyan eléctrico
-                    decreasing_line_color='#ff00ff'  # Magenta neón
+                    x=df['Time'],
+                    open=df['Open'], high=df['High'],
+                    low=df['Low'], close=df['Close'],
+                    increasing_line_color='#00ffcc',
+                    decreasing_line_color='#ff00ff',
+                    name='Market'
                 )])
 
-                # 🔥 LÍNEA DE PRECIO HORIZONTAL VIVA 🔥
+                # LÍNEA DE PRECIO VIVA
                 fig_live.add_hline(
                     y=p_actual, 
                     line_dash="dot", 
@@ -1354,41 +1353,36 @@ with tab_live:
 
                 fig_live.update_layout(
                     template='plotly_dark',
-                    height=550, # Más alto
+                    height=650, # Altura institucional
                     margin=dict(l=10, r=60, t=10, b=10),
                     xaxis_rangeslider_visible=False,
-                    hovermode='x unified', # 🔥 CROSSHAIR ACTIVADO 🔥
+                    uirevision='constant', # 🔥 FIX: EVITA QUE TITILEE Y RESETEE EL ZOOM 🔥
+                    hovermode='closest',
                     yaxis=dict(
                         side="right", 
                         gridcolor="rgba(255,255,255,0.05)",
                         tickformat=".6f",
-                        showspikes=True, # Líneas del crosshair
-                        spikemode="across",
-                        spikedash="solid",
-                        spikecolor="rgba(255,255,255,0.3)",
-                        spikethickness=1
+                        fixedrange=False, # 🔥 FIX: PERMITE ESTIRAR/ZOOM EJE Y 🔥
+                        showspikes=True, spikemode="across", spikesnap="cursor", spikecolor="rgba(255,255,255,0.4)", spikethickness=1 # 🔥 CROSSHAIR LIBRE Y 🔥
                     ),
                     xaxis=dict(
                         gridcolor="rgba(255,255,255,0.05)",
-                        showspikes=True, # Líneas del crosshair
-                        spikemode="across",
-                        spikedash="solid",
-                        spikecolor="rgba(255,255,255,0.3)",
-                        spikethickness=1
+                        fixedrange=False, # 🔥 FIX: PERMITE ESTIRAR/ZOOM EJE X 🔥
+                        showspikes=True, spikemode="across", spikesnap="cursor", spikecolor="rgba(255,255,255,0.4)", spikethickness=1 # 🔥 CROSSHAIR LIBRE X 🔥
                     )
                 )
 
-                # Mostrar métrica y gráfico
-                st.metric(f"📡 {ticker_rest} (Velas {tf_actual})", f"${p_actual:.6f}")
-                st.plotly_chart(fig_live, use_container_width=True, config={'displayModeBar': False})
+                st.metric(f"📡 {ticker_rest} (Velas {tf_actual}) | Zona: UTC {offset_actual}", f"${p_actual:.6f}")
+                # 🔥 FIX: config={'scrollZoom': True} ACTIVA LA RUEDA DEL RATÓN 🔥
+                st.plotly_chart(fig_live, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
                     
             except Exception as e:
                 st.error(f"⚠️ Error de enlace: {e}")
         else:
             st.info(f"Sistema en Standby. Telemetría lista para {ticker_rest} en {tf_actual}.")
 
-    with col_data:
-        monitor_velas_v2()
+    # Ejecución sin columnas para Full Width
+    monitor_velas_v2()
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
     tab_names = list(tab_id_map.keys())
