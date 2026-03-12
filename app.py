@@ -1270,68 +1270,51 @@ tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENE
 with tab_live:
     st.markdown("## 🧠 Terminal de Consciencia: GENESIS V2")
     
-    # 1. Variables de Estado blindadas
+    # 1. Variables de Memoria de la IA
     if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
     if 'last_price' not in st.session_state: st.session_state['last_price'] = 0.0
     if 'memoria_ticks' not in st.session_state: st.session_state['memoria_ticks'] = []
 
     col_ctrl, col_data = st.columns([1, 2])
-    ticker_ws = ticker.replace('/', '-')
+    # Ticker formateado para API REST (IOTX/USD)
+    ticker_rest = ticker.split('/')[0] + "/USD"
 
-    # BOTÓN DE CONTROL DE ENERGÍA
-    if col_ctrl.button("🚀 INICIAR / DETENER RADAR", key="v5_ignite", use_container_width=True):
+    # BOTÓN DE CONTROL
+    if col_ctrl.button("🚀 ACTIVAR TELEMETRÍA V6", key="v6_ignite", use_container_width=True):
         st.session_state['ws_run'] = not st.session_state['ws_run']
-        if not st.session_state['ws_run']:
-            st.session_state['last_price'] = 0.0 # Reset al apagar
         st.rerun()
 
-    # 2. Lógica de Captura (Solo corre si el radar está ON)
-    if st.session_state['ws_run']:
-        import websocket, json
-        
-        # Función para un solo tick rápido
-        def capturar_tick(sym):
-            try:
-                # Conexión ultra-rápida con timeout corto para no congelar la UI
-                ws = websocket.create_connection("wss://ws-feed.exchange.coinbase.com", timeout=0.8)
-                ws.send(json.dumps({"type": "subscribe", "product_ids": [sym], "channels": ["ticker"]}))
-                
-                # Buscamos el mensaje del ticker entre los primeros 3 (ignorar heartbeats/subscriptions)
-                for _ in range(3):
-                    msg = json.loads(ws.recv())
-                    if msg.get('type') == 'ticker' and 'price' in msg:
-                        ws.close()
-                        return float(msg['price'])
-                ws.close()
-            except:
-                return None
-            return None
-
-        # Intentamos capturar el dato
-        nuevo_precio = capturar_tick(ticker_ws)
-        if nuevo_precio:
-            st.session_state['last_price'] = nuevo_precio
-            st.session_state['memoria_ticks'].append(nuevo_precio)
-            if len(st.session_state['memoria_ticks']) > 30:
-                st.session_state['memoria_ticks'].pop(0)
-
-    # 3. MONITOR VISUAL AISLADO
-    @st.fragment(run_every=1)
-    def monitor_v5():
+    # 2. MONITOR DE ALTA FRECUENCIA (@st.fragment)
+    @st.fragment(run_every=1) # Se ejecuta cada 1 segundo exacto
+    def monitor_v6():
         if st.session_state['ws_run']:
-            p = st.session_state['last_price']
-            if p > 0:
-                st.metric(f"📡 {ticker_ws} (LIVE)", f"${p:.6f}")
-                # Barra de progreso de memoria
-                progreso = len(st.session_state['memoria_ticks']) / 30
-                st.progress(progreso, text=f"Memoria de IA: {len(st.session_state['memoria_ticks'])}/30 muestras")
-            else:
-                st.warning("📡 Sincronizando con Coinbase...")
+            try:
+                # Pedimos el precio actual de forma ultrarrápida (Ticker REST)
+                # Usamos el exchange que ya tienes definido arriba (coinbase)
+                data_tick = exchange.fetch_ticker(ticker_rest)
+                nuevo_p = float(data_tick['last'])
+                
+                # Guardamos en memoria
+                st.session_state['last_price'] = nuevo_p
+                st.session_state['memoria_ticks'].append(nuevo_p)
+                if len(st.session_state['memoria_ticks']) > 50:
+                    st.session_state['memoria_ticks'].pop(0)
+
+                # DIBUJAMOS LA INTERFAZ EN TIEMPO REAL
+                st.metric(f"📡 {ticker_rest} (LIVE)", f"${nuevo_p:.6f}")
+                
+                # Mini Gráfica de Latido (Sparkline)
+                if len(st.session_state['memoria_ticks']) > 2:
+                    df_viva = pd.DataFrame(st.session_state['memoria_ticks'], columns=['Price'])
+                    st.line_chart(df_viva, height=150, use_container_width=True)
+                    
+            except Exception as e:
+                st.error(f"⚠️ Error de enlace: {e}")
         else:
-            st.info("Sistema en Standby. Radar Apagado.")
+            st.info("Sistema en Standby. Presiona para iniciar telemetría.")
 
     with col_data:
-        monitor_v5()
+        monitor_v6()
 
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
