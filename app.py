@@ -1547,19 +1547,47 @@ st.markdown("<h3 style='text-align: center; color: #00FF00;'>🌐 CENTRO DE MAND
 tab_forja, tab_live = st.tabs(["🧬 Laboratorio de Forja (V320)", "👁️ GENESIS V2 (Live Trader)"])
 
 with tab_live:
-    # 1. Variables Globales y Sincronización del Sidebar
+    # -------------------------------------------------------------
+    # 🧠 1. MOTOR DE SIMULACIÓN INDEPENDIENTE (CARTERA FANTASMA)
+    # -------------------------------------------------------------
+    # GENESIS V2 tiene su propia memoria financiera separada de la Pestaña 1
+    if 'g_mode' not in st.session_state: st.session_state['g_mode'] = 'DEMO'
+    if 'g_cap' not in st.session_state: st.session_state['g_cap'] = capital_inicial
+    if 'g_pos' not in st.session_state: st.session_state['g_pos'] = False
+    if 'g_price' not in st.session_state: st.session_state['g_price'] = 0.0
+    if 'g_trades' not in st.session_state: st.session_state['g_trades'] = 0
+
+    st.markdown("### 🎛️ PANEL DE CONTROL: GENESIS V2 (AUTÓNOMA)")
+    c_mode, c_wall1, c_wall2, c_wall3 = st.columns(4)
+
+    with c_mode:
+        modo_actual = st.radio("🔌 Conexión del Sistema:", ["🟢 MODO DEMO (Paper Trading)", "🔴 API COINBASE (Real)"], index=0)
+        if "Real" in modo_actual:
+            st.warning("⚠️ MODO REAL SELECCIONADO. Esperando credenciales API.")
+
+    # Actualizamos variables visuales de la cartera fantasma
+    roi_g = ((st.session_state['g_cap'] - capital_inicial) / capital_inicial) * 100
+    estado_pos = "🟢 DENTRO DEL MERCADO" if st.session_state['g_pos'] else "⚪ ESPERANDO OPORTUNIDAD"
+
+    c_wall1.metric("Capital GENESIS (Demo)", f"${st.session_state['g_cap']:,.2f}", f"{roi_g:.2f}% ROI")
+    c_wall2.metric("Estado de Operación", estado_pos)
+    c_wall3.metric("Trades Ejecutados", st.session_state['g_trades'])
+
+    st.markdown("---")
+
+    # -------------------------------------------------------------
+    # 📡 2. RADAR DE STREAMING Y RENDERIZADO VISUAL
+    # -------------------------------------------------------------
     if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
     
     tf_actual = iv_download if 'iv_download' in locals() else '1m'
     offset_actual = utc_offset if 'utc_offset' in locals() else -5.0
     ticker_rest = ticker.split('/')[0] + "/USD"
 
-    # Sensor de Cambio: Resetea la gráfica si cambias de moneda o temporalidad
     if 'radar_config' not in st.session_state or st.session_state['radar_config'] != f"{ticker_rest}_{tf_actual}":
         st.session_state['ohlc_live'] = pd.DataFrame()
         st.session_state['radar_config'] = f"{ticker_rest}_{tf_actual}"
 
-    # BOTÓN PRINCIPAL (Ancho completo, arriba de la gráfica)
     btn_label = f"🔴 DETENER RADAR" if st.session_state['ws_run'] else f"🚀 INICIAR STREAMING VELAS ({tf_actual})"
     if st.button(btn_label, key="v6_ignite", use_container_width=True):
         st.session_state['ws_run'] = not st.session_state['ws_run']
@@ -1567,7 +1595,6 @@ with tab_live:
             st.session_state['ohlc_live'] = pd.DataFrame()
         st.rerun()
 
-    # 2. EL MOTOR DE RENDERIZADO (Fragmento)
     @st.fragment(run_every=1)
     def monitor_velas_v2():
         if st.session_state['ws_run']:
@@ -1579,48 +1606,57 @@ with tab_live:
                 
                 ex_radar = ccxt.coinbase({'enableRateLimit': False})
                 
-                # --- 🕯️ LÓGICA PERFECTA DE TIEMPO (Delegada al Exchange) ---
                 if st.session_state['ohlc_live'].empty:
-                    # Descarga inicial profunda (150 velas)
                     velas = ex_radar.fetch_ohlcv(ticker_rest, tf_actual, limit=150)
                     df = pd.DataFrame(velas, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
-                    # Aplicamos tu Zona Horaria
                     df['Time'] = pd.to_datetime(df['Time'], unit='ms') + timedelta(hours=offset_actual)
                     df.set_index('Time', inplace=True)
                     st.session_state['ohlc_live'] = df
                 else:
-                    # Actualización en vivo: Solo pedimos las últimas 2 velas
                     velas = ex_radar.fetch_ohlcv(ticker_rest, tf_actual, limit=2)
                     df_new = pd.DataFrame(velas, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
                     df_new['Time'] = pd.to_datetime(df_new['Time'], unit='ms') + timedelta(hours=offset_actual)
                     df_new.set_index('Time', inplace=True)
                     
-                    # Actualizamos las velas existentes
                     st.session_state['ohlc_live'].update(df_new)
-                    
-                    # Si Coinbase detecta que pasó el minuto/hora, creará una fila nueva. La añadimos:
                     nuevas_filas = df_new[~df_new.index.isin(st.session_state['ohlc_live'].index)]
                     if not nuevas_filas.empty:
                         st.session_state['ohlc_live'] = pd.concat([st.session_state['ohlc_live'], nuevas_filas])
-                        # Limpiamos el historial viejo para no saturar RAM
                         if len(st.session_state['ohlc_live']) > 200:
                             st.session_state['ohlc_live'] = st.session_state['ohlc_live'].iloc[-200:]
 
                 df = st.session_state['ohlc_live']
                 p_actual = df['Close'].iloc[-1]
 
-                # --- 📊 RENDERIZADO ESTILO TRADINGVIEW ---
                 fig_live = go.Figure(data=[go.Candlestick(
                     x=df.index,
                     open=df['Open'], high=df['High'],
                     low=df['Low'], close=df['Close'],
-                    increasing_line_color='#00ffcc', # Cyan
-                    decreasing_line_color='#ff00ff', # Magenta
+                    increasing_line_color='#00ffcc', 
+                    decreasing_line_color='#ff00ff', 
                     name='Precio',
                     showlegend=False
                 )])
 
-                # LÍNEA DEL PRECIO ACTUAL (Atraviesa el gráfico de lado a lado)
+                # --- 🎯 INYECCIÓN DE CONCIENCIA VISUAL EN EL GRÁFICO ---
+                # GENESIS revisa su propia memoria pura y pinta los gatillos en la gráfica
+                if 'Certeza_Compra' in df_global.columns:
+                    gatillos_compra = df_global[df_global['Certeza_Compra'] > 80]
+                    gatillos_venta = df_global[df_global['Certeza_Venta'] > 80]
+
+                    fig_live.add_trace(go.Scatter(
+                        x=gatillos_compra.index, y=gatillos_compra['Low'] * 0.998,
+                        mode='markers', name='GENESIS COMPRA',
+                        marker=dict(symbol='triangle-up', color='cyan', size=18, line=dict(width=2, color='white'))
+                    ))
+
+                    fig_live.add_trace(go.Scatter(
+                        x=gatillos_venta.index, y=gatillos_venta['High'] * 1.002,
+                        mode='markers', name='GENESIS VENTA',
+                        marker=dict(symbol='triangle-down', color='magenta', size=18, line=dict(width=2, color='white'))
+                    ))
+
+                # LÍNEA DEL PRECIO ACTUAL
                 fig_live.add_hline(
                     y=p_actual, line_dash="dot", line_color="yellow", line_width=1,
                     annotation_text=f"${p_actual:.4f}", annotation_position="bottom right",
@@ -1628,46 +1664,21 @@ with tab_live:
                 )
 
                 fig_live.update_layout(
-                    template='plotly_dark',
-                    height=600,
-                    margin=dict(l=10, r=60, t=10, b=10),
-                    xaxis_rangeslider_visible=False,
-                    uirevision='constant', # 🔥 ANCLA EL ZOOM Y EVITA SALTOS 🔥
-                    
-                    # 🔥 CROSSHAIR ESTILO TRADINGVIEW 🔥
-                    hovermode='x unified', 
+                    template='plotly_dark', height=600, margin=dict(l=10, r=60, t=10, b=10),
+                    xaxis_rangeslider_visible=False, uirevision='constant', hovermode='x unified', 
                     hoverlabel=dict(bgcolor="rgba(0,0,0,0.8)", font_size=13, font_family="Courier New"),
-                    yaxis=dict(
-                        side="right",
-                        tickformat=".4f",
-                        fixedrange=False,
-                        showline=True, linecolor='rgba(255,255,255,0.2)',
-                        showgrid=True, gridcolor='rgba(255,255,255,0.05)',
-                        showspikes=True, spikemode="across", spikesnap="cursor", spikecolor="rgba(255,255,255,0.5)", spikethickness=1
-                    ),
-                    xaxis=dict(
-                        type='date',
-                        tickformat="%H:%M\n%d %b", # Etiqueta de hora limpia
-                        nticks=6, # 🔥 No satura el eje X, deja espacios limpios 🔥
-                        fixedrange=False,
-                        showline=True, linecolor='rgba(255,255,255,0.2)',
-                        showgrid=True, gridcolor='rgba(255,255,255,0.05)',
-                        showspikes=True, spikemode="across", spikesnap="cursor", spikecolor="rgba(255,255,255,0.5)", spikethickness=1
-                    )
+                    yaxis=dict(side="right", tickformat=".4f", showgrid=True, gridcolor='rgba(255,255,255,0.05)'),
+                    xaxis=dict(type='date', tickformat="%H:%M\n%d %b", nticks=6, showgrid=True, gridcolor='rgba(255,255,255,0.05)')
                 )
 
-                # Título integrado como HTML (evita el repintado de st.metric)
-                st.markdown(f"<h3 style='text-align:center; color:#00ffcc;'>{ticker_rest} | Temporalidad: {tf_actual} | UTC {offset_actual} | Precio: ${p_actual:.6f}</h3>", unsafe_allow_html=True)
-                
-                # Render final con zoom del ratón activado
+                st.markdown(f"<h3 style='text-align:center; color:#00ffcc;'>{ticker_rest} | {tf_actual} | Precio: ${p_actual:.6f}</h3>", unsafe_allow_html=True)
                 st.plotly_chart(fig_live, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
                     
             except Exception as e:
                 st.error(f"⚠️ Sincronizando datos... {e}")
         else:
-            st.info(f"Sistema en Standby. Telemetría lista para {ticker_rest} en {tf_actual}. Pulsa Iniciar.")
+            st.info(f"Sistema en Standby. IA lista para analizar {ticker_rest} en {tf_actual}. Pulsa Iniciar.")
 
-    # Ejecución sin columnas extra (Full Width)
     monitor_velas_v2()
 with tab_forja:
     # 👇 ESTA ES LA LÍNEA 1265 ORIGINAL (AHORA DEBE LLEVAR UN TAB/ESPACIOS A LA IZQUIERDA)
