@@ -417,7 +417,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         
         for r in resultados: all_ohlcv.extend(r)
         
-        all_ohlcv = [dict(t) for t in {tuple(d) for d in all_ohlcv}]
+        all_ohlcv = [list(t) for t in {tuple(d) for d in all_ohlcv}]
         all_ohlcv.sort(key=lambda x: x[0])
         
         if not all_ohlcv: return pd.DataFrame(), f"El Exchange devolvió 0 velas."
