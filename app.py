@@ -1697,17 +1697,64 @@ with tab_live:
                     
                 st.session_state['ohlc_live'] = df_live
                 df = df_live.copy()
+                @st.fragment(run_every=3)
+    def monitor_velas_v2():
+        if st.session_state['ws_run']:
+            try:
+                import ccxt
+                import plotly.graph_objects as go
+                import pandas as pd
+                import numpy as np
+                from datetime import timedelta
+                
+                ex_radar = ccxt.coinbase({'enableRateLimit': False})
+                
+                fetch_tf = '1h' if (tf_actual == '4h' and 'coinbase' in st.session_state['data_params']['ex'].lower()) else tf_actual
+                
+                if st.session_state['ohlc_live'].empty:
+                    velas = ex_radar.fetch_ohlcv(ticker_rest, fetch_tf, limit=500)
+                    df = pd.DataFrame(velas, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
+                    df['Time'] = pd.to_datetime(df['Time'], unit='ms') + timedelta(hours=offset_actual)
+                    df.set_index('Time', inplace=True)
+                    st.session_state['ohlc_live'] = df
+                else:
+                    velas = ex_radar.fetch_ohlcv(ticker_rest, fetch_tf, limit=3)
+                    df_new = pd.DataFrame(velas, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
+                    df_new['Time'] = pd.to_datetime(df_new['Time'], unit='ms') + timedelta(hours=offset_actual)
+                    df_new.set_index('Time', inplace=True)
+                    
+                    st.session_state['ohlc_live'].update(df_new)
+                    nuevas_filas = df_new[~df_new.index.isin(st.session_state['ohlc_live'].index)]
+                    if not nuevas_filas.empty:
+                        st.session_state['ohlc_live'] = pd.concat([st.session_state['ohlc_live'], nuevas_filas])
+                        
+                df_live = st.session_state['ohlc_live']
+                freq_map = {'1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min', '1h': '1h', '4h': '4h', '1d': '1D'}
+                df_live = df_live.resample(freq_map.get(fetch_tf, '1min')).asfreq()
+                df_live['Close'] = df_live['Close'].ffill()
+                df_live['Open'] = df_live['Open'].fillna(df_live['Close'])
+                df_live['High'] = df_live['High'].fillna(df_live['Close'])
+                df_live['Low'] = df_live['Low'].fillna(df_live['Close'])
+                df_live['Volume'] = df_live['Volume'].fillna(0)
+
+                if fetch_tf == '1h' and tf_actual == '4h':
+                    df_live = df_live.resample('4h').agg({'Open':'first', 'High':'max', 'Low':'min', 'Close':'last', 'Volume':'sum'}).dropna()
+
+                if len(df_live) > 500:
+                    df_live = df_live.iloc[-500:]
+                    
+                st.session_state['ohlc_live'] = df_live
+                df = df_live.copy()
                 p_actual = df['Close'].iloc[-1]
 
                 # =============================================================
-                # 🧠 CÁLCULOS MATEMÁTICOS (SOBRE 500 VELAS PARA PRECISIÓN)
+                # 🧠 CÁLCULOS MATEMÁTICOS TÁCTICOS (Pestaña 2 - Live Radar)
                 # =============================================================
                 df['Basis'] = df['Close'].rolling(20).mean()
                 df['Dev'] = df['Close'].rolling(20).std(ddof=0)
                 df['BBU'] = df['Basis'] + (df['Dev'] * 2)
                 df['BBL'] = df['Basis'] - (df['Dev'] * 2)
                 
-                # RÍO INTOCABLE (Tu fórmula visual verificada)
                 df['ATR'] = (df['High'] - df['Low']).rolling(14).mean() 
                 delta = df['Close'].diff()
                 u = (delta.where(delta > 0, 0)).rolling(14).mean()
@@ -1719,26 +1766,40 @@ with tab_live:
                 df['River_Top'] = df['Basis'] + (df['River_Width'] / 2)
                 df['River_Bot'] = df['Basis'] - (df['River_Width'] / 2)
 
-                # Anomalías y Señales
+                df['AP'] = (df['High'] + df['Low'] + df['Close']) / 3
+                df['ESA'] = df['AP'].ewm(span=10, adjust=False).mean()
+                df['D_WT'] = (df['AP'] - df['ESA']).abs().ewm(span=10, adjust=False).mean()
+                df['CI'] = (df['AP'] - df['ESA']) / (0.015 * df['D_WT']).replace(0, 0.001)
+                df['WT1'] = df['CI'].ewm(span=21, adjust=False).mean()
+                df['WT2'] = df['WT1'].rolling(4).mean()
+
+                df['PH_100'] = df['High'].rolling(100).max()
+                df['PL_100'] = df['Low'].rolling(100).min()
+                df['Gravity_Target'] = (df['PH_100'] + df['PL_100']) / 2
+
+                df['Buy_Score'] = 0.0
+                df.loc[(df['RSI'] < 30) & (df['Close'] < df['BBL']), 'Buy_Score'] = 50.0
+                df.loc[(df['Close'] - df['PL_100']).abs() < (df['Close'] * 0.015), 'Buy_Score'] += 25.0
+
+                df['Sell_Score'] = 0.0
+                df.loc[(df['RSI'] > 70) & (df['Close'] > df['BBU']), 'Sell_Score'] = 50.0
+                df.loc[(df['Close'] - df['PH_100']).abs() < (df['Close'] * 0.015), 'Sell_Score'] += 25.0
+
                 vol_ma = df['Volume'].rolling(100).mean()
                 df['RVol'] = df['Volume'] / vol_ma.replace(0, 1)
                 df['Neon_Up'] = (df['Close'] >= df['BBU'] * 0.999) & (df['Close'] > df['Open'])
                 df['Neon_Dn'] = (df['Close'] <= df['BBL'] * 1.001) & (df['Close'] < df['Open'])
                 df['Rocket_Signal'] = df['Neon_Up'] & (df['RVol'] > 1.5) & (df['RSI'] > 60)
-                df['Nuclear_Sell'] = df['Neon_Dn'] & (df['RVol'] > 1.5) & (df['RSI'] < 40)
                 
                 df['Body_Size'] = (df['Close'] - df['Open']).abs()
                 df['Upper_Wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
                 df['Lower_Wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
-                df['Climax_Buy'] = (df['RSI'] < 30) & (df['Lower_Wick'] > df['Body_Size'] * 0.4)
-                df['Climax_Sell'] = (df['RSI'] > 70) & (df['Upper_Wick'] > df['Body_Size'] * 0.4)
+                
+                df['Climax_Buy'] = (df['Buy_Score'] >= 70) & (df['Lower_Wick'] > df['Body_Size'] * 0.4)
+                df['Climax_Sell'] = (df['Sell_Score'] >= 70) & (df['Upper_Wick'] > df['Body_Size'] * 0.4)
+                df['Nuclear_Buy'] = df['Climax_Buy'] & ((df['WT1'] < -60) | (df['WT1'] > df['WT2']))
+                df['Nuclear_Sell'] = df['Climax_Sell'] & ((df['WT1'] > 60) | (df['WT1'] < df['WT2']))
 
-                # Malla Local (Ahora usa 100 periodos para que los muros siempre estén cerca del precio visual)
-                df['PH_100'] = df['High'].rolling(100).max()
-                df['PL_100'] = df['Low'].rolling(100).min()
-                df['Gravity_Target'] = (df['PH_100'] + df['PL_100']) / 2
-
-                # --- Lógica de GENESIS y Ejecución ---
                 certeza_compra_actual = 99.0 if df['Rocket_Signal'].iloc[-1] else (df_global['Certeza_Compra'].iloc[-1] if 'Certeza_Compra' in df_global.columns else 0)
                 certeza_venta_actual = 99.0 if df['Nuclear_Sell'].iloc[-1] else (df_global['Certeza_Venta'].iloc[-1] if 'Certeza_Venta' in df_global.columns else 0)
                 
@@ -1769,15 +1830,13 @@ with tab_live:
                     st.toast(f"🚀 ENTRADA: Certeza {certeza_compra_actual:.1f}% > Umbral {umbral_ia}%", icon="💰")
 
                 # =============================================================
-                # 🎨 CORTE VISUAL (Solo ploteamos las últimas 150 velas)
+                # 🎨 RENDERIZADO VISUAL EXTREMO (Solo 150 velas)
                 # =============================================================
                 df_plot = df.iloc[-150:]
-                
                 fig_live = go.Figure()
 
                 fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['River_Top'], mode='lines', line=dict(color='rgba(0, 150, 255, 0.2)', width=1), showlegend=False, hoverinfo='skip'))
                 fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['River_Bot'], mode='lines', line=dict(color='rgba(0, 150, 255, 0.2)', width=1), fill='tonexty', fillcolor='rgba(0, 150, 255, 0.05)', showlegend=False, hoverinfo='skip'))
-
                 fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['BBU'], mode='lines', line=dict(color='rgba(128,128,128,0.4)', width=1, dash='dot'), showlegend=False, hoverinfo='skip'))
                 fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['BBL'], mode='lines', line=dict(color='rgba(128,128,128,0.4)', width=1, dash='dot'), showlegend=False, hoverinfo='skip'))
 
@@ -1785,28 +1844,31 @@ with tab_live:
                 fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['PL_100'], mode='lines', line=dict(color='rgba(0,255,0,0.3)', width=2), name='Muro Sup (100)'))
                 fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['Gravity_Target'], mode='lines', line=dict(color='rgba(255,255,0,0.4)', dash='dashdot', width=2), name='Target Lock'))
 
-                fig_live.add_trace(go.Candlestick(
-                    x=df_plot.index, open=df_plot['Open'], high=df_plot['High'], low=df_plot['Low'], close=df_plot['Close'],
-                    increasing_line_color='#00ffcc', decreasing_line_color='#ff00ff', name='Precio', showlegend=False
-                ))
+                fig_live.add_trace(go.Candlestick(x=df_plot.index, open=df_plot['Open'], high=df_plot['High'], low=df_plot['Low'], close=df_plot['Close'], increasing_line_color='#00ffcc', decreasing_line_color='#ff00ff', name='Precio', showlegend=False))
 
                 df_rocket = df_plot[df_plot['Rocket_Signal']]
                 if not df_rocket.empty: fig_live.add_trace(go.Candlestick(x=df_rocket.index, open=df_rocket['Open'], high=df_rocket['High'], low=df_rocket['Low'], close=df_rocket['Close'], increasing_line_color='#FF00FF', decreasing_line_color='#FF00FF', increasing_fillcolor='#FF00FF', decreasing_fillcolor='#FF00FF', name='Rocket', showlegend=False))
                 
-                df_nuclear = df_plot[df_plot['Nuclear_Sell']]
-                if not df_nuclear.empty: fig_live.add_trace(go.Candlestick(x=df_nuclear.index, open=df_nuclear['Open'], high=df_nuclear['High'], low=df_nuclear['Low'], close=df_nuclear['Close'], increasing_line_color='#FF0000', decreasing_line_color='#FF0000', increasing_fillcolor='#FF0000', decreasing_fillcolor='#FF0000', name='Nuclear', showlegend=False))
+                df_nuc_b = df_plot[df_plot['Nuclear_Buy']]
+                if not df_nuc_b.empty: fig_live.add_trace(go.Candlestick(x=df_nuc_b.index, open=df_nuc_b['Open'], high=df_nuc_b['High'], low=df_nuc_b['Low'], close=df_nuc_b['Close'], increasing_line_color='#00FF00', decreasing_line_color='#00FF00', increasing_fillcolor='#00FF00', decreasing_fillcolor='#00FF00', name='Nuclear Buy', showlegend=False))
+
+                df_nuc_s = df_plot[df_plot['Nuclear_Sell']]
+                if not df_nuc_s.empty: fig_live.add_trace(go.Candlestick(x=df_nuc_s.index, open=df_nuc_s['Open'], high=df_nuc_s['High'], low=df_nuc_s['Low'], close=df_nuc_s['Close'], increasing_line_color='#FF0000', decreasing_line_color='#FF0000', increasing_fillcolor='#FF0000', decreasing_fillcolor='#FF0000', name='Nuclear Sell', showlegend=False))
 
                 x_neon_up, y_neon_up = df_plot[df_plot['Neon_Up']].index, df_plot[df_plot['Neon_Up']]['Low'] * 0.999
                 x_neon_dn, y_neon_dn = df_plot[df_plot['Neon_Dn']].index, df_plot[df_plot['Neon_Dn']]['High'] * 1.001
                 if not x_neon_up.empty: fig_live.add_trace(go.Scatter(x=x_neon_up, y=y_neon_up, mode='markers', marker=dict(symbol='diamond-open', color='cyan', size=8), name='Neon Up'))
                 if not x_neon_dn.empty: fig_live.add_trace(go.Scatter(x=x_neon_dn, y=y_neon_dn, mode='markers', marker=dict(symbol='diamond-open', color='magenta', size=8), name='Neon Dn'))
 
-                x_early_b = df_plot[df_plot['Climax_Buy']].index
-                y_early_b = df_plot[df_plot['Climax_Buy']]['Low'] * 0.997
-                x_early_s = df_plot[df_plot['Climax_Sell']].index
-                y_early_s = df_plot[df_plot['Climax_Sell']]['High'] * 1.003
+                x_early_b, y_early_b = df_plot[df_plot['Climax_Buy']].index, df_plot[df_plot['Climax_Buy']]['Low'] * 0.997
+                x_early_s, y_early_s = df_plot[df_plot['Climax_Sell']].index, df_plot[df_plot['Climax_Sell']]['High'] * 1.003
                 if not x_early_b.empty: fig_live.add_trace(go.Scatter(x=x_early_b, y=y_early_b, mode='markers', marker=dict(symbol='star', color='yellow', size=12), name='Early Buy (Rayo)'))
                 if not x_early_s.empty: fig_live.add_trace(go.Scatter(x=x_early_s, y=y_early_s, mode='markers', marker=dict(symbol='star', color='orange', size=12), name='Early Sell (Rayo)'))
+
+                x_ex_b, y_ex_b = df_plot[df_plot['Nuclear_Buy']].index, df_plot[df_plot['Nuclear_Buy']]['Low'] * 0.994
+                x_ex_s, y_ex_s = df_plot[df_plot['Nuclear_Sell']].index, df_plot[df_plot['Nuclear_Sell']]['High'] * 1.006
+                if not x_ex_b.empty: fig_live.add_trace(go.Scatter(x=x_ex_b, y=y_ex_b, mode='markers', marker=dict(symbol='x', color='lime', size=14, line=dict(width=2, color='white')), name='Explosión Compra'))
+                if not x_ex_s.empty: fig_live.add_trace(go.Scatter(x=x_ex_s, y=y_ex_s, mode='markers', marker=dict(symbol='x', color='red', size=14, line=dict(width=2, color='white')), name='Explosión Venta'))
 
                 x_compra, y_compra, x_venta, y_venta = [], [], [], []
                 en_posicion_simulada, precio_simulado = False, 0
@@ -1817,16 +1879,16 @@ with tab_live:
                     idx_decision = df_global.loc[idx, 'IA_Decision_Index'] if idx in df_global.index else 0
                     
                     if not en_posicion_simulada and c_compra > umbral_ia:
-                        x_compra.append(idx); y_compra.append(row['Low'] * 0.995) 
+                        x_compra.append(idx); y_compra.append(row['Low'] * 0.990)
                         en_posicion_simulada = True; precio_simulado = row['Close']
                     elif en_posicion_simulada:
                         rend_sim = ((row['Close'] - precio_simulado) / precio_simulado) * 100
                         if (rend_sim > 0.2 and c_venta > umbral_ia) or (rend_sim < -0.5 and idx_decision < -25):
-                            x_venta.append(idx); y_venta.append(row['High'] * 1.005) 
+                            x_venta.append(idx); y_venta.append(row['High'] * 1.010)
                             en_posicion_simulada = False
 
-                if x_compra: fig_live.add_trace(go.Scatter(x=x_compra, y=y_compra, mode='markers', marker=dict(symbol='triangle-up', color='cyan', size=18, line=dict(width=2, color='white')), name='GENESIS IN'))
-                if x_venta: fig_live.add_trace(go.Scatter(x=x_venta, y=y_venta, mode='markers', marker=dict(symbol='triangle-down', color='magenta', size=18, line=dict(width=2, color='white')), name='GENESIS OUT'))
+                if x_compra: fig_live.add_trace(go.Scatter(x=x_compra, y=y_compra, mode='markers', marker=dict(symbol='triangle-up', color='cyan', size=18, line=dict(width=2, color='white')), name='ENTRY COMPRA'))
+                if x_venta: fig_live.add_trace(go.Scatter(x=x_venta, y=y_venta, mode='markers', marker=dict(symbol='triangle-down', color='magenta', size=18, line=dict(width=2, color='white')), name='EXIT VENTA (DYN)'))
 
                 fig_live.add_hline(y=p_actual, line_dash="dot", line_color="yellow", line_width=1, annotation_text=f"${p_actual:.4f}", annotation_position="bottom right", annotation_font=dict(color="black", size=12), annotation_bgcolor="yellow")
 
