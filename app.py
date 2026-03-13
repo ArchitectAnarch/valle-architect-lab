@@ -1344,6 +1344,45 @@ if deep_state and not deep_state.get('paused', False) and deep_state.get('curren
 # ==========================================
 st.title("🛡️ PREDATOR LAB (V320 FUSION)")
 
+# --- INICIO DEL NÚCLEO DE CONCIENCIA ---
+st.markdown("---")
+st.subheader("🛸 NÚCLEO DE CONCIENCIA GENESIS IA")
+
+# Extraemos la última neurona (el estado actual del mercado)
+# Nota: 'df' debe ser el DataFrame ya procesado con el motor V320
+if not df.empty:
+    ultima_neurona = df.iloc[-1]
+    certeza_compra = ultima_neurona.get('Certeza_Compra', 0)
+    certeza_venta = ultima_neurona.get('Certeza_Venta', 0)
+    decision_index = ultima_neurona.get('IA_Decision_Index', 0)
+    friccion = ultima_neurona.get('Friction_Weight', 0)
+    defcon_ia = int(ultima_neurona.get('DEFCON_Level', 5))
+    rvol_ia = ultima_neurona.get('RVol', 1.0)
+
+    # 1. Indicadores de Mando Superior
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("ÍNDICE DECISIÓN", f"{decision_index:.2f}", delta="BULL" if decision_index > 0 else "BEAR")
+    c2.metric("FRICCIÓN MALLA", f"{friccion} pts")
+    c3.metric("ALERTA IA", f"DEFCON {defcon_ia}")
+    c4.metric("FUERZA BALLENA", f"{rvol_ia:.2f}x")
+
+    # 2. TERMÓMETRO CUÁNTICO
+    st.write(f"🎯 Correlación Valles (COMPRA): **{certeza_compra:.1f}%**")
+    st.progress(min(max(certeza_compra/100, 0.0), 1.0))
+    
+    st.write(f"🏔️ Correlación Picos (VENTA): **{certeza_venta:.1f}%**")
+    st.progress(min(max(certeza_venta/100, 0.0), 1.0))
+
+    # 3. CONCLUSIÓN AUTÓNOMA
+    if certeza_compra > 80:
+        st.success(f"**CONCIENCIA IA:** Estructura detectada. Certeza de Compra al {certeza_compra:.1f}%. Fricción de Malla nivel {friccion}. ¡ALTA PROBABILIDAD DE REBOTE!")
+    elif certeza_venta > 80:
+        st.error(f"**CONCIENCIA IA:** Agotamiento detectado. Certeza de Venta al {certeza_venta:.1f}%. ¡ALTA PROBABILIDAD DE CAÍDA!")
+    else:
+        st.info("**CONCIENCIA IA:** Analizando Matrix... Sin confluencia clara. Manteniendo posición defensiva.")
+st.markdown("---")
+# --- FIN DEL NÚCLEO DE CONCIENCIA ---
+
 with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA", expanded=True):
     leaderboard_data = []
     for s in estrategias:
