@@ -1688,15 +1688,15 @@ with tab_live:
                 df['BBU'] = df['Basis'] + (df['Dev'] * 2)
                 df['BBL'] = df['Basis'] - (df['Dev'] * 2)
                 
-                # 2. Río Histórico Dinámico
-                df['ATR'] = df['High'].rolling(14).max() - df['Low'].rolling(14).min() 
+                # 2. Río Histórico Dinámico (Corregido a Escala Real)
+                df['ATR'] = (df['High'] - df['Low']).rolling(14).mean() 
                 delta = df['Close'].diff()
                 u = (delta.where(delta > 0, 0)).rolling(14).mean()
                 d = (-delta.where(delta < 0, 0)).rolling(14).mean()
                 df['RSI'] = 100 - (100 / (1 + (u / d.replace(0, 0.001))))
                 df['RSI_Velocity'] = df['RSI'].diff()
                 
-                df['River_Width'] = (df['ATR'] * 1.2) + (df['RSI_Velocity'].abs() / 10.0)
+                df['River_Width'] = df['ATR'] * (1.2 + (df['RSI_Velocity'].abs() / 10.0))
                 df['River_Top'] = df['Basis'] + (df['River_Width'] / 2)
                 df['River_Bot'] = df['Basis'] - (df['River_Width'] / 2)
 
