@@ -711,6 +711,18 @@ if 'EMA_20' not in df_global.columns:
 for col in ['PA_Engulfing_Buy', 'PA_Engulfing_Sell', 'PA_Pinbar_Buy', 'PA_Pinbar_Sell', 'PA_3_Soldiers', 'PA_3_Crows']:
     if col not in df_global.columns:
         df_global[col] = False
+        # =============================================================
+        # 🛡️ ESCUDO ANTI-CRASH: SEÑALES DEL SISTEMA V320
+        # =============================================================
+        señales_requeridas = [
+            'Squeeze_On', 'Neon_Up', 'Neon_Dn', 'Rocket_Signal', 
+            'Señal_Relampago', 'Señal_Explosiva', 'Is_Magenta', 
+            'Is_Magenta_Buy', 'Is_Magenta_Sell', 'Whale_Signal'
+        ]
+        
+        for señal in señales_requeridas:
+            if señal not in df_global.columns:
+                df_global[señal] = False  # Si el gráfico no la encuentra, la apaga sin crashear
         
 a_ema20, a_atr = df_global['EMA_20'].values, df_global['ATR'].values
 a_rvol = df_global['RVol'].values
