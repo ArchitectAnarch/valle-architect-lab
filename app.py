@@ -1638,17 +1638,41 @@ with tab_live:
                     showlegend=False
                 )])
 
-                # --- 🎯 INYECCIÓN DE CONCIENCIA VISUAL EN EL GRÁFICO ---
-                # GENESIS revisa su propia memoria pura y pinta los gatillos en la gráfica
+            # --- 🎯 INYECCIÓN DE CONCIENCIA VISUAL (LÓGICA DE FRANCOTIRADOR) ---
                 if 'Certeza_Compra' in df_global.columns:
-                    gatillos_compra = df_global[df_global['Certeza_Compra'] > 80]
-                    gatillos_venta = df_global[df_global['Certeza_Venta'] > 80]
+                    x_compra, y_compra = [], []
+                    x_venta, y_venta = [], []
+                    
+                    en_posicion_local = False
+                    
+                    # Simulador rápido para la gráfica: Solo alterna 1 Compra -> 1 Venta
+                    for i in range(len(df)):
+                        compra_val = df['Certeza_Compra'].iloc[i]
+                        venta_val = df['Certeza_Venta'].iloc[i]
+                        
+                        # Solo dispara COMPRA si está > 85 y NO está ya en posición
+                        if compra_val > 85 and not en_posicion_local:
+                            x_compra.append(df.index[i])
+                            y_compra.append(df['Low'].iloc[i] * 0.998)
+                            en_posicion_local = True
+                            
+                        # Solo dispara VENTA si está > 85 y SÍ está en posición
+                        elif venta_val > 85 and en_posicion_local:
+                            x_venta.append(df.index[i])
+                            y_venta.append(df['High'].iloc[i] * 1.002)
+                            en_posicion_local = False
 
-                    fig_live.add_trace(go.Scatter(
-                        x=gatillos_compra.index, y=gatillos_compra['Low'] * 0.998,
-                        mode='markers', name='GENESIS COMPRA',
-                        marker=dict(symbol='triangle-up', color='cyan', size=18, line=dict(width=2, color='white'))
-                    ))
+                    # Dibujamos solo los tiros exactos (10 o 20 puntos, no miles)
+                    if x_compra:
+                        fig_live.add_trace(go.Scatter(
+                            x=x_compra, y=y_compra, mode='markers', name='GENESIS COMPRA',
+                            marker=dict(symbol='triangle-up', color='cyan', size=16, line=dict(width=2, color='white'))
+                        ))
+                    if x_venta:
+                        fig_live.add_trace(go.Scatter(
+                            x=x_venta, y=y_venta, mode='markers', name='GENESIS VENTA',
+                            marker=dict(symbol='triangle-down', color='magenta', size=16, line=dict(width=2, color='white'))
+                        ))
 
                     fig_live.add_trace(go.Scatter(
                         x=gatillos_venta.index, y=gatillos_venta['High'] * 1.002,
