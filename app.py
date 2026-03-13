@@ -686,88 +686,77 @@ st.download_button(
 )
 # -------------------------------------------
 # ==========================================
-# 🧠 CREACIÓN DE MATRICES NUMPY V320 CORE
+# 🧠 CREACIÓN DE MATRICES NUMPY V320 CORE (BLINDADO TOTAL)
 # ==========================================
-a_c, a_o, a_h, a_l = df_global['Close'].values, df_global['Open'].values, df_global['High'].values, df_global['Low'].values
-a_rsi, a_rsi_ma, a_adx = df_global['RSI'].values, df_global['RSI_MA'].values, df_global['ADX'].values
-a_bbl, a_bbu = df_global['BBL'].values, df_global['BBU'].values
-a_wt1, a_wt2 = df_global['WT1'].values, df_global['WT2'].values
-# =============================================================
-# 🛡️ PUENTE BLINDADO ANTES DEL RENDERIZADO VISUAL
-# =============================================================
-# Si el DataFrame global perdió las columnas en el camino, las forzamos aquí:
-if 'EMA_20' not in df_global.columns:
-    df_global['EMA_20'] = df_global['Close'].ewm(span=20, adjust=False).mean()
-    df_global['EMA_200'] = df_global['Close'].ewm(span=200, adjust=False).mean()
-    df_global['Vol_MA_100'] = df_global['Volume'].rolling(window=100).mean()
-    df_global['Macro_Bull'] = df_global['Close'] >= df_global['EMA_200']
-    df_global['body_size'] = abs(df_global['Close'] - df_global['Open'])
-    df_global['upper_wick'] = df_global['High'] - df_global[['Open', 'Close']].max(axis=1)
-    df_global['lower_wick'] = df_global[['Open', 'Close']].min(axis=1) - df_global['Low']
-    df_global['Vela_Verde'] = df_global['Close'] > df_global['Open']
-    df_global['Vela_Roja'] = df_global['Close'] < df_global['Open']
-    df_global['BBU'] = df_global['Close'].rolling(20).mean() + (df_global['Close'].rolling(20).std() * 2)
-    df_global['BBL'] = df_global['Close'].rolling(20).mean() - (df_global['Close'].rolling(20).std() * 2)
+# 1. Preparación de Escudos (Ceros y Falsos)
+n_len = len(df_global)
+zeros = pd.Series([0.0] * n_len, index=df_global.index)
+falses = pd.Series([False] * n_len, index=df_global.index)
 
-# Prevención de errores con los viejos patrones de velas (Llenamos con False)
-for col in ['PA_Engulfing_Buy', 'PA_Engulfing_Sell', 'PA_Pinbar_Buy', 'PA_Pinbar_Sell', 'PA_3_Soldiers', 'PA_3_Crows']:
-    if col not in df_global.columns:
-        df_global[col] = False
-        # =============================================================
-        # 🛡️ ESCUDO ANTI-CRASH: SEÑALES DEL SISTEMA V320
-        # =============================================================
-        señales_requeridas = [
-            'Squeeze_On', 'Neon_Up', 'Neon_Dn', 'Rocket_Signal', 
-            'Señal_Relampago', 'Señal_Explosiva', 'Is_Magenta', 
-            'Is_Magenta_Buy', 'Is_Magenta_Sell', 'Whale_Signal'
-        ]
-        
-        for señal in señales_requeridas:
-            if señal not in df_global.columns:
-                df_global[señal] = False  # Si el gráfico no la encuentra, la apaga sin crashear
-        
-# =============================================================
-        # 🛡️ EXTRACCIÓN BLINDADA (ANTI-CRASH TOTAL)
-        # =============================================================
-        import pandas as pd
-        import numpy as np
-        
-        # Preparamos escudos vacíos del tamaño exacto del gráfico
-        n_len = len(df_global)
-        zeros = pd.Series([0.0] * n_len)
-        falses = pd.Series([False] * n_len)
+# 2. Renombrado Táctico (Traducción para el simulador antiguo)
+df_global['Vela_Verde'] = df_global['Close'] > df_global['Open']
+df_global['Vela_Roja'] = df_global['Close'] < df_global['Open']
+df_global['EMA_20'] = df_global['Close'].ewm(span=20, adjust=False).mean()
+df_global['EMA_200'] = df_global['Close'].ewm(span=200, adjust=False).mean()
+df_global['Macro_Bull'] = df_global['Close'] >= df_global['EMA_200']
 
-        # Extracción segura: Si no existe, entrega ceros o falsos y sigue adelante
-        a_ema20 = df_global.get('EMA_20', zeros).values
-        a_atr = df_global.get('ATR', zeros).values
-        a_rvol = df_global.get('RVol', zeros).values
-        a_vv = df_global.get('Vela_Verde', falses).values
-        a_vr = df_global.get('Vela_Roja', falses).values
-        a_sqz_on = df_global.get('Squeeze_On', falses).values
-        a_bb_delta = df_global.get('BB_Delta', zeros).values
-        a_bb_delta_avg = df_global.get('BB_Delta_Avg', zeros).values
-        a_zscore = df_global.get('Z_Score', zeros).values
-        a_rsi_bb_b = df_global.get('RSI_BB_Basis', zeros).values
-        a_rsi_bb_d = df_global.get('RSI_BB_Dev', zeros).values
-        a_lw = df_global.get('lower_wick', zeros).values
-        a_uw = df_global.get('upper_wick', zeros).values
-        a_bs = df_global.get('body_size', zeros).values
-        a_mb = df_global.get('Macro_Bull', falses).values
+# 3. Extracción de Arrays Maestros (Uso estricto de .get para evitar crasheos)
+a_c = df_global['Close'].values
+a_o = df_global['Open'].values
+a_h = df_global['High'].values
+a_l = df_global['Low'].values
 
-a_pa_eng_b, a_pa_eng_s = df_global['PA_Engulfing_Buy'].values, df_global['PA_Engulfing_Sell'].values
-a_pa_pin_b, a_pa_pin_s = df_global['PA_Pinbar_Buy'].values, df_global['PA_Pinbar_Sell'].values
-a_pa_3sol_b, a_pa_3cro_s = df_global['PA_3_Soldiers'].values, df_global['PA_3_Crows'].values
+a_rsi = df_global.get('RSI', zeros).values
+a_rsi_ma = df_global.get('RSI_MA', zeros).values
+a_adx = df_global.get('ADX', zeros).values
+a_bbl = df_global.get('BBL', zeros).values
+a_bbu = df_global.get('BBU', zeros).values
+a_wt1 = df_global.get('WT1', zeros).values
+a_wt2 = df_global.get('WT2', zeros).values
+a_atr = df_global.get('ATR', zeros).values
+a_rvol = df_global.get('RVol', zeros).values
+a_ema20 = df_global['EMA_20'].values
 
-a_pl100_l, a_ph100_l = df_global['PL100_L'].fillna(0).values, df_global['PH100_L'].fillna(99999).values
-a_pl300_l, a_ph300_l = df_global['PL300_L'].fillna(0).values, df_global['PH300_L'].fillna(99999).values
-a_pl800_l, a_ph800_l = df_global['PL800_L'].fillna(0).values, df_global['PH800_L'].fillna(99999).values
+# 4. Traducción de la Malla Matrix (De 'PL_100' del V320 a 'PL100_L' del Simulador)
+a_pl100_l = df_global.get('PL_100', zeros).values
+a_ph100_l = df_global.get('PH_100', zeros).values
+a_pl300_l = df_global.get('PL_300', zeros).values
+a_ph300_l = df_global.get('PH_300', zeros).values
+a_pl800_l = df_global.get('PL_800', zeros).values
+a_ph800_l = df_global.get('PH_800', zeros).values
 
+# 5. Traducción de Variables Físicas (Mayúsculas a Minúsculas)
+a_lw = df_global.get('Lower_Wick', zeros).values
+a_uw = df_global.get('Upper_Wick', zeros).values
+a_bs = df_global.get('Body_Size', zeros).values
+a_mb = df_global['Macro_Bull'].values
+
+# 6. Escudos para Variables Ocultas de Fluido
+a_vv = df_global['Vela_Verde'].values
+a_vr = df_global['Vela_Roja'].values
+a_sqz_on = df_global.get('Squeeze_On', falses).values
+a_bb_delta = df_global.get('BB_Delta', zeros).values
+a_bb_delta_avg = df_global.get('BB_Delta_Avg', zeros).values
+a_zscore = df_global.get('Z_Score', zeros).values
+a_rsi_bb_b = df_global.get('RSI_BB_Basis', zeros).values
+a_rsi_bb_d = df_global.get('RSI_BB_Dev', zeros).values
+
+# 7. Apagado Sistemático de Patrones Legacy
+a_pa_eng_b = df_global.get('PA_Engulfing_Buy', falses).values
+a_pa_eng_s = df_global.get('PA_Engulfing_Sell', falses).values
+a_pa_pin_b = df_global.get('PA_Pinbar_Buy', falses).values
+a_pa_pin_s = df_global.get('PA_Pinbar_Sell', falses).values
+a_pa_3sol_b = df_global.get('PA_3_Soldiers', falses).values
+a_pa_3cro_s = df_global.get('PA_3_Crows', falses).values
+
+# 8. Vectores Shifteados (Preparación para hiper-velocidad Numba)
 a_c_s1, a_o_s1, a_l_s1 = npshift(a_c, 1, 0.0), npshift(a_o, 1, 0.0), npshift(a_l, 1, 0.0)
 a_l_s5, a_h_s1, a_h_s5 = npshift(a_l, 5, 0.0), npshift(a_h, 1, 0.0), npshift(a_h, 5, 0.0)
 a_rsi_s1, a_rsi_s5 = npshift(a_rsi, 1, 50.0), npshift(a_rsi, 5, 50.0)
 a_wt1_s1, a_wt2_s1 = npshift(a_wt1, 1, 0.0), npshift(a_wt2, 1, 0.0)
 
 def calcular_señales_numpy(hitbox, therm_w, adx_th, whale_f):
+
     n_len = len(a_c); s_dict = {}
     
     a_tsup = np.maximum(a_pl100_l, np.maximum(a_pl300_l, a_pl800_l))
