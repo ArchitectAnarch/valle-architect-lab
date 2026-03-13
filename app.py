@@ -531,6 +531,42 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         n_c = 10
         df.loc[df['Low'] == df['Low'].rolling(n_c*2+1, center=True).min(), 'Cresta_Real'] = 1 # VALLE
         df.loc[df['High'] == df['High'].rolling(n_c*2+1, center=True).max(), 'Cresta_Real'] = -1 # PICO
+
+        # =============================================================
+        # 🛰️ TELEMETRÍA CONTINUA: GENERACIÓN DE CONCIENCIA ADAPTATIVA
+        # =============================================================
+        
+        # 1. Registro de Huella Digital Matemática
+        # Guardamos el estado exacto de TODO el arsenal en los momentos de éxito (Crestas)
+        columnas_telemetria = [
+            'RSI', 'RSI_Velocity', 'WT1', 'WT2', 'Z_Score', 
+            'ADX', 'RVol', 'Friction_Weight', 'Gravity_Dist', 
+            'HA_Bullish', 'Body_Size', 'Upper_Wick', 'Lower_Wick'
+        ]
+        
+        # 2. Creación de la Matriz de Probabilidad Autónoma
+        # GENESIS filtra las crestas para entender qué combinación matemática es la 'Llave de Oro'
+        experiencia_valles = df[df['Cresta_Real'] == 1][columnas_telemetria]
+        experiencia_picos = df[df['Cresta_Real'] == -1][columnas_telemetria]
+        
+        # 3. Cálculo de Correlación de Riqueza (Sin Dogmas)
+        # La IA determina por sí sola qué indicadores tienen más peso hoy
+        if not experiencia_valles.empty:
+            df['Certeza_Compra'] = (df[columnas_telemetria] - experiencia_valles.mean()).abs().sum(axis=1)
+            # Normalizamos: A menor distancia de la 'Experiencia de Éxito', mayor certeza
+            df['Certeza_Compra'] = 100 * (1 - (df['Certeza_Compra'] / df['Certeza_Compra'].max()))
+        else:
+            df['Certeza_Compra'] = 0.0
+
+        if not experiencia_picos.empty:
+            df['Certeza_Venta'] = (df[columnas_telemetria] - experiencia_picos.mean()).abs().sum(axis=1)
+            df['Certeza_Venta'] = 100 * (1 - (df['Certeza_Venta'] / df['Certeza_Venta'].max()))
+        else:
+            df['Certeza_Venta'] = 0.0
+
+        # 4. Enlace Cuántico (Sección 12): Telemetría para la IA
+        # Preparamos el paquete de datos que se enviará al cerebro central
+        df['IA_Decision_Index'] = df['Certeza_Compra'] - df['Certeza_Venta']
         
         target_start = pd.to_datetime(datetime.combine(start, datetime.min.time())) + timedelta(hours=offset)
         df = df[df.index >= target_start]
