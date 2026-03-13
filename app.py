@@ -1677,46 +1677,47 @@ with tab_live:
                             st.session_state['ohlc_live'] = st.session_state['ohlc_live'].iloc[-200:]
 
                 df = st.session_state['ohlc_live']
-                p_actual = df['Close'].iloc[-1]
+               p_actual = df['Close'].iloc[-1]
 
                 # =============================================================
-                # 🧠 INYECCIÓN DE CONCIENCIA EN TIEMPO REAL (NEURO-LINK)
+                # 🧠 INYECCIÓN DE CONCIENCIA EN TIEMPO REAL (PARIDAD 100% TV)
                 # =============================================================
-                # 1. Bandas Base (Squeeze)
+                # 1. Squeeze y Sincronización de ATR con Pine Script (RMA)
                 df['Basis'] = df['Close'].rolling(20).mean()
                 df['Dev'] = df['Close'].rolling(20).std(ddof=0)
                 df['BBU'] = df['Basis'] + (df['Dev'] * 2)
                 df['BBL'] = df['Basis'] - (df['Dev'] * 2)
                 
-                # 2. Río Histórico Dinámico (Corregido a Escala Real)
-                df['ATR'] = (df['High'] - df['Low']).rolling(14).mean() 
+                # Usamos la misma función matemática de tu núcleo para paridad total
+                df['ATR'] = rma_pine((df['High'] - df['Low']).values, 14)
+                
+                # 2. Río Histórico Dinámico (Fórmula Exacta del df_global)
                 delta = df['Close'].diff()
                 u = (delta.where(delta > 0, 0)).rolling(14).mean()
                 d = (-delta.where(delta < 0, 0)).rolling(14).mean()
                 df['RSI'] = 100 - (100 / (1 + (u / d.replace(0, 0.001))))
                 df['RSI_Velocity'] = df['RSI'].diff()
                 
-                df['River_Width'] = df['ATR'] * (1.2 + (df['RSI_Velocity'].abs() / 10.0))
+                df['River_Width'] = (df['ATR'] * 1.2) + (df['RSI_Velocity'].abs() / 10.0)
                 df['River_Top'] = df['Basis'] + (df['River_Width'] / 2)
                 df['River_Bot'] = df['Basis'] - (df['River_Width'] / 2)
 
-                # 3. Anomalías y Ballenas
+                # 3. Anomalías y Fluido (Neon, Rocket, Nuclear en Vivo)
                 vol_ma = df['Volume'].rolling(100).mean()
                 df['RVol'] = df['Volume'] / vol_ma.replace(0, 1)
-                neon_up = (df['Close'] >= df['BBU'] * 0.999) & (df['Close'] > df['Open'])
-                neon_dn = (df['Close'] <= df['BBL'] * 1.001) & (df['Close'] < df['Open'])
-                df['Rocket_Signal'] = neon_up & (df['RVol'] > 1.5) & (df['RSI'] > 60)
-                df['Nuclear_Sell'] = neon_dn & (df['RVol'] > 1.5) & (df['RSI'] < 40)
+                df['Neon_Up'] = (df['Close'] >= df['BBU'] * 0.999) & (df['Close'] > df['Open'])
+                df['Neon_Dn'] = (df['Close'] <= df['BBL'] * 1.001) & (df['Close'] < df['Open'])
+                df['Rocket_Signal'] = df['Neon_Up'] & (df['RVol'] > 1.5) & (df['RSI'] > 60)
+                df['Nuclear_Sell'] = df['Neon_Dn'] & (df['RVol'] > 1.5) & (df['RSI'] < 40)
 
-                # 4. Actualizar Variables para el Cerebro
-                certeza_compra_actual = 0
-                certeza_venta_actual = 0
-                if len(df) > 20: 
-                    certeza_compra_actual = 99.0 if df['Rocket_Signal'].iloc[-1] else (df_global['Certeza_Compra'].iloc[-1] if 'Certeza_Compra' in df_global.columns else 0)
-                    certeza_venta_actual = 99.0 if df['Nuclear_Sell'].iloc[-1] else (df_global['Certeza_Venta'].iloc[-1] if 'Certeza_Venta' in df_global.columns else 0)
-                    
-                    if df['Rocket_Signal'].iloc[-1]: st.toast("🚀 ¡SEÑAL ROCKET DETECTADA EN VIVO!", icon="🔥")
-                    if df['Nuclear_Sell'].iloc[-1]: st.toast("☢️ ¡COLAPSO NUCLEAR DETECTADO EN VIVO!", icon="🩸")
+                # 4. Importación de Malla y Gravedad (Desde el Cerebro Central)
+                # Extraemos los datos pesados pre-calculados para las velas que coinciden
+                velas_visibles = df_global.index.intersection(df.index)
+                df_sync = df_global.loc[velas_visibles]
+                
+                # Actualizar Variables para el Cerebro
+                certeza_compra_actual = 99.0 if df['Rocket_Signal'].iloc[-1] else (df_global['Certeza_Compra'].iloc[-1] if 'Certeza_Compra' in df_global.columns else 0)
+                certeza_venta_actual = 99.0 if df['Nuclear_Sell'].iloc[-1] else (df_global['Certeza_Venta'].iloc[-1] if 'Certeza_Venta' in df_global.columns else 0)
 
                 # =============================================================
                 # 🧠 NÚCLEO DE DECISIÓN ADAPTATIVO (GENESIS V2)
@@ -1754,21 +1755,29 @@ with tab_live:
                 # =============================================================
                 fig_live = go.Figure()
 
-                # 1. El Río Histórico
-                fig_live.add_trace(go.Scatter(x=df.index, y=df['River_Top'], mode='lines', line=dict(color='rgba(0, 150, 255, 0.2)', width=1), showlegend=False))
-                fig_live.add_trace(go.Scatter(x=df.index, y=df['River_Bot'], mode='lines', line=dict(color='rgba(0, 150, 255, 0.2)', width=1), fill='tonexty', fillcolor='rgba(0, 150, 255, 0.05)', showlegend=False))
+                # 1. El Río Histórico (Banda Azul)
+                fig_live.add_trace(go.Scatter(x=df.index, y=df['River_Top'], mode='lines', line=dict(color='rgba(0, 150, 255, 0.2)', width=1), showlegend=False, hoverinfo='skip'))
+                fig_live.add_trace(go.Scatter(x=df.index, y=df['River_Bot'], mode='lines', line=dict(color='rgba(0, 150, 255, 0.2)', width=1), fill='tonexty', fillcolor='rgba(0, 150, 255, 0.05)', showlegend=False, hoverinfo='skip'))
 
-                # 2. Fronteras del Squeeze
-                fig_live.add_trace(go.Scatter(x=df.index, y=df['BBU'], mode='lines', line=dict(color='rgba(128,128,128,0.4)', width=1, dash='dot'), showlegend=False))
-                fig_live.add_trace(go.Scatter(x=df.index, y=df['BBL'], mode='lines', line=dict(color='rgba(128,128,128,0.4)', width=1, dash='dot'), showlegend=False))
+                # 2. Fronteras del Squeeze (BBU / BBL)
+                fig_live.add_trace(go.Scatter(x=df.index, y=df['BBU'], mode='lines', line=dict(color='rgba(128,128,128,0.4)', width=1, dash='dot'), showlegend=False, hoverinfo='skip'))
+                fig_live.add_trace(go.Scatter(x=df.index, y=df['BBL'], mode='lines', line=dict(color='rgba(128,128,128,0.4)', width=1, dash='dot'), showlegend=False, hoverinfo='skip'))
 
-                # 3. Velas Japonesas Standard
+                # 3. MALLA HISTÓRICA Y TARGET LOCKS (Extraídos del cerebro central para no laggear)
+                if not df_sync.empty and 'Gravity_Target' in df_sync.columns:
+                    # Pintamos los muros de 300 periodos (Resistencias y Soportes)
+                    fig_live.add_trace(go.Scatter(x=df_sync.index, y=df_sync['PH_300'], mode='lines', line=dict(color='rgba(255,0,0,0.3)', width=2), name='Muro Res (300)'))
+                    fig_live.add_trace(go.Scatter(x=df_sync.index, y=df_sync['PL_300'], mode='lines', line=dict(color='rgba(0,255,0,0.3)', width=2), name='Muro Sup (300)'))
+                    # Target Lock (Centro de Gravedad)
+                    fig_live.add_trace(go.Scatter(x=df_sync.index, y=df_sync['Gravity_Target'], mode='lines', line=dict(color='rgba(255,255,0,0.4)', dash='dashdot', width=2), name='Target Lock'))
+
+                # 4. Velas Japonesas Base
                 fig_live.add_trace(go.Candlestick(
                     x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
                     increasing_line_color='#00ffcc', decreasing_line_color='#ff00ff', name='Precio', showlegend=False
                 ))
 
-                # 4. Velas Especiales (Rocket Pink y Nuclear Red)
+                # 5. VELAS ROSAS Y ROJAS (Anomalías Rocket y Nuclear)
                 df_rocket = df[df['Rocket_Signal']]
                 if not df_rocket.empty:
                     fig_live.add_trace(go.Candlestick(x=df_rocket.index, open=df_rocket['Open'], high=df_rocket['High'], low=df_rocket['Low'], close=df_rocket['Close'], increasing_line_color='#FF00FF', decreasing_line_color='#FF00FF', increasing_fillcolor='#FF00FF', decreasing_fillcolor='#FF00FF', name='Rocket', showlegend=False))
@@ -1777,7 +1786,21 @@ with tab_live:
                 if not df_nuclear.empty:
                     fig_live.add_trace(go.Candlestick(x=df_nuclear.index, open=df_nuclear['Open'], high=df_nuclear['High'], low=df_nuclear['Low'], close=df_nuclear['Close'], increasing_line_color='#FF0000', decreasing_line_color='#FF0000', increasing_fillcolor='#FF0000', decreasing_fillcolor='#FF0000', name='Nuclear', showlegend=False))
 
-                # 5. RENDERIZADO DE TRADES ESTRICTOS
+                # 6. ICONOGRAFÍA DE LA ESTRATEGIA (Neones y Early Signals)
+                x_neon_up, y_neon_up = df[df['Neon_Up']].index, df[df['Neon_Up']]['Low'] * 0.999
+                x_neon_dn, y_neon_dn = df[df['Neon_Dn']].index, df[df['Neon_Dn']]['High'] * 1.001
+                if not x_neon_up.empty: fig_live.add_trace(go.Scatter(x=x_neon_up, y=y_neon_up, mode='markers', marker=dict(symbol='diamond-open', color='cyan', size=8), name='Neon Up', showlegend=False))
+                if not x_neon_dn.empty: fig_live.add_trace(go.Scatter(x=x_neon_dn, y=y_neon_dn, mode='markers', marker=dict(symbol='diamond-open', color='magenta', size=8), name='Neon Dn', showlegend=False))
+
+                if not df_sync.empty and 'Climax_Buy' in df_sync.columns:
+                    x_early_b = df_sync[df_sync['Climax_Buy']].index
+                    y_early_b = df_sync[df_sync['Climax_Buy']]['Low'] * 0.997
+                    x_early_s = df_sync[df_sync['Climax_Sell']].index
+                    y_early_s = df_sync[df_sync['Climax_Sell']]['High'] * 1.003
+                    if not x_early_b.empty: fig_live.add_trace(go.Scatter(x=x_early_b, y=y_early_b, mode='markers', marker=dict(symbol='star', color='yellow', size=12), name='Early Buy (Rayo)'))
+                    if not x_early_s.empty: fig_live.add_trace(go.Scatter(x=x_early_s, y=y_early_s, mode='markers', marker=dict(symbol='star', color='orange', size=12), name='Early Sell (Rayo)'))
+
+                # 7. RENDERIZADO DE EJECUCIÓN (TRIÁNGULOS DE GENESIS)
                 x_compra, y_compra, x_venta, y_venta = [], [], [], []
                 en_posicion_simulada, precio_simulado = False, 0
                 
@@ -1787,17 +1810,17 @@ with tab_live:
                     idx_decision = df_global.loc[idx, 'IA_Decision_Index'] if idx in df_global.index else 0
                     
                     if not en_posicion_simulada and c_compra > umbral_ia:
-                        x_compra.append(idx); y_compra.append(row['Low'] * 0.998)
+                        x_compra.append(idx); y_compra.append(row['Low'] * 0.995) # Triángulo más abajo para no tapar el Rayo
                         en_posicion_simulada = True; precio_simulado = row['Close']
                         
                     elif en_posicion_simulada:
                         rend_sim = ((row['Close'] - precio_simulado) / precio_simulado) * 100
                         if (rend_sim > 0.2 and c_venta > umbral_ia) or (rend_sim < -0.5 and idx_decision < -25):
-                            x_venta.append(idx); y_venta.append(row['High'] * 1.002)
+                            x_venta.append(idx); y_venta.append(row['High'] * 1.005) # Triángulo más arriba
                             en_posicion_simulada = False
 
-                if x_compra: fig_live.add_trace(go.Scatter(x=x_compra, y=y_compra, mode='markers', marker=dict(symbol='triangle-up', color='cyan', size=16, line=dict(width=2, color='black')), showlegend=False))
-                if x_venta: fig_live.add_trace(go.Scatter(x=x_venta, y=y_venta, mode='markers', marker=dict(symbol='triangle-down', color='magenta', size=16, line=dict(width=2, color='black')), showlegend=False))
+                if x_compra: fig_live.add_trace(go.Scatter(x=x_compra, y=y_compra, mode='markers', marker=dict(symbol='triangle-up', color='cyan', size=18, line=dict(width=2, color='white')), name='GENESIS IN'))
+                if x_venta: fig_live.add_trace(go.Scatter(x=x_venta, y=y_venta, mode='markers', marker=dict(symbol='triangle-down', color='magenta', size=18, line=dict(width=2, color='white')), name='GENESIS OUT'))
 
                 # LÍNEA DEL PRECIO ACTUAL
                 fig_live.add_hline(y=p_actual, line_dash="dot", line_color="yellow", line_width=1, annotation_text=f"${p_actual:.4f}", annotation_position="bottom right", annotation_font=dict(color="black", size=12), annotation_bgcolor="yellow")
