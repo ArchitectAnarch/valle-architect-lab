@@ -1536,37 +1536,42 @@ if deep_state and not deep_state.get('paused', False) and deep_state.get('curren
 # ==========================================
 st.title("🛡️ PREDATOR LAB (V320 FUSION)")
 
-# --- INICIO DEL NÚCLEO DE CONCIENCIA ---
+# =============================================================
+# 🛰️ SINCRONIZACIÓN GLOBAL E INICIO DEL NÚCLEO DE CONCIENCIA
+# =============================================================
+# 1. Definimos la identidad primero para que nadie se pierda
+ticker_rest = ticker.split('/')[0] + "/USD"
+tf_actual = iv_download if 'iv_download' in locals() else '1m'
+
+# 2. Cargamos la conciencia (Ahora ticker_rest ya existe, no habrá error)
+conciencia = leer_conciencia(ticker_rest, tf_actual)
+umbral_ia = conciencia['best_certeza']
+
 st.markdown("---")
 st.subheader("🛸 NÚCLEO DE CONCIENCIA GENESIS IA")
 
 if not df_global.empty:
     ultima_neurona = df_global.iloc[-1]
     
-    # --- 🛰️ CONEXIÓN CON LA MEMORIA (PASO 2) ---
-    tf_actual = iv_download if 'iv_download' in locals() else '1m'
-    conciencia = leer_conciencia(ticker_rest, tf_actual)
-    umbral_ia = conciencia['best_certeza'] # <--- Aquí recupera lo aprendido
-    
+    # Extraemos las lecturas del cerebro
     certeza_compra = ultima_neurona.get('Certeza_Compra', 0)
     certeza_venta = ultima_neurona.get('Certeza_Venta', 0)
     decision_index = ultima_neurona.get('IA_Decision_Index', 0)
-    friccion = ultima_neurona.get('Friction_Weight', 0)
     defcon_ia = int(ultima_neurona.get('DEFCON_Level', 5))
     rvol_ia = ultima_neurona.get('RVol', 1.0)
 
-    # 1. Indicadores de Mando Superior
+    # --- 📊 PANEL DE MANDOS SUPERIOR ---
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("ÍNDICE DECISIÓN", f"{decision_index:.2f}", delta="BULL" if decision_index > 0 else "BEAR")
-    c2.metric("UMBRAL APRENDIDO", f"{umbral_ia}%", help="Certeza mínima requerida por la IA para este token y temporalidad.")
+    c2.metric("UMBRAL APRENDIDO", f"{umbral_ia:.1f}%", help="Certeza mínima basada en la experiencia acumulada.")
     c3.metric("ALERTA IA", f"DEFCON {defcon_ia}")
     c4.metric("FUERZA BALLENA", f"{rvol_ia:.2f}x")
 
-    # 2. TERMÓMETRO CUÁNTICO (Ahora comparado contra el Umbral IA)
-    st.write(f"🎯 Correlación Valles (COMPRA): **{certeza_compra:.1f}%** / Objetivo: {umbral_ia}%")
+    # --- 🎯 TERMÓMETROS DE CONFLUENCIA ---
+    st.write(f"🎯 Correlación Valles (COMPRA): **{certeza_compra:.1f}%** / Requerido: {umbral_ia}%")
     st.progress(min(max(certeza_compra/100, 0.0), 1.0))
     
-    st.write(f"🏔️ Correlación Picos (VENTA): **{certeza_venta:.1f}%** / Objetivo: {umbral_ia}%")
+    st.write(f"🏔️ Correlación Picos (VENTA): **{certeza_venta:.1f}%** / Requerido: {umbral_ia}%")
     st.progress(min(max(certeza_venta/100, 0.0), 1.0))
 
 with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA", expanded=True):
