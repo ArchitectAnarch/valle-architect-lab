@@ -385,8 +385,8 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         all_ohlcv, current_ts, error_count = [], start_ts, 0
         req_limit = 1000
         if 'coinbase' in exchange_id.lower(): req_limit = 300
-            
-from concurrent.futures import ThreadPoolExecutor
+      # ---> DEBE EMPEZAR AQUÍ <---
+        from concurrent.futures import ThreadPoolExecutor
         
         req_limit = 300 if 'coinbase' in exchange_id.lower() else 1000
         total_range = end_ts - start_ts
@@ -424,7 +424,7 @@ from concurrent.futures import ThreadPoolExecutor
         
         all_ohlcv = [dict(t) for t in {tuple(d) for d in all_ohlcv}]
         all_ohlcv.sort(key=lambda x: x[0])
-
+        # ---> DEBE TERMINAR AQUÍ <---
         if not all_ohlcv: return pd.DataFrame(), f"El Exchange devolvió 0 velas."
         df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms'); df.set_index('timestamp', inplace=True)
