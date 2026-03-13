@@ -517,10 +517,13 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['LinReg_50'] = df['Close'].rolling(50).apply(lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] * 50 + np.polyfit(np.arange(len(x)), x, 1)[1], raw=True)
         df['Trend_Vector'] = df['LinReg_50'] - df['LinReg_50'].shift(1)
 
-        # --- 7. DINÁMICA DE FLUIDOS (SQUEEZE & DEFCON) ---
+      # --- 7. DINÁMICA DE FLUIDOS (SQUEEZE & DEFCON) ---
         bb_u, bb_l = df['Basis'] + (df['Dev'] * 2), df['Basis'] - (df['Dev'] * 2)
+        
+        df['BBU'] = bb_u  # <-- NUEVO: Guardamos la banda superior para el gráfico
+        df['BBL'] = bb_l  # <-- NUEVO: Guardamos la banda inferior para el gráfico
+        
         kc_u, kc_l = df['Basis'] + (df['ATR'] * 1.5), df['Basis'] - (df['ATR'] * 1.5)
-        df['Squeeze_On'] = (bb_u < kc_u) & (bb_l > kc_l)
         
         df['DEFCON_Level'] = 5
         neon_up = (df['Close'] >= bb_u * 0.999) & (df['Close'] > df['Open'])
