@@ -142,7 +142,6 @@ def npshift_bool(arr, num, fill_value=False):
     else: result[:] = arr
     return result
 
-@njit(fastmath=True)
 def rma_pine(arr, length):
     alpha = 1.0 / length; out = np.full_like(arr, np.nan)
     sum_val = 0.0; count = 0
@@ -154,7 +153,6 @@ def rma_pine(arr, length):
             else: out[i] = alpha * arr[i] + (1.0 - alpha) * out[i-1]
     return out
 
-@njit(fastmath=True)
 def simular_core_rapido(h_arr, l_arr, c_arr, o_arr, f_buy, f_sell, tp_pct_val, sl_pct_val, cap_ini, com_pct, invest_pct, slippage_pct, is_calib):
     cap_act = cap_ini; en_pos = False; p_ent = 0.0
     pos_size = 0.0; invest_amt = 0.0; g_profit = 0.0; g_loss = 0.0
