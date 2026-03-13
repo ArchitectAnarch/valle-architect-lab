@@ -1659,37 +1659,23 @@ with tab_live:
                 ex_radar = ccxt.coinbase({'enableRateLimit': False})
                 fetch_tf = '1h' if (tf_actual == '4h' and 'coinbase' in st.session_state['data_params']['ex'].lower()) else tf_actual
                 
-                # 1. CAPTURA DE DATOS DE ALTA RESOLUCIÓN
+                # 1. DESCARGA DE DATOS (600 velas para estabilidad de medias)
                 velas = ex_radar.fetch_ohlcv(ticker_rest, fetch_tf, limit=600)
                 df = pd.DataFrame(velas, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
                 df['Time'] = pd.to_datetime(df['Time'], unit='ms') + timedelta(hours=offset_actual)
                 df.set_index('Time', inplace=True)
-                
-                # Relleno de huecos (Anti-barrotes)
-                freq_map = {'1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min', '1h': '1h', '4h': '4h'}
-                df = df.resample(freq_map.get(tf_actual, '15min')).asfreq()
-                df[['Open', 'High', 'Low', 'Close']] = df[['Open', 'High', 'Low', 'Close']].ffill()
-                df['Volume'] = df['Volume'].fillna(0)
 
-                # 2. MATEMÁTICA ESPEJO (PINE RMA)
+                # 2. MOTOR MATEMÁTICO RMA (PINE SCRIPT ORIGINAL)
                 def pine_rma(src, length):
-                    return src.ewm(alpha=1/length, min_periods=length, adjust=False).mean()
+                    alpha = 1 / length
+                    return src.ewm(alpha=alpha, min_periods=length, adjust=False).mean()
 
+                # ATR y RSI Espejo
                 df['ATR'] = pine_rma(np.maximum(df['High']-df['Low'], np.maximum(abs(df['High']-df['Close'].shift(1)), abs(df['Low']-df['Close'].shift(1)))), 14)
-                
-                # RSI 
                 diff = df['Close'].diff()
                 df['RSI'] = 100 - (100 / (1 + (pine_rma(diff.where(diff > 0, 0), 14) / pine_rma(diff.where(diff < 0, 0).abs(), 14).replace(0, 0.001))))
                 
-                # Squeeze y Río
-                df['Basis'] = df['Close'].rolling(20).mean()
-                df['BBU'] = df['Basis'] + (df['Close'].rolling(20).std() * 2)
-                df['BBL'] = df['Basis'] - (df['Close'].rolling(20).std() * 2)
-                df['River_Width'] = df['ATR'] * (1.2 + (df['RSI'].diff().abs() / 10.0))
-                df['River_Top'] = df['Basis'] + (df['River_Width'] / 2)
-                df['River_Bot'] = df['Basis'] - (df['River_Width'] / 2)
-
-                # WaveTrend (Clave para Vender)
+                # WaveTrend (Clave para Ventas)
                 ap = (df['High'] + df['Low'] + df['Close']) / 3
                 esa = ap.ewm(span=10, adjust=False).mean()
                 d = (ap - esa).abs().ewm(span=10, adjust=False).mean()
@@ -1697,62 +1683,77 @@ with tab_live:
                 df['WT1'] = ci.ewm(span=21, adjust=False).mean()
                 df['WT2'] = df['WT1'].rolling(4).mean()
 
-                # 3. LÓGICA DE OPERACIÓN (EL ARREGLO)
-                p_actual = df['Close'].iloc[-1]
-                # Sincronizamos con el umbral aprendido
-                conciencia = leer_conciencia(ticker_rest, tf_actual)
-                umbral_ia = conciencia['best_certeza']
-                
-                # Intentamos obtener la certeza de la memoria global, si no, calculamos una básica live
-                curr_time = df.index[-1]
-                certeza_b = df_global.loc[curr_time, 'Certeza_Compra'] if curr_time in df_global.index else (70 if df['RSI'].iloc[-1] < 30 else 0)
-                certeza_s = df_global.loc[curr_time, 'Certeza_Venta'] if curr_time in df_global.index else (70 if df['RSI'].iloc[-1] > 70 else 0)
+                # Squeeze y Río
+                df['Basis'] = df['Close'].rolling(20).mean()
+                df['Dev'] = df['Close'].rolling(20).std()
+                df['BBU'] = df['Basis'] + (df['Dev'] * 2)
+                df['BBL'] = df['Basis'] - (df['Dev'] * 2)
+                df['River_Width'] = df['ATR'] * (1.2 + (df['RSI'].diff().abs() / 10.0))
+                df['River_Top'] = df['Basis'] + (df['River_Width'] / 2)
+                df['River_Bot'] = df['Basis'] - (df['River_Width'] / 2)
 
+                # Malla y PH/PL
+                df['PH_100'] = df['High'].rolling(100).max()
+                df['PL_100'] = df['Low'].rolling(100).min()
+
+                # 3. MINI-CEREBRO IA (Toma de decisiones en vivo)
+                # Calculamos certeza live basada en indicadores
+                df['Live_Buy_Certeza'] = 0.0
+                df.loc[(df['RSI'] < 32) & (df['Low'] < df['BBL']), 'Live_Buy_Certeza'] = 85.0
+                df.loc[(df['WT1'] < -60) & (df['WT1'] > df['WT2']), 'Live_Buy_Certeza'] += 10.0
+                
+                df['Live_Sell_Certeza'] = 0.0
+                df.loc[(df['RSI'] > 68) & (df['High'] > df['BBU']), 'Live_Sell_Certeza'] = 85.0
+                df.loc[(df['WT1'] > 60) & (df['WT1'] < df['WT2']), 'Live_Sell_Certeza'] += 10.0
+
+                p_actual = df['Close'].iloc[-1]
+                umbral_ia = leer_conciencia(ticker_rest, tf_actual)['best_certeza']
+
+                # LÓGICA DE TRADING REAL-TIME
                 if st.session_state['g_pos']:
                     p_ent = st.session_state['g_price']
                     rend = ((p_actual - p_ent) / p_ent) * 100
-                    # GATILLO DE VENTA REFORZADO: Vende por Meta, por IA o por WaveTrend Extremo
-                    if (rend > 0.3 and certeza_s > umbral_ia) or (rend < -1.0) or (df['WT1'].iloc[-1] > 60 and df['WT1'].iloc[-1] < df['WT2'].iloc[-1]):
+                    # Venta por: Certeza IA, WaveTrend o Stop de Emergencia
+                    if (df['Live_Sell_Certeza'].iloc[-1] >= umbral_ia) or (df['WT1'].iloc[-1] > 55 and df['WT1'].iloc[-1] < df['WT2'].iloc[-1]) or (rend < -1.5):
                         st.session_state['g_cap'] *= (1 + (rend/100))
                         st.session_state['g_trades'] += 1
                         st.session_state['g_pos'] = False
                         guardar_aprendizaje(ticker_rest, tf_actual, rend > 0)
-                        st.toast(f"💰 VENTA EJECUTADA: {rend:.2f}%", icon="✅")
+                        st.toast(f"✅ VENTA: {rend:.2f}%", icon="💰")
                 
-                elif certeza_b > umbral_ia:
+                elif df['Live_Buy_Certeza'].iloc[-1] >= umbral_ia:
                     st.session_state['g_pos'] = True
                     st.session_state['g_price'] = p_actual
                     st.toast(f"🚀 COMPRA EJECUTADA", icon="📥")
 
-                # 4. RENDERIZADO DE MORFOLOGÍA TRADINGVIEW
-                df_p = df.tail(120).copy()
+                # 4. DIBUJO DE MORFOLOGÍA TRADINGVIEW
+                df_plot = df.tail(100).copy()
                 fig = go.Figure()
 
-                # Río Sombreado
-                fig.add_trace(go.Scatter(x=df_p.index, y=df_p['River_Top'], mode='lines', line=dict(color='rgba(0,150,255,0)', width=0), showlegend=False))
-                fig.add_trace(go.Scatter(x=df_p.index, y=df_p['River_Bot'], mode='lines', line=dict(color='rgba(0,150,255,0)', width=0), fill='tonexty', fillcolor='rgba(0,100,255,0.08)', showlegend=False))
+                # Río y Squeeze
+                fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['River_Top'], mode='lines', line=dict(color='rgba(0,180,255,0.1)', width=1), showlegend=False))
+                fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['River_Bot'], mode='lines', line=dict(color='rgba(0,180,255,0.1)', width=1), fill='tonexty', fillcolor='rgba(0,120,255,0.12)', showlegend=False))
 
-                # Velas con morfología limpia
+                # Velas (Sin barrotes, ancho automático)
                 fig.add_trace(go.Candlestick(
-                    x=df_p.index, open=df_p['Open'], high=df_p['High'], low=df_p['Low'], close=df_p['Close'],
+                    x=df_plot.index, open=df_plot['Open'], high=df_plot['High'], low=df_plot['Low'], close=df_plot['Close'],
                     increasing_line_color='#00ffcc', decreasing_line_color='#ff00ff',
-                    increasing_fillcolor='rgba(0,255,204,0.6)', decreasing_fillcolor='rgba(255,0,255,0.6)',
-                    name='Matrix'
+                    increasing_fillcolor='rgba(0,255,204,0.7)', decreasing_fillcolor='rgba(255,0,255,0.7)',
+                    name='Price'
                 ))
 
-                # Señales Visuales (Espejo TV)
-                # Early Signals (Estrellas)
-                early_b = df_p[(df_p['RSI'] < 30) & (df_p['Low'] < df_p['BBL'])]
+                # Rayos (Early Signals)
+                early_b = df_plot[df_plot['Live_Buy_Certeza'] >= 80]
                 if not early_b.empty:
-                    fig.add_trace(go.Scatter(x=early_b.index, y=early_b['Low']*0.998, mode='markers', marker=dict(symbol='star', color='yellow', size=11), name='Rayo Buy'))
+                    fig.add_trace(go.Scatter(x=early_b.index, y=early_b['Low']*0.998, mode='markers', marker=dict(symbol='star', color='yellow', size=12), name='Early Buy'))
                 
-                early_s = df_p[(df_p['RSI'] > 70) & (df_p['High'] > df_p['BBU'])]
+                early_s = df_plot[df_plot['Live_Sell_Certeza'] >= 80]
                 if not early_s.empty:
-                    fig.add_trace(go.Scatter(x=early_s.index, y=early_s['High']*1.002, mode='markers', marker=dict(symbol='star', color='orange', size=11), name='Rayo Sell'))
+                    fig.add_trace(go.Scatter(x=early_s.index, y=early_s['High']*1.002, mode='markers', marker=dict(symbol='star', color='orange', size=12), name='Early Sell'))
 
-                # Triángulos de Operación
+                # Línea de entrada si estamos en posición
                 if st.session_state['g_pos']:
-                    fig.add_annotation(x=df_p.index[-1], y=st.session_state['g_price'], text="ENTRY", showarrow=True, arrowhead=2, bgcolor="cyan", font=dict(color="black"))
+                    fig.add_hline(y=st.session_state['g_price'], line_dash="dash", line_color="cyan", annotation_text="ENTRY")
 
                 fig.update_layout(
                     template='plotly_dark', height=650, margin=dict(l=10, r=50, t=10, b=10),
@@ -1761,10 +1762,10 @@ with tab_live:
                     xaxis=dict(gridcolor='rgba(255,255,255,0.05)', type='date')
                 )
 
-                st.plotly_chart(fig, use_container_width=True, key="radar_v3")
+                st.plotly_chart(fig, use_container_width=True, key="radar_v4")
                 
             except Exception as e:
-                st.error(f"Sincronizando: {e}")
+                st.error(f"Sincronizando Matrix: {e}")
         else:
             st.info(f"Sistema en Standby. IA lista para analizar {ticker_rest} en {tf_actual}. Pulsa Iniciar.")
 
