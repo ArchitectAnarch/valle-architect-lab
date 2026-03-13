@@ -1659,54 +1659,56 @@ with tab_live:
                 ex_radar = ccxt.coinbase({'enableRateLimit': False})
                 fetch_tf = '1h' if (tf_actual == '4h' and 'coinbase' in st.session_state['data_params']['ex'].lower()) else tf_actual
                 
-                # Descarga masiva para que las medias no salgan erróneas
+                # 1. DESCARGA DE ALTA FIDELIDAD (Aumentamos a 600 para estabilizar RMA)
                 if st.session_state['ohlc_live'].empty:
-                    velas = ex_radar.fetch_ohlcv(ticker_rest, fetch_tf, limit=500)
+                    velas = ex_radar.fetch_ohlcv(ticker_rest, fetch_tf, limit=600)
                     df = pd.DataFrame(velas, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
                     df['Time'] = pd.to_datetime(df['Time'], unit='ms') + timedelta(hours=offset_actual)
                     df.set_index('Time', inplace=True)
                     st.session_state['ohlc_live'] = df
                 else:
-                    velas = ex_radar.fetch_ohlcv(ticker_rest, fetch_tf, limit=3)
+                    velas = ex_radar.fetch_ohlcv(ticker_rest, fetch_tf, limit=5)
                     df_new = pd.DataFrame(velas, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
                     df_new['Time'] = pd.to_datetime(df_new['Time'], unit='ms') + timedelta(hours=offset_actual)
                     df_new.set_index('Time', inplace=True)
                     st.session_state['ohlc_live'].update(df_new)
-                    nuevas_filas = df_new[~df_new.index.isin(st.session_state['ohlc_live'].index)]
-                    if not nuevas_filas.empty:
-                        st.session_state['ohlc_live'] = pd.concat([st.session_state['ohlc_live'], nuevas_filas])
-                        
-                df_live = st.session_state['ohlc_live']
-                freq_map = {'1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min', '1h': '1h', '4h': '4h', '1d': '1D'}
-                df_live = df_live.resample(freq_map.get(fetch_tf, '1min')).asfreq()
-                df_live[['Close','Open','High','Low']] = df_live[['Close','Open','High','Low']].ffill()
-                df_live['Volume'] = df_live['Volume'].fillna(0)
+                    nuevas = df_new[~df_new.index.isin(st.session_state['ohlc_live'].index)]
+                    if not nuevas.empty:
+                        st.session_state['ohlc_live'] = pd.concat([st.session_state['ohlc_live'], nuevas])
+                
+                df = st.session_state['ohlc_live'].tail(600).copy()
+                
+                # 2. TRADUCCIÓN MATEMÁTICA "ESPEJO" (PINE SCRIPT RMA)
+                def pine_rma(series, length):
+                    alpha = 1 / length
+                    return series.ewm(alpha=alpha, adjust=False).mean()
 
-                if fetch_tf == '1h' and tf_actual == '4h':
-                    df_live = df_live.resample('4h').agg({'Open':'first', 'High':'max', 'Low':'min', 'Close':'last', 'Volume':'sum'}).dropna()
-
-                if len(df_live) > 500: df_live = df_live.iloc[-500:]
-                st.session_state['ohlc_live'] = df_live
-                df = df_live.copy()
-                p_actual = df['Close'].iloc[-1]
-
-                # =============================================================
-                # 🧠 CÁLCULOS MATEMÁTICOS DE ALTA PRECISIÓN (HUD)
-                # =============================================================
+                # ATR Sensible (Usa RMA como TradingView)
+                tr = np.maximum((df['High'] - df['Low']), 
+                                np.maximum(abs(df['High'] - df['Close'].shift(1)), 
+                                           abs(df['Low'] - df['Close'].shift(1))))
+                df['ATR'] = pine_rma(tr, 14)
+                
+                # RSI Sensible (Usa RMA como TradingView)
+                delta = df['Close'].diff()
+                gain = (delta.where(delta > 0, 0))
+                loss = (-delta.where(delta < 0, 0))
+                avg_gain = pine_rma(gain, 14)
+                avg_loss = pine_rma(loss, 14)
+                rs = avg_gain / avg_loss.replace(0, 0.001)
+                df['RSI'] = 100 - (100 / (1 + rs))
+                
+                # 3. NÚCLEO TÁCTICO
                 df['Basis'] = df['Close'].rolling(20).mean()
                 df['Dev'] = df['Close'].rolling(20).std(ddof=0)
                 df['BBU'] = df['Basis'] + (df['Dev'] * 2)
                 df['BBL'] = df['Basis'] - (df['Dev'] * 2)
                 
-                df['ATR'] = (df['High'] - df['Low']).rolling(14).mean() 
-                df['RSI'] = 100 - (100 / (1 + (df['Close'].diff().where(df['Close'].diff() > 0, 0).rolling(14).mean() / df['Close'].diff().where(df['Close'].diff() < 0, 0).abs().rolling(14).mean().replace(0, 0.001))))
-                df['RSI_Velocity'] = df['RSI'].diff()
-                
-                df['River_Width'] = df['ATR'] * (1.2 + (df['RSI_Velocity'].abs() / 10.0))
+                df['River_Width'] = df['ATR'] * (1.2 + (df['RSI'].diff().abs() / 10.0))
                 df['River_Top'] = df['Basis'] + (df['River_Width'] / 2)
                 df['River_Bot'] = df['Basis'] - (df['River_Width'] / 2)
 
-                # WaveTrend para Explosiones
+                # WaveTrend (Sensibilidad Extrema)
                 df['AP'] = (df['High'] + df['Low'] + df['Close']) / 3
                 df['ESA'] = df['AP'].ewm(span=10, adjust=False).mean()
                 df['D_WT'] = (df['AP'] - df['ESA']).abs().ewm(span=10, adjust=False).mean()
@@ -1714,95 +1716,70 @@ with tab_live:
                 df['WT1'] = df['CI'].ewm(span=21, adjust=False).mean()
                 df['WT2'] = df['WT1'].rolling(4).mean()
 
-                # Mallas Rojas y Verdes (Soportes/Resistencias)
+                # Mallas y Gravedad
                 df['PH_100'] = df['High'].rolling(100).max()
                 df['PL_100'] = df['Low'].rolling(100).min()
                 df['Gravity_Target'] = (df['PH_100'] + df['PL_100']) / 2
 
-                # Lógica de Color de Velas (Scores)
-                df['Buy_Score'] = 0.0
-                df.loc[(df['RSI'] < 35) & (df['Close'] < df['BBL']), 'Buy_Score'] = 75.0
-                df['Sell_Score'] = 0.0
-                df.loc[(df['RSI'] > 65) & (df['Close'] > df['BBU']), 'Sell_Score'] = 75.0
+                # 4. GATILLOS VISUALES (ESPEJO)
+                df['Body'] = (df['Close'] - df['Open']).abs()
+                df['Buy_Score'] = np.where((df['RSI'] < 35) & (df['Low'] < df['BBL']), 80, 0)
+                df['Sell_Score'] = np.where((df['RSI'] > 65) & (df['High'] > df['BBU']), 80, 0)
+                
+                df['Early_B'] = (df['Buy_Score'] >= 70) & (df['Low'] < df['Low'].shift(1))
+                df['Early_S'] = (df['Sell_Score'] >= 70) & (df['High'] > df['High'].shift(1))
+                df['Nuc_B'] = df['Early_B'] & (df['WT1'] < -60)
+                df['Nuc_S'] = df['Early_S'] & (df['WT1'] > 60)
+                df['Rocket'] = (df['Close'] > df['BBU']) & (df['Volume'] > df['Volume'].rolling(100).mean()*1.5)
 
-                # Anomalías: Rocket (Rosa), Nuclear (Explosión), Climax (Rayo)
-                vol_ma = df['Volume'].rolling(100).mean()
-                df['RVol'] = df['Volume'] / vol_ma.replace(0, 1)
-                df['Neon_Up'] = (df['Close'] >= df['BBU'] * 0.999) & (df['Close'] > df['Open'])
-                df['Neon_Dn'] = (df['Close'] <= df['BBL'] * 1.001) & (df['Close'] < df['Open'])
-                df['Rocket_Signal'] = df['Neon_Up'] & (df['RVol'] > 1.5)
-                
-                df['Body_Size'] = (df['Close'] - df['Open']).abs()
-                df['Upper_Wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
-                df['Lower_Wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
-                
-                df['Climax_Buy'] = (df['Buy_Score'] >= 70) & (df['Lower_Wick'] > df['Body_Size'] * 0.4)
-                df['Climax_Sell'] = (df['Sell_Score'] >= 70) & (df['Upper_Wick'] > df['Body_Size'] * 0.4)
-                df['Nuclear_Buy'] = df['Climax_Buy'] & (df['WT1'] < -60)
-                df['Nuclear_Sell'] = df['Climax_Sell'] & (df['WT1'] > 60)
+                p_actual = df['Close'].iloc[-1]
+                df_plot = df.iloc[-120:] # Zoom más agresivo para ver detalle
 
                 # =============================================================
-                # 🎨 RENDERIZADO VISUAL "ESTILO TRADINGVIEW"
+                # 🎨 RENDERIZADO VISUAL "PRO-TRADER"
                 # =============================================================
-                df_plot = df.iloc[-150:]
                 fig_live = go.Figure()
 
-                # 1. El Río Histórico (Sombreado Azul)
-                fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['River_Top'], mode='lines', line=dict(color='rgba(0, 150, 255, 0.1)', width=0), showlegend=False))
-                fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['River_Bot'], mode='lines', line=dict(color='rgba(0, 150, 255, 0.1)', width=0), fill='tonexty', fillcolor='rgba(0, 150, 255, 0.07)', showlegend=False))
-
-                # 2. Las Mallas (Soportes/Resistencias Horizontales)
-                fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['PH_100'], mode='lines', line=dict(color='rgba(255, 0, 0, 0.3)', width=1, dash='dash'), name='Muro Resistencia'))
-                fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['PL_100'], mode='lines', line=dict(color='rgba(0, 255, 0, 0.3)', width=1, dash='dash'), name='Muro Soporte'))
-                fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['Gravity_Target'], mode='lines', line=dict(color='rgba(255, 255, 255, 0.2)', width=1, dash='dot'), name='Target Lock'))
-
-                # 3. Velas Japonesas Base
-                fig_live.add_trace(go.Candlestick(x=df_plot.index, open=df_plot['Open'], high=df_plot['High'], low=df_plot['Low'], close=df_plot['Close'], increasing_line_color='#00ffcc', decreasing_line_color='#ff00ff', name='Precio', showlegend=False))
-
-                # 4. CAPA DE VELAS ESPECIALES (Sobrescribimos el color)
-                # Velas Rosas (Rocket)
-                df_r = df_plot[df_plot['Rocket_Signal']]
-                if not df_r.empty:
-                    fig_live.add_trace(go.Candlestick(x=df_r.index, open=df_r['Open'], high=df_r['High'], low=df_r['Low'], close=df_r['Close'], increasing_line_color='#FF00FF', decreasing_line_color='#FF00FF', increasing_fillcolor='#FF00FF', decreasing_fillcolor='#FF00FF', name='Rocket Pink'))
+                # Río y Squeeze
+                fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['River_Top'], mode='lines', line=dict(color='rgba(0, 200, 255, 0.1)', width=0), showlegend=False))
+                fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['River_Bot'], mode='lines', line=dict(color='rgba(0, 200, 255, 0.1)', width=0), fill='tonexty', fillcolor='rgba(0, 150, 255, 0.1)', showlegend=False))
                 
-                # Velas Nucleares (Verde brillante y Rojo Sangre)
-                df_nb = df_plot[df_plot['Nuclear_Buy']]
-                if not df_nb.empty:
-                    fig_live.add_trace(go.Candlestick(x=df_nb.index, open=df_nb['Open'], high=df_nb['High'], low=df_nb['Low'], close=df_nb['Close'], increasing_line_color='#00FF00', decreasing_line_color='#00FF00', increasing_fillcolor='#00FF00', decreasing_fillcolor='#00FF00', name='Nuclear Buy'))
-                
-                df_ns = df_plot[df_plot['Nuclear_Sell']]
-                if not df_ns.empty:
-                    fig_live.add_trace(go.Candlestick(x=df_ns.index, open=df_ns['Open'], high=df_ns['High'], low=df_ns['Low'], close=df_ns['Close'], increasing_line_color='#FF0000', decreasing_line_color='#FF0000', increasing_fillcolor='#FF0000', decreasing_fillcolor='#FF0000', name='Nuclear Sell'))
+                # Mallas (Opacidad baja para no ensuciar)
+                fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['PH_100'], mode='lines', line=dict(color='rgba(255,0,0,0.2)', width=1, dash='dash'), name='Muro Res'))
+                fig_live.add_trace(go.Scatter(x=df_plot.index, y=df_plot['PL_100'], mode='lines', line=dict(color='rgba(0,255,0,0.2)', width=1, dash='dash'), name='Muro Sup'))
 
-                # 5. ICONOGRAFÍA TÁCTICA (Rayos, Estrellas, Cruces)
-                # Rayos / Estrellas (Climax)
-                if not df_plot[df_plot['Climax_Buy']].empty:
-                    fig_live.add_trace(go.Scatter(x=df_plot[df_plot['Climax_Buy']].index, y=df_plot[df_plot['Climax_Buy']]['Low']*0.998, mode='markers', marker=dict(symbol='star', color='yellow', size=12), name='Early Signal (Rayo)'))
-                
-                # Cruces X (Explosiones Nucleares)
-                if not df_plot[df_plot['Nuclear_Buy']].empty:
-                    fig_live.add_trace(go.Scatter(x=df_nb.index, y=df_nb['Low']*0.995, mode='markers', marker=dict(symbol='x', color='#00FF00', size=14, line=dict(width=2, color='white')), name='EXPLOSIÓN'))
+                # Velas (Ajustamos el ancho para evitar los "barrotes")
+                fig_live.add_trace(go.Candlestick(
+                    x=df_plot.index, open=df_plot['Open'], high=df_plot['High'], low=df_plot['Low'], close=df_plot['Close'],
+                    increasing_line_color='#00ffcc', decreasing_line_color='#ff00ff',
+                    increasing_fillcolor='#00ffcc', decreasing_fillcolor='#ff00ff',
+                    line_width=1.5, name='Precio'
+                ))
 
-                # Triángulos de GENESIS IA
-                x_compra, y_compra, x_venta, y_venta = [], [], [], []
-                en_pos_sim, p_ent_sim = False, 0
-                certeza_umbral = leer_conciencia(ticker_rest, tf_actual)['best_certeza']
+                # Capa de Velas Especiales (Pintura Pura)
+                for label, color, mask in [('Rocket', '#FF00FF', df_plot['Rocket']), 
+                                           ('Nuc_B', '#00FF00', df_plot['Nuc_B']), 
+                                           ('Nuc_S', '#FF0000', df_plot['Nuc_S'])]:
+                    if not df_plot[mask].empty:
+                        d = df_plot[mask]
+                        fig_live.add_trace(go.Candlestick(x=d.index, open=d['Open'], high=d['High'], low=d['Low'], close=d['Close'], increasing_line_color=color, decreasing_line_color=color, increasing_fillcolor=color, decreasing_fillcolor=color, showlegend=False))
 
+                # Iconografía Espejo
+                if not df_plot[df_plot['Early_B']].empty:
+                    fig_live.add_trace(go.Scatter(x=df_plot[df_plot['Early_B']].index, y=df_plot[df_plot['Early_B']]['Low']*0.998, mode='markers', marker=dict(symbol='star', color='yellow', size=10), name='Early Buy'))
+                if not df_plot[df_plot['Early_S']].empty:
+                    fig_live.add_trace(go.Scatter(x=df_plot[df_plot['Early_S']].index, y=df_plot[df_plot['Early_S']]['High']*1.002, mode='markers', marker=dict(symbol='star', color='orange', size=10), name='Early Sell'))
+
+                # Triángulos de Operación IA
+                certeza_ia = leer_conciencia(ticker_rest, tf_actual)['best_certeza']
+                x_in, y_in = [], []
                 for idx, row in df_plot.iterrows():
-                    c_compra = 99 if row['Rocket_Signal'] else (df_global.loc[idx, 'Certeza_Compra'] if idx in df_global.index else 0)
-                    c_venta = 99 if row['Nuclear_Sell'] else (df_global.loc[idx, 'Certeza_Venta'] if idx in df_global.index else 0)
-                    if not en_pos_sim and c_compra > certeza_umbral:
-                        x_compra.append(idx); y_compra.append(row['Low'] * 0.990); en_pos_sim = True; p_ent_sim = row['Close']
-                    elif en_pos_sim:
-                        rend = ((row['Close'] - p_ent_sim) / p_ent_sim) * 100
-                        if (rend > 0.2 and c_venta > certeza_umbral) or (rend < -0.5):
-                            x_venta.append(idx); y_venta.append(row['High'] * 1.010); en_pos_sim = False
+                    if (df_global.loc[idx, 'Certeza_Compra'] if idx in df_global.index else 0) > certeza_ia:
+                        x_in.append(idx); y_in.append(row['Low']*0.995)
+                if x_in: fig_live.add_trace(go.Scatter(x=x_in, y=y_in, mode='markers', marker=dict(symbol='triangle-up', color='white', size=15, line=dict(width=2, color='cyan')), name='IA ENTRY'))
 
-                if x_compra: fig_live.add_trace(go.Scatter(x=x_compra, y=y_compra, mode='markers', marker=dict(symbol='triangle-up', color='cyan', size=20, line=dict(width=2, color='white')), name='IA ENTRY'))
-                if x_venta: fig_live.add_trace(go.Scatter(x=x_venta, y=y_venta, mode='markers', marker=dict(symbol='triangle-down', color='magenta', size=20, line=dict(width=2, color='white')), name='IA EXIT'))
-
-                fig_live.add_hline(y=p_actual, line_dash="dot", line_color="yellow", line_width=1, annotation_text=f"${p_actual:.4f}", annotation_position="bottom right")
-                fig_live.update_layout(template='plotly_dark', height=600, margin=dict(l=10, r=60, t=10, b=10), xaxis_rangeslider_visible=False, yaxis=dict(side="right", tickformat=".4f"))
+                fig_live.add_hline(y=p_actual, line_dash="dot", line_color="yellow", line_width=1)
+                fig_live.update_layout(template='plotly_dark', height=650, margin=dict(l=10, r=60, t=10, b=10), xaxis_rangeslider_visible=False, yaxis=dict(side="right", tickformat=".6f", gridcolor='rgba(255,255,255,0.05)'))
                 
                 st.markdown(f"<h3 style='text-align:center; color:#00ffcc;'>{ticker_rest} | {tf_actual} | Precio: ${p_actual:.6f}</h3>", unsafe_allow_html=True)
                 st.plotly_chart(fig_live, use_container_width=True, key="radar_genesis_live")
