@@ -1646,7 +1646,7 @@ with tab_live:
             st.session_state['ohlc_live'] = pd.DataFrame()
         st.rerun()
 
-    @st.fragment(run_every=1)
+    @st.fragment(run_every=3)
     def monitor_velas_v2():
         if st.session_state['ws_run']:
             try:
