@@ -385,22 +385,44 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         all_ohlcv, current_ts, error_count = [], start_ts, 0
         req_limit = 1000
         if 'coinbase' in exchange_id.lower(): req_limit = 300
-all_ohlcv, current_ts, error_count = [], start_ts, 0
-        req_limit = 1000
-        if 'coinbase' in exchange_id.lower(): req_limit = 300
+from concurrent.futures import ThreadPoolExecutor
+        
+        req_limit = 300 if 'coinbase' in exchange_id.lower() else 1000
+        total_range = end_ts - start_ts
+        segment = total_range // 6
+        
+        def fetch_segment(s_ts, e_ts):
+            local_ohlcv = []
+            curr = s_ts
+            err_count = 0
+            while curr < e_ts:
+                try: 
+                    batch = ex_class.fetch_ohlcv(sym, iv_down, since=curr, limit=req_limit)
+                    err_count = 0
+                except Exception as e:
+                    err_count += 1
+                    if err_count >= 3: break
+                    time.sleep(1); continue
+                    
+                if not batch or len(batch) == 0: break
+                if local_ohlcv and batch[0][0] <= local_ohlcv[-1][0]:
+                    batch = [c for c in batch if c[0] > local_ohlcv[-1][0]]
+                    if not batch: break
+                local_ohlcv.extend(batch)
+                curr = batch[-1][0] + 1
+            return local_ohlcv
 
-        while current_ts < end_ts:
-            try: ohlcv = ex_class.fetch_ohlcv(sym, iv_down, since=current_ts, limit=req_limit); error_count = 0 
-            except Exception as e: 
-                error_count += 1
-                if error_count >= 3: return pd.DataFrame(), f"❌ ERROR CCXT ({exchange_id}): {str(e)}"
-                time.sleep(1); continue
-            if not ohlcv or len(ohlcv) == 0: break
-            if all_ohlcv and ohlcv[0][0] <= all_ohlcv[-1][0]:
-                ohlcv = [c for c in ohlcv if c[0] > all_ohlcv[-1][0]]
-                if not ohlcv: break
-            all_ohlcv.extend(ohlcv); current_ts = ohlcv[-1][0] + 1
-            if len(all_ohlcv) > 100000: break
+        puntos = [(start_ts + i * segment, start_ts + (i + 1) * segment) for i in range(6)]
+        puntos[-1] = (puntos[-1][0], end_ts)
+        
+        all_ohlcv = []
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            resultados = list(executor.map(lambda p: fetch_segment(p[0], p[1]), puntos))
+        
+        for r in resultados: all_ohlcv.extend(r)
+        
+        all_ohlcv = [dict(t) for t in {tuple(d) for d in all_ohlcv}]
+        all_ohlcv.sort(key=lambda x: x[0])
         if not all_ohlcv: return pd.DataFrame(), f"El Exchange devolvió 0 velas."
         df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms'); df.set_index('timestamp', inplace=True)
