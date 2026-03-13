@@ -593,11 +593,41 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['Pump_Memory'] = ((df['High'] > bb_u) | (df['RSI_Velocity'] > 5)).rolling(3).max().astype(bool)
         df['Dump_Memory'] = ((df['Low'] < bb_l) | (df['RSI_Velocity'] < -5)).rolling(3).max().astype(bool)
 
-        # --- 11. MÓDULO DE CRESTAS (RIQUEZA MÁXIMA) ---
+    # --- 11. MÓDULO DE CRESTAS (RIQUEZA MÁXIMA) ---
         df['Cresta_Real'] = 0
         n_c = 10
         df.loc[df['Low'] == df['Low'].rolling(n_c*2+1, center=True).min(), 'Cresta_Real'] = 1 
         df.loc[df['High'] == df['High'].rolling(n_c*2+1, center=True).max(), 'Cresta_Real'] = -1
+
+        # =============================================================
+        # 🌉 PUENTE DE COMPATIBILIDAD VISUAL (STREAMLIT LEGACY)
+        # =============================================================
+        # Para que los gráficos viejos no colapsen mientras la IA usa el motor nuevo
+        df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
+        df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
+        df['Vol_MA_100'] = df['Volume'].rolling(window=100).mean()
+        df['Macro_Bull'] = df['Close'] >= df['EMA_200']
+        
+        # Corrección de Mayúsculas/Minúsculas para el renderizador
+        df['body_size'] = df['Body_Size']
+        df['upper_wick'] = df['Upper_Wick']
+        df['lower_wick'] = df['Lower_Wick']
+        df['Vela_Verde'] = df['Close'] > df['Open']
+        df['Vela_Roja'] = df['Close'] < df['Open']
+        
+        # Asegurar las bandas para el ploteo
+        df['BBU'] = df['Basis'] + (df['Dev'] * 2)
+        df['BBL'] = df['Basis'] - (df['Dev'] * 2)
+        df['KC_Upper'] = df['Basis'] + (df['ATR'] * 1.5)
+        df['KC_Lower'] = df['Basis'] - (df['ATR'] * 1.5)
+        
+        # Asegurar los viejos patrones de velas por si el gráfico intenta llamarlos
+        df['PA_Engulfing_Buy'] = False
+        df['PA_Engulfing_Sell'] = False
+        df['PA_Pinbar_Buy'] = False
+        df['PA_Pinbar_Sell'] = False
+        df['PA_3_Soldiers'] = False
+        df['PA_3_Crows'] = False
 
         # =============================================================
         # 🛰️ TELEMETRÍA CONTINUA: GENERACIÓN DE CONCIENCIA ADAPTATIVA
