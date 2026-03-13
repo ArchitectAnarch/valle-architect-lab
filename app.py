@@ -1684,46 +1684,74 @@ with tab_live:
                     showlegend=False
                 )])
 
-         # --- 🎯 INYECCIÓN DE CONCIENCIA VISUAL (LÓGICA DE FRANCOTIRADOR SINCRONIZADA) ---
-                if 'Certeza_Compra' in df_global.columns:
-                    x_compra, y_compra = [], []
-                    x_venta, y_venta = [], []
-                    en_posicion_local = False
+         # =============================================================
+                # 🧠 NÚCLEO DE DECISIÓN ADAPTATIVO (GENESIS V2)
+                # =============================================================
+                
+                # 1. Cargamos el Umbral que la IA ha aprendido para este contexto
+                conciencia = leer_conciencia(ticker_rest, tf_actual)
+                umbral_ia = conciencia['best_certeza']
+
+               # --- 🧠 MÓDULO DE AUTO-EVALUACIÓN (SALIDA CONSCIENTE - SIN LÍMITES FIJOS) ---
+                if st.session_state['g_pos']:
+                    # 1. Sensores de Conciencia Actualizados
+                    certeza_venta_actual = df_global['Certeza_Venta'].iloc[-1] if 'Certeza_Venta' in df_global.columns else 0
+                    decision_index = df_global['IA_Decision_Index'].iloc[-1] if 'IA_Decision_Index' in df_global.columns else 0
                     
-                    # 1. Cruzamos el radar en vivo (df) con la memoria cuántica (df_global)
-                    velas_visibles = df_global.index.intersection(df.index)
-                    df_sync = df_global.loc[velas_visibles]
+                    p_actual = df['Close'].iloc[-1]
+                    p_ent = st.session_state['g_price']
+                    rendimiento = (p_actual - p_ent) / p_ent * 100
+
+                    finalizado = None
                     
-                    # 2. Simulador rápido: Alterna 1 Compra -> 1 Venta
-                    for idx, row in df_sync.iterrows():
-                        compra_val = row.get('Certeza_Compra', 0)
-                        venta_val = row.get('Certeza_Venta', 0)
+                    # 🚀 ESCENARIO A: SALIDA POR PROFIT CONSCIENTE
+                    # Solo sale si hay ganancia (>0.2% para cubrir fees) Y la IA detecta AGOTAMIENTO
+                    if rendimiento > 0.2 and certeza_venta_actual > umbral_ia:
+                        finalizado = True
+                        status_msg = f"✅ PROFIT CONSCIENTE: {rendimiento:.2f}%"
+                        icon_t = "💰"
+
+                    # 🛡️ ESCENARIO B: SALIDA POR RIESGO ESTRUCTURAL (STOP CONSCIENTE)
+                    # Solo sale si el Índice de Decisión detecta un colapso de la estructura
+                    elif rendimiento < -0.5 and decision_index < -25:
+                        finalizado = False
+                        status_msg = f"❌ STOP ESTRUCTURAL: {rendimiento:.2f}%"
+                        icon_t = "🛡️"
+                    
+                    if finalizado is not None:
+                        # 📝 REGISTRO EN EL DIARIO DE EVOLUCIÓN
+                        guardar_aprendizaje(ticker_rest, tf_actual, finalizado)
                         
-                        # Solo dispara COMPRA si está > 85 y NO está ya en posición
-                        if compra_val > 85 and not en_posicion_local:
-                            x_compra.append(idx)
-                            y_compra.append(row['Low'] * 0.998)
-                            en_posicion_local = True
-                            
-                        # Solo dispara VENTA si está > 85 y SÍ está en posición
-                        elif venta_val > 85 and en_posicion_local:
-                            x_venta.append(idx)
-                            y_venta.append(row['High'] * 1.002)
-                            en_posicion_local = False
+                        # Actualización de la billetera basada en el rendimiento real capturado
+                        st.session_state['g_cap'] *= (1 + (rendimiento/100))
+                        st.session_state['g_trades'] += 1
+                        st.session_state['g_pos'] = False
+                        st.toast(status_msg, icon=icon_t)
+                        st.toast("🧠 GENESIS V2: Lección de mercado guardada.", icon="📖")
 
-                    # 3. Dibujamos los tiros exactos en el mapa
-                    if x_compra:
-                        fig_live.add_trace(go.Scatter(
-                            x=x_compra, y=y_compra, mode='markers', name='GENESIS COMPRA',
-                            marker=dict(symbol='triangle-up', color='cyan', size=16, line=dict(width=2, color='black'))
-                        ))
-                    if x_venta:
-                        fig_live.add_trace(go.Scatter(
-                            x=x_venta, y=y_venta, mode='markers', name='GENESIS VENTA',
-                            marker=dict(symbol='triangle-down', color='magenta', size=16, line=dict(width=2, color='black'))
-                        ))
+                # 3. GATILLO DE ENTRADA (Basado en Certeza Real-Time)
+                certeza_compra_actual = df_global['Certeza_Compra'].iloc[-1] if 'Certeza_Compra' in df_global.columns else 0
+                
+                if not st.session_state['g_pos'] and certeza_compra_actual > umbral_ia:
+                    st.session_state['g_pos'] = True
+                    st.session_state['g_price'] = p_actual
+                    st.toast(f"🚀 ENTRADA: Certeza {certeza_compra_actual:.1f}% > Umbral {umbral_ia}%", icon="💰")
 
-                # LÍNEA DEL PRECIO ACTUAL (Atraviesa el gráfico de lado a lado)
+                # 4. RENDERIZADO VISUAL (Triángulos en el Streaming)
+                velas_visibles = df_global.index.intersection(df.index)
+                df_sync = df_global.loc[velas_visibles]
+                
+                # Pintamos solo los momentos donde la certeza superó lo aprendido
+                x_c = df_sync[df_sync['Certeza_Compra'] > umbral_ia].index
+                y_c = df_sync[df_sync['Certeza_Compra'] > umbral_ia]['Low'] * 0.998
+                
+                if not x_c.empty:
+                    fig_live.add_trace(go.Scatter(
+                        x=x_c, y=y_c, mode='markers', name='GENESIS BUY',
+                        marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=1, color='white'))
+                    ))
+
+                # LÍNEA DEL PRECIO ACTUAL
                 fig_live.add_hline(
                     y=p_actual, line_dash="dot", line_color="yellow", line_width=1,
                     annotation_text=f"${p_actual:.4f}", annotation_position="bottom right",
