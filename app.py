@@ -690,6 +690,28 @@ a_c, a_o, a_h, a_l = df_global['Close'].values, df_global['Open'].values, df_glo
 a_rsi, a_rsi_ma, a_adx = df_global['RSI'].values, df_global['RSI_MA'].values, df_global['ADX'].values
 a_bbl, a_bbu = df_global['BBL'].values, df_global['BBU'].values
 a_wt1, a_wt2 = df_global['WT1'].values, df_global['WT2'].values
+# =============================================================
+# 🛡️ PUENTE BLINDADO ANTES DEL RENDERIZADO VISUAL
+# =============================================================
+# Si el DataFrame global perdió las columnas en el camino, las forzamos aquí:
+if 'EMA_20' not in df_global.columns:
+    df_global['EMA_20'] = df_global['Close'].ewm(span=20, adjust=False).mean()
+    df_global['EMA_200'] = df_global['Close'].ewm(span=200, adjust=False).mean()
+    df_global['Vol_MA_100'] = df_global['Volume'].rolling(window=100).mean()
+    df_global['Macro_Bull'] = df_global['Close'] >= df_global['EMA_200']
+    df_global['body_size'] = abs(df_global['Close'] - df_global['Open'])
+    df_global['upper_wick'] = df_global['High'] - df_global[['Open', 'Close']].max(axis=1)
+    df_global['lower_wick'] = df_global[['Open', 'Close']].min(axis=1) - df_global['Low']
+    df_global['Vela_Verde'] = df_global['Close'] > df_global['Open']
+    df_global['Vela_Roja'] = df_global['Close'] < df_global['Open']
+    df_global['BBU'] = df_global['Close'].rolling(20).mean() + (df_global['Close'].rolling(20).std() * 2)
+    df_global['BBL'] = df_global['Close'].rolling(20).mean() - (df_global['Close'].rolling(20).std() * 2)
+
+# Prevención de errores con los viejos patrones de velas (Llenamos con False)
+for col in ['PA_Engulfing_Buy', 'PA_Engulfing_Sell', 'PA_Pinbar_Buy', 'PA_Pinbar_Sell', 'PA_3_Soldiers', 'PA_3_Crows']:
+    if col not in df_global.columns:
+        df_global[col] = False
+        
 a_ema20, a_atr = df_global['EMA_20'].values, df_global['ATR'].values
 a_rvol = df_global['RVol'].values
 a_vv, a_vr = df_global['Vela_Verde'].values, df_global['Vela_Roja'].values
