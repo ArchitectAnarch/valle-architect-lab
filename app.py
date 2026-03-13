@@ -385,6 +385,9 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         all_ohlcv, current_ts, error_count = [], start_ts, 0
         req_limit = 1000
         if 'coinbase' in exchange_id.lower(): req_limit = 300
+all_ohlcv, current_ts, error_count = [], start_ts, 0
+        req_limit = 1000
+        if 'coinbase' in exchange_id.lower(): req_limit = 300
 
         while current_ts < end_ts:
             try: ohlcv = ex_class.fetch_ohlcv(sym, iv_down, since=current_ts, limit=req_limit); error_count = 0 
@@ -398,7 +401,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
                 if not ohlcv: break
             all_ohlcv.extend(ohlcv); current_ts = ohlcv[-1][0] + 1
             if len(all_ohlcv) > 100000: break
-            
         if not all_ohlcv: return pd.DataFrame(), f"El Exchange devolvió 0 velas."
         df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms'); df.set_index('timestamp', inplace=True)
