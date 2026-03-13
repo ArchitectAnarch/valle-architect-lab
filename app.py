@@ -1677,7 +1677,7 @@ with tab_live:
                             st.session_state['ohlc_live'] = st.session_state['ohlc_live'].iloc[-200:]
 
                 df = st.session_state['ohlc_live']
-               p_actual = df['Close'].iloc[-1]
+                p_actual = df['Close'].iloc[-1]
 
                 # =============================================================
                 # 🧠 INYECCIÓN DE CONCIENCIA EN TIEMPO REAL (NEURO-LINK)
