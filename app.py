@@ -1742,18 +1742,48 @@ with tab_live:
                     st.session_state['g_price'] = p_actual
                     st.toast(f"🚀 ENTRADA: Certeza {certeza_compra_actual:.1f}% > Umbral {umbral_ia}%", icon="💰")
 
-                # 4. RENDERIZADO VISUAL (Triángulos en el Streaming)
+               # 4. RENDERIZADO VISUAL ESTRICTO (Secuencia COMPRA -> VENTA -> COMPRA)
                 velas_visibles = df_global.index.intersection(df.index)
                 df_sync = df_global.loc[velas_visibles]
                 
-                # Pintamos solo los momentos donde la certeza superó lo aprendido
-                x_c = df_sync[df_sync['Certeza_Compra'] > umbral_ia].index
-                y_c = df_sync[df_sync['Certeza_Compra'] > umbral_ia]['Low'] * 0.998
+                x_compra, y_compra = [], []
+                x_venta, y_venta = [], []
+                en_posicion_simulada = False
+                precio_simulado = 0
                 
-                if not x_c.empty:
+                # Simulamos la mente de la IA vela por vela para dibujar exactamente sus pasos
+                for idx, row in df_sync.iterrows():
+                    c_compra = row.get('Certeza_Compra', 0)
+                    c_venta = row.get('Certeza_Venta', 0)
+                    idx_decision = row.get('IA_Decision_Index', 0)
+                    
+                    # 🟢 LÓGICA DE COMPRA (100% del Capital, solo si NO estamos en posición)
+                    if not en_posicion_simulada and c_compra > umbral_ia:
+                        x_compra.append(idx)
+                        y_compra.append(row['Low'] * 0.998)
+                        en_posicion_simulada = True
+                        precio_simulado = row['Close']
+                        
+                    # 🔴 LÓGICA DE VENTA (Salida Consciente o Defensiva, solo si SÍ estamos en posición)
+                    elif en_posicion_simulada:
+                        rend_sim = ((row['Close'] - precio_simulado) / precio_simulado) * 100
+                        
+                        # Vende si hay profit consciente (>0.2% y pico de venta) O pánico estructural
+                        if (rend_sim > 0.2 and c_venta > umbral_ia) or (rend_sim < -0.5 and idx_decision < -25):
+                            x_venta.append(idx)
+                            y_venta.append(row['High'] * 1.002)
+                            en_posicion_simulada = False
+
+                # Dibujamos las señales limpias en el radar
+                if x_compra:
                     fig_live.add_trace(go.Scatter(
-                        x=x_c, y=y_c, mode='markers', name='GENESIS BUY',
-                        marker=dict(symbol='triangle-up', color='cyan', size=14, line=dict(width=1, color='white'))
+                        x=x_compra, y=y_compra, mode='markers', name='GENESIS ALL-IN',
+                        marker=dict(symbol='triangle-up', color='cyan', size=16, line=dict(width=2, color='black'))
+                    ))
+                if x_venta:
+                    fig_live.add_trace(go.Scatter(
+                        x=x_venta, y=y_venta, mode='markers', name='GENESIS SELL-ALL',
+                        marker=dict(symbol='triangle-down', color='magenta', size=16, line=dict(width=2, color='black'))
                     ))
 
                 # LÍNEA DEL PRECIO ACTUAL
@@ -1762,7 +1792,7 @@ with tab_live:
                     annotation_text=f"${p_actual:.4f}", annotation_position="bottom right",
                     annotation_font=dict(color="black", size=12), annotation_bgcolor="yellow"
                 )
-
+          
                 fig_live.update_layout(
                     template='plotly_dark', height=600, margin=dict(l=10, r=60, t=10, b=10),
                     xaxis_rangeslider_visible=False, uirevision='constant', hovermode='x unified', 
