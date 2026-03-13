@@ -598,6 +598,8 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         n_c = 10
         df.loc[df['Low'] == df['Low'].rolling(n_c*2+1, center=True).min(), 'Cresta_Real'] = 1 
         df.loc[df['High'] == df['High'].rolling(n_c*2+1, center=True).max(), 'Cresta_Real'] = -1
+        # Sincronización forzada: Todo lo que pensó la IA pasa al gráfico
+        df_global = df.copy()
 
         # =============================================================
         # 🌉 PUENTE DE COMPATIBILIDAD VISUAL (STREAMLIT LEGACY)
@@ -724,14 +726,33 @@ for col in ['PA_Engulfing_Buy', 'PA_Engulfing_Sell', 'PA_Pinbar_Buy', 'PA_Pinbar
             if señal not in df_global.columns:
                 df_global[señal] = False  # Si el gráfico no la encuentra, la apaga sin crashear
         
-a_ema20, a_atr = df_global['EMA_20'].values, df_global['ATR'].values
-a_rvol = df_global['RVol'].values
-a_vv, a_vr = df_global['Vela_Verde'].values, df_global['Vela_Roja'].values
-a_sqz_on = df_global['Squeeze_On'].values
-a_bb_delta, a_bb_delta_avg = df_global['BB_Delta'].values, df_global['BB_Delta_Avg'].values
-a_zscore, a_rsi_bb_b, a_rsi_bb_d = df_global['Z_Score'].values, df_global['RSI_BB_Basis'].values, df_global['RSI_BB_Dev'].values
-a_lw, a_uw, a_bs = df_global['lower_wick'].values, df_global['upper_wick'].values, df_global['body_size'].values
-a_mb = df_global['Macro_Bull'].values
+# =============================================================
+        # 🛡️ EXTRACCIÓN BLINDADA (ANTI-CRASH TOTAL)
+        # =============================================================
+        import pandas as pd
+        import numpy as np
+        
+        # Preparamos escudos vacíos del tamaño exacto del gráfico
+        n_len = len(df_global)
+        zeros = pd.Series([0.0] * n_len)
+        falses = pd.Series([False] * n_len)
+
+        # Extracción segura: Si no existe, entrega ceros o falsos y sigue adelante
+        a_ema20 = df_global.get('EMA_20', zeros).values
+        a_atr = df_global.get('ATR', zeros).values
+        a_rvol = df_global.get('RVol', zeros).values
+        a_vv = df_global.get('Vela_Verde', falses).values
+        a_vr = df_global.get('Vela_Roja', falses).values
+        a_sqz_on = df_global.get('Squeeze_On', falses).values
+        a_bb_delta = df_global.get('BB_Delta', zeros).values
+        a_bb_delta_avg = df_global.get('BB_Delta_Avg', zeros).values
+        a_zscore = df_global.get('Z_Score', zeros).values
+        a_rsi_bb_b = df_global.get('RSI_BB_Basis', zeros).values
+        a_rsi_bb_d = df_global.get('RSI_BB_Dev', zeros).values
+        a_lw = df_global.get('lower_wick', zeros).values
+        a_uw = df_global.get('upper_wick', zeros).values
+        a_bs = df_global.get('body_size', zeros).values
+        a_mb = df_global.get('Macro_Bull', falses).values
 
 a_pa_eng_b, a_pa_eng_s = df_global['PA_Engulfing_Buy'].values, df_global['PA_Engulfing_Sell'].values
 a_pa_pin_b, a_pa_pin_s = df_global['PA_Pinbar_Buy'].values, df_global['PA_Pinbar_Sell'].values
