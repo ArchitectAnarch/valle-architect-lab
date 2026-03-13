@@ -13,6 +13,57 @@ import glob
 from datetime import datetime, timedelta
 import websocket
 import threading
+# ==========================================
+# 🧠 MEMORIA PERMANENTE V2: MULTIDIMENSIONAL
+# ==========================================
+
+MEMORY_FILE = "genesis_experience.json"
+
+def guardar_aprendizaje(token, tf, exito):
+    """
+    TF: Temporalidad (ej. '1m', '15m', '1h')
+    exito: True si el trade terminó en ganancia (TP), False si no (SL)
+    """
+    # Creamos una llave única de contexto (ej. "BTC/USD_15min")
+    contexto = f"{token}_{tf}"
+    
+    # Estructura base si el archivo no existe
+    memoria = {"Universal": {"aciertos": 0, "fallos": 0}, "Contextos": {}}
+    
+    if os.path.exists(MEMORY_FILE):
+        try:
+            with open(MEMORY_FILE, 'r') as f:
+                memoria = json.load(f)
+        except: pass
+
+    # 1. Actualizar Memoria Universal (Física de la Estrategia)
+    key = "aciertos" if exito else "fallos"
+    memoria["Universal"][key] += 1
+
+    # 2. Actualizar Memoria por Contexto (Token + Temporalidad)
+    if contexto not in memoria["Contextos"]:
+        memoria["Contextos"][contexto] = {"aciertos": 0, "fallos": 0, "best_certeza": 85.0}
+    
+    memoria["Contextos"][contexto][key] += 1
+    
+    # 3. Evolución Adaptativa: Solo sube el umbral si falla en ese contexto específico
+    if not exito and memoria["Contextos"][contexto]["fallos"] % 5 == 0:
+        memoria["Contextos"][contexto]["best_certeza"] += 0.5 
+        # Capamos el umbral máximo al 95% para que no se bloquee por miedo
+        if memoria["Contextos"][contexto]["best_certeza"] > 95.0:
+            memoria["Contextos"][contexto]["best_certeza"] = 95.0
+
+    with open(MEMORY_FILE, 'w') as f:
+        json.dump(memoria, f, indent=4)
+
+def leer_conciencia(token, tf):
+    """Carga los parámetros específicos para el token y su temporalidad actual"""
+    contexto = f"{token}_{tf}"
+    if os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE, 'r') as f:
+            memoria = json.load(f)
+            return memoria.get("Contextos", {}).get(contexto, {"best_certeza": 85.0})
+    return {"best_certeza": 85.0}
 
 # --- MOTOR DE HIPER-VELOCIDAD (NUMBA JIT) ---
 try:
