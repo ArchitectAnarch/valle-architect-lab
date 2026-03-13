@@ -1645,7 +1645,6 @@ with tab_live:
                     en_posicion_local = False
                     
                     # 1. Cruzamos el radar en vivo (df) con la memoria cuántica (df_global)
-                    # Para no colgar la RAM, solo analizamos las velas visibles en pantalla
                     velas_visibles = df_global.index.intersection(df.index)
                     df_sync = df_global.loc[velas_visibles]
                     
@@ -1677,13 +1676,8 @@ with tab_live:
                             x=x_venta, y=y_venta, mode='markers', name='GENESIS VENTA',
                             marker=dict(symbol='triangle-down', color='magenta', size=16, line=dict(width=2, color='black'))
                         ))
-                    fig_live.add_trace(go.Scatter(
-                        x=gatillos_venta.index, y=gatillos_venta['High'] * 1.002,
-                        mode='markers', name='GENESIS VENTA',
-                        marker=dict(symbol='triangle-down', color='magenta', size=18, line=dict(width=2, color='white'))
-                    ))
 
-                # LÍNEA DEL PRECIO ACTUAL
+                # LÍNEA DEL PRECIO ACTUAL (Atraviesa el gráfico de lado a lado)
                 fig_live.add_hline(
                     y=p_actual, line_dash="dot", line_color="yellow", line_width=1,
                     annotation_text=f"${p_actual:.4f}", annotation_position="bottom right",
