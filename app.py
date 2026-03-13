@@ -1802,7 +1802,7 @@ with tab_live:
                 )
 
                 st.markdown(f"<h3 style='text-align:center; color:#00ffcc;'>{ticker_rest} | {tf_actual} | Precio: ${p_actual:.6f}</h3>", unsafe_allow_html=True)
-                st.plotly_chart(fig_live, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
+                st.plotly_chart(fig_live, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False}, key="radar_genesis_live")
                     
             except Exception as e:
                 st.error(f"⚠️ Sincronizando datos... {e}")
