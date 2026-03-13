@@ -1677,121 +1677,130 @@ with tab_live:
                             st.session_state['ohlc_live'] = st.session_state['ohlc_live'].iloc[-200:]
 
                 df = st.session_state['ohlc_live']
-                p_actual = df['Close'].iloc[-1]
+               p_actual = df['Close'].iloc[-1]
 
-                fig_live = go.Figure(data=[go.Candlestick(
-                    x=df.index,
-                    open=df['Open'], high=df['High'],
-                    low=df['Low'], close=df['Close'],
-                    increasing_line_color='#00ffcc', 
-                    decreasing_line_color='#ff00ff', 
-                    name='Precio',
-                    showlegend=False
-                )])
+                # =============================================================
+                # 🧠 INYECCIÓN DE CONCIENCIA EN TIEMPO REAL (NEURO-LINK)
+                # =============================================================
+                # 1. Bandas Base (Squeeze)
+                df['Basis'] = df['Close'].rolling(20).mean()
+                df['Dev'] = df['Close'].rolling(20).std(ddof=0)
+                df['BBU'] = df['Basis'] + (df['Dev'] * 2)
+                df['BBL'] = df['Basis'] - (df['Dev'] * 2)
+                
+                # 2. Río Histórico Dinámico
+                df['ATR'] = df['High'].rolling(14).max() - df['Low'].rolling(14).min() 
+                delta = df['Close'].diff()
+                u = (delta.where(delta > 0, 0)).rolling(14).mean()
+                d = (-delta.where(delta < 0, 0)).rolling(14).mean()
+                df['RSI'] = 100 - (100 / (1 + (u / d.replace(0, 0.001))))
+                df['RSI_Velocity'] = df['RSI'].diff()
+                
+                df['River_Width'] = (df['ATR'] * 1.2) + (df['RSI_Velocity'].abs() / 10.0)
+                df['River_Top'] = df['Basis'] + (df['River_Width'] / 2)
+                df['River_Bot'] = df['Basis'] - (df['River_Width'] / 2)
 
-         # =============================================================
+                # 3. Anomalías y Ballenas
+                vol_ma = df['Volume'].rolling(100).mean()
+                df['RVol'] = df['Volume'] / vol_ma.replace(0, 1)
+                neon_up = (df['Close'] >= df['BBU'] * 0.999) & (df['Close'] > df['Open'])
+                neon_dn = (df['Close'] <= df['BBL'] * 1.001) & (df['Close'] < df['Open'])
+                df['Rocket_Signal'] = neon_up & (df['RVol'] > 1.5) & (df['RSI'] > 60)
+                df['Nuclear_Sell'] = neon_dn & (df['RVol'] > 1.5) & (df['RSI'] < 40)
+
+                # 4. Actualizar Variables para el Cerebro
+                certeza_compra_actual = 0
+                certeza_venta_actual = 0
+                if len(df) > 20: 
+                    certeza_compra_actual = 99.0 if df['Rocket_Signal'].iloc[-1] else (df_global['Certeza_Compra'].iloc[-1] if 'Certeza_Compra' in df_global.columns else 0)
+                    certeza_venta_actual = 99.0 if df['Nuclear_Sell'].iloc[-1] else (df_global['Certeza_Venta'].iloc[-1] if 'Certeza_Venta' in df_global.columns else 0)
+                    
+                    if df['Rocket_Signal'].iloc[-1]: st.toast("🚀 ¡SEÑAL ROCKET DETECTADA EN VIVO!", icon="🔥")
+                    if df['Nuclear_Sell'].iloc[-1]: st.toast("☢️ ¡COLAPSO NUCLEAR DETECTADO EN VIVO!", icon="🩸")
+
+                # =============================================================
                 # 🧠 NÚCLEO DE DECISIÓN ADAPTATIVO (GENESIS V2)
                 # =============================================================
-                
-                # 1. Cargamos el Umbral que la IA ha aprendido para este contexto
                 conciencia = leer_conciencia(ticker_rest, tf_actual)
                 umbral_ia = conciencia['best_certeza']
 
-               # --- 🧠 MÓDULO DE AUTO-EVALUACIÓN (SALIDA CONSCIENTE - SIN LÍMITES FIJOS) ---
+                # --- MÓDULO DE AUTO-EVALUACIÓN (SALIDA CONSCIENTE) ---
                 if st.session_state['g_pos']:
-                    # 1. Sensores de Conciencia Actualizados
-                    certeza_venta_actual = df_global['Certeza_Venta'].iloc[-1] if 'Certeza_Venta' in df_global.columns else 0
                     decision_index = df_global['IA_Decision_Index'].iloc[-1] if 'IA_Decision_Index' in df_global.columns else 0
-                    
-                    p_actual = df['Close'].iloc[-1]
                     p_ent = st.session_state['g_price']
                     rendimiento = (p_actual - p_ent) / p_ent * 100
-
                     finalizado = None
                     
-                    # 🚀 ESCENARIO A: SALIDA POR PROFIT CONSCIENTE
-                    # Solo sale si hay ganancia (>0.2% para cubrir fees) Y la IA detecta AGOTAMIENTO
                     if rendimiento > 0.2 and certeza_venta_actual > umbral_ia:
-                        finalizado = True
-                        status_msg = f"✅ PROFIT CONSCIENTE: {rendimiento:.2f}%"
-                        icon_t = "💰"
-
-                    # 🛡️ ESCENARIO B: SALIDA POR RIESGO ESTRUCTURAL (STOP CONSCIENTE)
-                    # Solo sale si el Índice de Decisión detecta un colapso de la estructura
+                        finalizado = True; status_msg = f"✅ PROFIT CONSCIENTE: {rendimiento:.2f}%"; icon_t = "💰"
                     elif rendimiento < -0.5 and decision_index < -25:
-                        finalizado = False
-                        status_msg = f"❌ STOP ESTRUCTURAL: {rendimiento:.2f}%"
-                        icon_t = "🛡️"
+                        finalizado = False; status_msg = f"❌ STOP ESTRUCTURAL: {rendimiento:.2f}%"; icon_t = "🛡️"
                     
                     if finalizado is not None:
-                        # 📝 REGISTRO EN EL DIARIO DE EVOLUCIÓN
                         guardar_aprendizaje(ticker_rest, tf_actual, finalizado)
-                        
-                        # Actualización de la billetera basada en el rendimiento real capturado
                         st.session_state['g_cap'] *= (1 + (rendimiento/100))
                         st.session_state['g_trades'] += 1
                         st.session_state['g_pos'] = False
                         st.toast(status_msg, icon=icon_t)
-                        st.toast("🧠 GENESIS V2: Lección de mercado guardada.", icon="📖")
 
-                # 3. GATILLO DE ENTRADA (Basado en Certeza Real-Time)
-                certeza_compra_actual = df_global['Certeza_Compra'].iloc[-1] if 'Certeza_Compra' in df_global.columns else 0
-                
+                # --- GATILLO DE ENTRADA ---
                 if not st.session_state['g_pos'] and certeza_compra_actual > umbral_ia:
                     st.session_state['g_pos'] = True
                     st.session_state['g_price'] = p_actual
                     st.toast(f"🚀 ENTRADA: Certeza {certeza_compra_actual:.1f}% > Umbral {umbral_ia}%", icon="💰")
 
-               # 4. RENDERIZADO VISUAL ESTRICTO (Secuencia COMPRA -> VENTA -> COMPRA)
-                velas_visibles = df_global.index.intersection(df.index)
-                df_sync = df_global.loc[velas_visibles]
+                # =============================================================
+                # 🎨 CAPAS VISUALES TÁCTICAS (ESTILO PREDATOR TV)
+                # =============================================================
+                fig_live = go.Figure()
+
+                # 1. El Río Histórico
+                fig_live.add_trace(go.Scatter(x=df.index, y=df['River_Top'], mode='lines', line=dict(color='rgba(0, 150, 255, 0.2)', width=1), showlegend=False))
+                fig_live.add_trace(go.Scatter(x=df.index, y=df['River_Bot'], mode='lines', line=dict(color='rgba(0, 150, 255, 0.2)', width=1), fill='tonexty', fillcolor='rgba(0, 150, 255, 0.05)', showlegend=False))
+
+                # 2. Fronteras del Squeeze
+                fig_live.add_trace(go.Scatter(x=df.index, y=df['BBU'], mode='lines', line=dict(color='rgba(128,128,128,0.4)', width=1, dash='dot'), showlegend=False))
+                fig_live.add_trace(go.Scatter(x=df.index, y=df['BBL'], mode='lines', line=dict(color='rgba(128,128,128,0.4)', width=1, dash='dot'), showlegend=False))
+
+                # 3. Velas Japonesas Standard
+                fig_live.add_trace(go.Candlestick(
+                    x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'],
+                    increasing_line_color='#00ffcc', decreasing_line_color='#ff00ff', name='Precio', showlegend=False
+                ))
+
+                # 4. Velas Especiales (Rocket Pink y Nuclear Red)
+                df_rocket = df[df['Rocket_Signal']]
+                if not df_rocket.empty:
+                    fig_live.add_trace(go.Candlestick(x=df_rocket.index, open=df_rocket['Open'], high=df_rocket['High'], low=df_rocket['Low'], close=df_rocket['Close'], increasing_line_color='#FF00FF', decreasing_line_color='#FF00FF', increasing_fillcolor='#FF00FF', decreasing_fillcolor='#FF00FF', name='Rocket', showlegend=False))
                 
-                x_compra, y_compra = [], []
-                x_venta, y_venta = [], []
-                en_posicion_simulada = False
-                precio_simulado = 0
+                df_nuclear = df[df['Nuclear_Sell']]
+                if not df_nuclear.empty:
+                    fig_live.add_trace(go.Candlestick(x=df_nuclear.index, open=df_nuclear['Open'], high=df_nuclear['High'], low=df_nuclear['Low'], close=df_nuclear['Close'], increasing_line_color='#FF0000', decreasing_line_color='#FF0000', increasing_fillcolor='#FF0000', decreasing_fillcolor='#FF0000', name='Nuclear', showlegend=False))
+
+                # 5. RENDERIZADO DE TRADES ESTRICTOS
+                x_compra, y_compra, x_venta, y_venta = [], [], [], []
+                en_posicion_simulada, precio_simulado = False, 0
                 
-                # Simulamos la mente de la IA vela por vela para dibujar exactamente sus pasos
-                for idx, row in df_sync.iterrows():
-                    c_compra = row.get('Certeza_Compra', 0)
-                    c_venta = row.get('Certeza_Venta', 0)
-                    idx_decision = row.get('IA_Decision_Index', 0)
+                for idx, row in df.iterrows():
+                    c_compra = 99 if row.get('Rocket_Signal', False) else (df_global.loc[idx, 'Certeza_Compra'] if idx in df_global.index else 0)
+                    c_venta = 99 if row.get('Nuclear_Sell', False) else (df_global.loc[idx, 'Certeza_Venta'] if idx in df_global.index else 0)
+                    idx_decision = df_global.loc[idx, 'IA_Decision_Index'] if idx in df_global.index else 0
                     
-                    # 🟢 LÓGICA DE COMPRA (100% del Capital, solo si NO estamos en posición)
                     if not en_posicion_simulada and c_compra > umbral_ia:
-                        x_compra.append(idx)
-                        y_compra.append(row['Low'] * 0.998)
-                        en_posicion_simulada = True
-                        precio_simulado = row['Close']
+                        x_compra.append(idx); y_compra.append(row['Low'] * 0.998)
+                        en_posicion_simulada = True; precio_simulado = row['Close']
                         
-                    # 🔴 LÓGICA DE VENTA (Salida Consciente o Defensiva, solo si SÍ estamos en posición)
                     elif en_posicion_simulada:
                         rend_sim = ((row['Close'] - precio_simulado) / precio_simulado) * 100
-                        
-                        # Vende si hay profit consciente (>0.2% y pico de venta) O pánico estructural
                         if (rend_sim > 0.2 and c_venta > umbral_ia) or (rend_sim < -0.5 and idx_decision < -25):
-                            x_venta.append(idx)
-                            y_venta.append(row['High'] * 1.002)
+                            x_venta.append(idx); y_venta.append(row['High'] * 1.002)
                             en_posicion_simulada = False
 
-                # Dibujamos las señales limpias en el radar
-                if x_compra:
-                    fig_live.add_trace(go.Scatter(
-                        x=x_compra, y=y_compra, mode='markers', name='GENESIS ALL-IN',
-                        marker=dict(symbol='triangle-up', color='cyan', size=16, line=dict(width=2, color='black'))
-                    ))
-                if x_venta:
-                    fig_live.add_trace(go.Scatter(
-                        x=x_venta, y=y_venta, mode='markers', name='GENESIS SELL-ALL',
-                        marker=dict(symbol='triangle-down', color='magenta', size=16, line=dict(width=2, color='black'))
-                    ))
+                if x_compra: fig_live.add_trace(go.Scatter(x=x_compra, y=y_compra, mode='markers', marker=dict(symbol='triangle-up', color='cyan', size=16, line=dict(width=2, color='black')), showlegend=False))
+                if x_venta: fig_live.add_trace(go.Scatter(x=x_venta, y=y_venta, mode='markers', marker=dict(symbol='triangle-down', color='magenta', size=16, line=dict(width=2, color='black')), showlegend=False))
 
                 # LÍNEA DEL PRECIO ACTUAL
-                fig_live.add_hline(
-                    y=p_actual, line_dash="dot", line_color="yellow", line_width=1,
-                    annotation_text=f"${p_actual:.4f}", annotation_position="bottom right",
-                    annotation_font=dict(color="black", size=12), annotation_bgcolor="yellow"
-                )
+                fig_live.add_hline(y=p_actual, line_dash="dot", line_color="yellow", line_width=1, annotation_text=f"${p_actual:.4f}", annotation_position="bottom right", annotation_font=dict(color="black", size=12), annotation_bgcolor="yellow")
           
                 fig_live.update_layout(
                     template='plotly_dark', height=600, margin=dict(l=10, r=60, t=10, b=10),
