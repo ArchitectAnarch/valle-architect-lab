@@ -430,35 +430,48 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['Open'] = df['Open'].fillna(df['Close']); df['High'] = df['High'].fillna(df['Close']); df['Low'] = df['Low'].fillna(df['Close'])
         df['Volume'] = df['Volume'].fillna(0)
             
-  # =============================================================
-        # 🧠 MOTOR DE CONCIENCIA V320: VALLE ARCHITECT [TOTAL ADN]
+# =============================================================
+        # 🧠 NÚCLEO GENESIS V2: VALLE ARCHITECT [INVENTARIO TOTAL 100%]
         # =============================================================
         
-        # --- [SECCIÓN 4: MOTORES MATEMÁTICOS & FÍSICA] ---
-        # 1. Física Base
+        # --- 1. MOTORES DE FÍSICA & PREDICCIÓN LINEAL ---
         df['ATR'] = rma_pine(df['High'] - df['Low'], 14)
-        df['Basis_Sigma'] = df['Close'].rolling(20).mean()
-        df['Dev_Sigma'] = df['Close'].rolling(20).std(ddof=0)
-        df['Z_Score'] = (df['Close'] - df['Basis_Sigma']) / df['Dev_Sigma'].replace(0, 1)
+        df['Basis'] = df['Close'].rolling(20).mean()
+        df['Dev'] = df['Close'].rolling(20).std(ddof=0)
+        df['Z_Score'] = (df['Close'] - df['Basis']) / df['Dev'].replace(0, 1)
+        # PP_Slope: El vector de dirección física (Sigma Vector)
         df['PP_Slope'] = df['Close'].rolling(5).apply(lambda x: np.polyfit(np.arange(len(x)), x, 1)[0], raw=True)
+        
+        # [NUEVO: CATÁLOGO 15 - PING-PONG]
+        df['Slope_5'] = df['Close'].diff(5) / 5
+        df['Ping_Pong_Reflect'] = np.where(df['Z_Score'].abs() > 2.0, df['Slope_5'] * -1, df['Slope_5'])
 
-        # 2. RSI Completo (Velocity & Crosses)
+        # --- 2. RSI COMPLETO & VELOCIDAD ---
         delta = df['Close'].diff()
         u = (delta.where(delta > 0, 0)).rolling(14).mean()
         d = (-delta.where(delta < 0, 0)).rolling(14).mean()
         df['RSI'] = 100 - (100 / (1 + (u / d.replace(0, 0.001))))
         df['RSI_MA'] = df['RSI'].rolling(14).mean()
+        df['RSI_Fast'] = df['RSI'].ewm(span=5, adjust=False).mean()
+        df['RSI_Slow'] = df['RSI'].ewm(span=15, adjust=False).mean()
         df['RSI_Velocity'] = df['RSI'].diff()
+        
+        # [NUEVO: CATÁLOGO 2 y 11 - RÍO HISTÓRICO DINÁMICO & PUSH/ENTRY]
+        df['River_Width'] = (df['ATR'] * 1.2) + (df['RSI_Velocity'].abs() / 10.0)
+        df['River_Top'] = df['Basis'] + (df['River_Width'] / 2)
+        df['River_Bot'] = df['Basis'] - (df['River_Width'] / 2)
+        df['River_Push_Up'] = (df['Low'] <= df['River_Top']) & (df['Close'] > df['River_Top'])
+        df['River_Push_Dn'] = (df['High'] >= df['River_Bot']) & (df['Close'] < df['River_Bot'])
 
-        # ### NUEVO: ADX (DMI) ###
+        # --- 3. DMI & ADX (FUERZA DE TENDENCIA) ---
         plus_dm = df['High'].diff().where(lambda x: (x > df['Low'].diff().abs()) & (x > 0), 0)
         minus_dm = df['Low'].diff().abs().where(lambda x: (x > df['High'].diff()) & (x > 0), 0)
         atr_14_adx = df['ATR'].replace(0, 1)
-        plus_di = 100 * (plus_dm.rolling(14).mean() / atr_14_adx)
-        minus_di = 100 * (minus_dm.rolling(14).mean() / atr_14_adx)
-        df['ADX'] = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di).replace(0, 1)).rolling(14).mean()
+        df['DI_Plus'] = 100 * (plus_dm.rolling(14).mean() / atr_14_adx)
+        df['DI_Minus'] = 100 * (minus_dm.rolling(14).mean() / atr_14_adx)
+        df['ADX'] = 100 * (abs(df['DI_Plus'] - df['DI_Minus']) / (df['DI_Plus'] + df['DI_Minus']).replace(0, 1)).rolling(14).mean()
 
-        # 3. WaveTrend (TCI Master)
+        # --- 4. WAVETREND (TCI MASTER) ---
         df['AP'] = (df['High'] + df['Low'] + df['Close']) / 3
         df['ESA'] = df['AP'].ewm(span=10, adjust=False).mean()
         df['D_WT'] = (df['AP'] - df['ESA']).abs().ewm(span=10, adjust=False).mean()
@@ -466,77 +479,88 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['WT1'] = df['CI'].ewm(span=21, adjust=False).mean()
         df['WT2'] = df['WT1'].rolling(4).mean()
 
-        # 4. Ballenas & Volumen (Whale Holograph)
+        # --- 5. BALLENAS, FLASH VOL & MEMORIA ---
         vol_ma = df['Volume'].rolling(100).mean()
         df['RVol'] = df['Volume'] / vol_ma.replace(0, 1)
         df['Flash_Vol'] = (df['RVol'] > 2.0) & (np.abs(df['Close']-df['Open']) > (df['ATR'] * 0.3))
         df['Whale_Buy'] = df['Flash_Vol'] & (df['Close'] > df['Open'])
         df['Whale_Sell'] = df['Flash_Vol'] & (df['Close'] < df['Open'])
+        df['Whale_Memory'] = (df['Whale_Buy'] | df['Whale_Buy'].shift(1) | df['Whale_Buy'].shift(2) | 
+                              df['Whale_Sell'] | df['Whale_Sell'].shift(1) | df['Whale_Sell'].shift(2))
+        
+        # [NUEVO: CATÁLOGO 12 - WHALE HALO]
+        df['Halo_High'] = df['High'].ewm(span=3, adjust=False).mean()
+        df['Halo_Low'] = df['Low'].ewm(span=3, adjust=False).mean()
 
-        # --- [SECCIÓN 5: MALLA & MATRIX] ---
-        def get_pivots(series, left, right):
+        # --- 6. MALLA MATRIX, GRAVEDAD & FRICCIÓN ---
+        def get_pivots_full(series, left, right):
             pivots = np.full(len(series), np.nan)
             for i in range(left, len(series) - right):
                 window = series.iloc[i-left : i+right+1]
-                if series.iloc[i] == window.max(): pivots[i] = series.iloc[i]
-            return pd.Series(pivots, index=series.index)
+                if series.iloc[i] == window.max() or series.iloc[i] == window.min():
+                    pivots[i] = series.iloc[i]
+            return pd.Series(pivots, index=series.index).ffill()
 
-        for p, w in zip([30, 100, 300, 800], [1, 3, 5, 8]):
-            df[f'PH_{p}'] = get_pivots(df['High'], p, 3).ffill()
-            df[f'PL_{p}'] = get_pivots(df['Low'], p, 3).ffill()
-            df[f'Weight_{p}'] = w
-
-        # --- [SECCIÓN 6: RADAR DE GRAVEDAD & FRICCIÓN] ---
         df['Friction_Weight'] = 0
         hitbox = 0.015 
-        for p in [30, 100, 300, 800]:
-            df.loc[(df['Close'] - df[f'PH_{p}']).abs() < (df['Close'] * hitbox), 'Friction_Weight'] += df[f'Weight_{p}']
-            df.loc[(df['Close'] - df[f'PL_{p}']).abs() < (df['Close'] * hitbox), 'Friction_Weight'] += df[f'Weight_{p}']
+        for p, w in zip([30, 100, 300, 800], [1, 3, 5, 8]):
+            df[f'PH_{p}'] = get_pivots_full(df['High'], p, 3)
+            df[f'PL_{p}'] = get_pivots_full(df['Low'], p, 3)
+            df.loc[(df['Close'] - df[f'PH_{p}']).abs() < (df['Close'] * hitbox), 'Friction_Weight'] += w
+            df.loc[(df['Close'] - df[f'PL_{p}']).abs() < (df['Close'] * hitbox), 'Friction_Weight'] += w
         
         df['Gravity_Target'] = (df['PH_800'] + df['PL_800']) / 2
         df['Gravity_Zone'] = (df['Close'] - df['Gravity_Target']).abs() < (df['ATR'] * 3)
-        # ### NUEVO: DISTANCIA DE GRAVEDAD ###
         df['Gravity_Dist'] = (df['Close'] - df['Gravity_Target']) / df['Close'].replace(0, 1)
 
-        # ### NUEVO: DINÁMICA DEFCON ###
-        bb_u = df['Basis_Sigma'] + (df['Dev_Sigma'] * 2)
-        bb_l = df['Basis_Sigma'] - (df['Dev_Sigma'] * 2)
-        bb_width = (bb_u - bb_l) / df['Basis_Sigma'].replace(0, 1)
-        bb_delta = bb_width.diff()
-        bb_delta_avg = bb_delta.rolling(10).mean()
+        # [NUEVO: CATÁLOGO 3 - RÍO PREDICTIVO]
+        df['LinReg_50'] = df['Close'].rolling(50).apply(lambda x: np.polyfit(np.arange(len(x)), x, 1)[0] * 50 + np.polyfit(np.arange(len(x)), x, 1)[1], raw=True)
+        df['Trend_Vector'] = df['LinReg_50'] - df['LinReg_50'].shift(1)
+
+        # --- 7. DINÁMICA DE FLUIDOS (SQUEEZE & DEFCON) ---
+        bb_u, bb_l = df['Basis'] + (df['Dev'] * 2), df['Basis'] - (df['Dev'] * 2)
+        kc_u, kc_l = df['Basis'] + (df['ATR'] * 1.5), df['Basis'] - (df['ATR'] * 1.5)
+        df['Squeeze_On'] = (bb_u < kc_u) & (bb_l > kc_l)
         
         df['DEFCON_Level'] = 5
         neon_up = (df['Close'] >= bb_u * 0.999) & (df['Close'] > df['Open'])
         neon_dn = (df['Close'] <= bb_l * 1.001) & (df['Close'] < df['Open'])
         df.loc[neon_up | neon_dn, 'DEFCON_Level'] = 4
+        bb_width = (bb_u - bb_l) / df['Basis'].replace(0, 1)
+        bb_delta = bb_width.diff()
+        bb_delta_avg = bb_delta.rolling(10).mean()
         df.loc[(df['DEFCON_Level'] == 4) & (bb_delta > 0), 'DEFCON_Level'] = 3
         df.loc[(df['DEFCON_Level'] == 3) & (bb_delta > bb_delta_avg) & (df['ADX'] > 20), 'DEFCON_Level'] = 2
         df.loc[(df['DEFCON_Level'] == 2) & (bb_delta > bb_delta_avg * 1.5) & (df['ADX'] > 25) & (df['RVol'] > 1.2), 'DEFCON_Level'] = 1
 
-        # --- [SECCIÓN 7: SEÑALES & CERTEZA FÍSICA (SCORES)] ---
+        # --- 8. SCORE DE CERTEZA FÍSICA ---
+        btc_bull = True # Placeholder para telemetría BTC
         df['Buy_Score'] = 0.0
-        df['Sell_Score'] = 0.0
-        retro_buy = (df['RSI'] < 30) & (df['Z_Score'] < -2.0)
-        df.loc[retro_buy, 'Buy_Score'] += 50.0
+        df.loc[(df['RSI'] < 30) & (df['Close'] < bb_l), 'Buy_Score'] = 50.0
         df.loc[df['Friction_Weight'] > 0, 'Buy_Score'] += 25.0
-        df.loc[df['RVol'] > 1.5, 'Buy_Score'] += 20.0
-        df.loc[(df['Low'] < df['Low'].shift(5)) & (df['RSI'] > df['RSI'].shift(5)), 'Buy_Score'] += 15.0 
+        df.loc[df['Whale_Memory'], 'Buy_Score'] += 20.0
+        df.loc[(df['Low'] < df['Low'].shift(5)) & (df['RSI'] > df['RSI'].shift(5)), 'Buy_Score'] += 15.0
+        if not btc_bull: df['Buy_Score'] -= 15.0
         
-        retro_sell = (df['RSI'] > 70) & (df['Z_Score'] > 2.0)
-        df.loc[retro_sell, 'Sell_Score'] += 50.0
+        df['Sell_Score'] = 0.0
+        df.loc[(df['RSI'] > 70) & (df['Close'] > bb_u), 'Sell_Score'] = 50.0
         df.loc[df['Friction_Weight'] > 0, 'Sell_Score'] += 25.0
-        df.loc[df['RVol'] > 1.5, 'Sell_Score'] += 20.0
+        df.loc[df['Whale_Memory'], 'Sell_Score'] += 20.0
 
-        # --- [SECCIÓN 8: CLÍMAX & NUCLEAR] ---
+        # --- 9. CLÍMAX, NUCLEAR, MECHAS & ROCKET ---
         df['Upper_Wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
         df['Lower_Wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
         df['Body_Size'] = (df['Close'] - df['Open']).abs()
+        
         df['Climax_Buy'] = (df['Buy_Score'] >= 70) & (df['Lower_Wick'] > df['Body_Size'] * 0.4)
         df['Climax_Sell'] = (df['Sell_Score'] >= 70) & (df['Upper_Wick'] > df['Body_Size'] * 0.4)
         df['Nuclear_Buy'] = df['Climax_Buy'] & ((df['WT1'] < -60) | (df['WT1'] > df['WT2']))
         df['Nuclear_Sell'] = df['Climax_Sell'] & ((df['WT1'] > 60) | (df['WT1'] < df['WT2']))
+        
+        # [NUEVO: CATÁLOGO 8 - SEÑAL ROCKET 🚀]
+        df['Rocket_Signal'] = neon_up & (df['RVol'] > 1.5) & (df['RSI'] > 60)
 
-        # --- [SECCIÓN DEFENSA: ADAPTABILIDAD HEIKIN ASHI] ---
+        # --- 10. VISIÓN HEIKIN ASHI ---
         df_ha = df.copy()
         for i in range(1, len(df)):
             df_ha.iat[i, 0] = (df_ha.iat[i-1, 0] + df_ha.iat[i-1, 3]) / 2
@@ -544,7 +568,29 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['HA_Open'] = df_ha['Open']
         df['HA_Bullish'] = df['HA_Close'] > df['HA_Open']
 
-        # --- [MÓDULO DE CRESTAS: APRENDIZAJE AUTÓNOMO] ---
+        # [NUEVO: FILTRO GAUSSIANO - CHOP INDEX]
+        tr_sum = (df['High'].combine(df['Close'].shift(), max) - df['Low'].combine(df['Close'].shift(), min)).rolling(14).sum()
+        rng = df['High'].rolling(14).max() - df['Low'].rolling(14).min()
+        df['CHOP'] = 100 * np.log10(tr_sum / rng.replace(0, 0.001)) / np.log10(14)
+        
+        # --- [PARCHE DE COMPLETITUD TOTAL: RESTAURACIÓN DE OMITIDOS] ---
+        # 6. Velas Magenta Explícitas
+        df['Is_Magenta_Buy'] = df['Buy_Score'] >= 70
+        df['Is_Magenta_Sell'] = df['Sell_Score'] >= 70
+
+        # 11. Entry (Cruce del Río)
+        df['River_Entry_Up'] = (df['Close'].shift(1) < df['River_Bot']) & (df['Close'] > df['River_Bot'])
+        df['River_Entry_Dn'] = (df['Close'].shift(1) > df['River_Top']) & (df['Close'] < df['River_Top'])
+
+        # 14. Pullback / Rebound (Triángulos Base)
+        df['Rebound_Buy'] = (df['RSI'] > df['RSI_MA']) & (df['RSI'].shift(1) <= df['RSI_MA'].shift(1)) & (~df['Is_Magenta_Buy'])
+        df['Rebound_Sell'] = (df['RSI'] < df['RSI_MA']) & (df['RSI'].shift(1) >= df['RSI_MA'].shift(1)) & (~df['Is_Magenta_Sell'])
+
+        # 25. Memoria Pump & Dump
+        df['Pump_Memory'] = ((df['High'] > bb_u) | (df['RSI_Velocity'] > 5)).rolling(3).max().astype(bool)
+        df['Dump_Memory'] = ((df['Low'] < bb_l) | (df['RSI_Velocity'] < -5)).rolling(3).max().astype(bool)
+
+        # --- 11. MÓDULO DE CRESTAS (RIQUEZA MÁXIMA) ---
         df['Cresta_Real'] = 0
         n_c = 10
         df.loc[df['Low'] == df['Low'].rolling(n_c*2+1, center=True).min(), 'Cresta_Real'] = 1 
