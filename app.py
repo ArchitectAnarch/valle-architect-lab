@@ -1659,31 +1659,50 @@ with tab_live:
                 ex_radar = ccxt.coinbase({'enableRateLimit': False})
                 fetch_tf = '1h' if (tf_actual == '4h' and 'coinbase' in st.session_state['data_params']['ex'].lower()) else tf_actual
                 
-                # 1. MEMORIA TOTAL V320 (1200 VELAS)
+                # 1. DESCARGA (1000 velas para ADX y Malla 800)
                 velas = ex_radar.fetch_ohlcv(ticker_rest, fetch_tf, limit=1000)
                 df = pd.DataFrame(velas, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
                 df['Time'] = pd.to_datetime(df['Time'], unit='ms') + timedelta(hours=offset_actual)
                 df.set_index('Time', inplace=True)
 
-                # 2. MOTOR MATEMÁTICO RMA (EL ALMA DE PINE)
+                # 2. FUNCIONES BASE PINE SCRIPT
                 def pine_rma(src, length):
                     return src.ewm(alpha=1/length, min_periods=length, adjust=False).mean()
 
-                # Indicadores Base
+                df['Body'] = (df['Close'] - df['Open']).abs()
+                df['Upper_Wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
+                df['Lower_Wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
+
+                # ATR & RSI (Checklist 2)
                 tr = np.maximum((df['High']-df['Low']), np.maximum(abs(df['High']-df['Close'].shift(1)), abs(df['Low']-df['Close'].shift(1))))
                 df['ATR'] = pine_rma(tr, 14)
                 diff = df['Close'].diff()
                 df['RSI'] = 100 - (100 / (1 + (pine_rma(diff.where(diff > 0, 0), 14) / pine_rma(diff.where(diff < 0, 0).abs(), 14).replace(0, 0.001))))
-                
-                # Squeeze (Gusano) y Z-Score
+
+                # ADX (EL MOTOR FALTANTE PARA EL CLIMAX - Checklist 19)
+                upMove = df['High'].diff()
+                downMove = df['Low'].shift(1) - df['Low']
+                plusDM = np.where((upMove > downMove) & (upMove > 0), upMove, 0)
+                minusDM = np.where((downMove > upMove) & (downMove > 0), downMove, 0)
+                plusDI = 100 * pine_rma(pd.Series(plusDM), 14) / df['ATR']
+                minusDI = 100 * pine_rma(pd.Series(minusDM), 14) / df['ATR']
+                dx = 100 * abs(plusDI - minusDI) / (plusDI + minusDI).replace(0, 1)
+                df['ADX'] = pine_rma(dx, 14)
+
+                # SQUEEZE & NEON (Checklist 4, 5)
                 df['Basis'] = df['Close'].rolling(20).mean()
                 df['Std'] = df['Close'].rolling(20).std().replace(0, 0.001)
                 df['Z_Score'] = (df['Close'] - df['Basis']) / df['Std']
-                df['BBU'] = df['Basis'] + (df['Std'] * 2); df['BBL'] = df['Basis'] - (df['Std'] * 2)
-                df['KC_U'] = df['Basis'] + (df['ATR'] * 1.5); df['KC_L'] = df['Basis'] - (df['ATR'] * 1.5)
-                df['Squeeze'] = (df['BBU'] < df['KC_U']) & (df['BBL'] > df['KC_L'])
+                df['BBU'] = df['Basis'] + (df['Std'] * 2)
+                df['BBL'] = df['Basis'] - (df['Std'] * 2)
+                df['KC_U'] = df['Basis'] + (df['ATR'] * 1.5)
+                df['KC_L'] = df['Basis'] - (df['ATR'] * 1.5)
+                df['Squeeze_On'] = (df['BBU'] < df['KC_U']) & (df['BBL'] > df['KC_L'])
+                
+                df['Neon_Up'] = df['Squeeze_On'] & (df['Close'] >= df['BBU'] * 0.999) & (df['Close'] > df['Open'])
+                df['Neon_Dn'] = df['Squeeze_On'] & (df['Close'] <= df['BBL'] * 1.001) & (df['Close'] < df['Open'])
 
-                # WaveTrend Master (22)
+                # WAVETREND (Checklist 22)
                 ap = (df['High'] + df['Low'] + df['Close']) / 3
                 esa = ap.ewm(span=10, adjust=False).mean()
                 d_wt = (ap - esa).abs().ewm(span=10, adjust=False).mean()
@@ -1691,102 +1710,128 @@ with tab_live:
                 df['WT1'] = ci.ewm(span=21, adjust=False).mean()
                 df['WT2'] = df['WT1'].rolling(4).mean()
 
-                # 3. MALLA Y SCORE ACUMULATIVO (6, 10, 11, 13)
-                df['RVol'] = df['Volume'] / df['Volume'].rolling(100).mean().replace(0, 1)
+                # MALLA MATRIX & GRAVEDAD (Checklist 1, 7)
+                df['PH_100'] = df['High'].rolling(100).max()
+                df['PL_100'] = df['Low'].rolling(100).min()
+                df['Gravity'] = (df['High'].rolling(800).max() + df['Low'].rolling(800).min()) / 2
+
+                # 3. BALLENAS & SCORE ACUMULATIVO V320 (Checklist 13, 25, 6)
+                vol_ma = df['Volume'].rolling(100).mean().replace(0, 1)
+                df['RVol'] = df['Volume'] / vol_ma
                 
-                # SCORE DE COMPRA
+                df['Whale_Buy'] = (df['RVol'] > 2.5) & (df['Body'] > df['ATR'] * 0.3) & (df['Close'] > df['Open'])
+                df['Whale_Sell'] = (df['RVol'] > 2.5) & (df['Body'] > df['ATR'] * 0.3) & (df['Close'] < df['Open'])
+                
+                # Memoria de Ballena (Vital para que la IA dispare)
+                df['Whale_Mem_B'] = df['Whale_Buy'] | df['Whale_Buy'].shift(1) | df['Whale_Buy'].shift(2)
+                df['Whale_Mem_S'] = df['Whale_Sell'] | df['Whale_Sell'].shift(1) | df['Whale_Sell'].shift(2)
+
+                # SCORE ENGINE
                 df['B_Score'] = 0.0
-                df.loc[(df['RSI'] < 35) & (df['Low'] < df['BBL']), 'B_Score'] += 50
-                df.loc[df['Z_Score'] < -1.8, 'B_Score'] += 25
-                df.loc[df['WT1'] < -60, 'B_Score'] += 25
+                df.loc[(df['RSI'] < 30) & (df['Close'] < df['BBL']), 'B_Score'] = 50
+                df.loc[(df['RSI'] < 35) & (df['Close'] >= df['BBL']), 'B_Score'] = 30
+                df.loc[df['Whale_Mem_B'], 'B_Score'] += 20
+                df.loc[df['Z_Score'] < -2.0, 'B_Score'] += 15
                 
-                # SCORE DE VENTA (EL ESPEJO QUE FALTABA)
                 df['S_Score'] = 0.0
-                df.loc[(df['RSI'] > 65) & (df['High'] > df['BBU']), 'S_Score'] += 50
-                df.loc[df['Z_Score'] > 1.8, 'S_Score'] += 25
-                df.loc[df['WT1'] > 60, 'S_Score'] += 25
+                df.loc[(df['RSI'] > 70) & (df['Close'] > df['BBU']), 'S_Score'] = 50
+                df.loc[(df['RSI'] > 65) & (df['Close'] <= df['BBU']), 'S_Score'] = 30
+                df.loc[df['Whale_Mem_S'], 'S_Score'] += 20
+                df.loc[df['Z_Score'] > 2.0, 'S_Score'] += 15
 
-                # Identificación de Anomalías
-                df['Is_Mag_B'] = df['B_Score'] >= 70
-                df['Is_Mag_S'] = df['S_Score'] >= 70
-                df['Nuclear_B'] = df['Is_Mag_B'] & (df['WT1'] < -65)
-                df['Nuclear_S'] = df['Is_Mag_S'] & (df['WT1'] > 65)
-                df['Whale_B'] = (df['RVol'] > 2.5) & (df['Close'] > df['Open'])
-                df['Whale_S'] = (df['RVol'] > 2.5) & (df['Close'] < df['Open'])
+                # 4. GATILLOS CLIMAX & NUCLEAR (Checklist 9, 10)
+                df['Magenta_B'] = df['B_Score'] >= 70
+                df['Magenta_S'] = df['S_Score'] >= 70
 
-                # 4. GESTIÓN IA GENESIS (OPERACIONES REALES)
+                dyn_wick = np.where(df['ADX'] < 40, 0.4, 0.5) # ADX en acción
+                df['Climax_B'] = df['Magenta_B'] & (df['Lower_Wick'] > (df['Body'] * dyn_wick))
+                df['Climax_S'] = df['Magenta_S'] & (df['Upper_Wick'] > (df['Body'] * dyn_wick))
+                
+                df['Nuclear_B'] = df['Climax_B'] & ((df['WT1'] < -60) | (df['WT1'] > df['WT2']))
+                df['Nuclear_S'] = df['Climax_S'] & ((df['WT1'] > 60) | (df['WT1'] < df['WT2']))
+
+                # 5. INTELIGENCIA IA GENESIS (OPERACIÓN)
                 p_actual = df['Close'].iloc[-1]
                 if st.session_state['g_pos']:
                     rend = ((p_actual - st.session_state['g_price']) / st.session_state['g_price']) * 100
-                    if df['Is_Mag_S'].iloc[-1] or df['Nuclear_S'].iloc[-1] or rend < -1.2:
+                    # La IA ahora evalúa Ventas Nucleares, Clímax o Pérdida de Gravedad
+                    if df['Nuclear_S'].iloc[-1] or df['Climax_S'].iloc[-1] or rend < -1.5 or (df['WT1'].iloc[-1] < df['WT2'].iloc[-1] and df['WT1'].iloc[-1] > 50):
                         st.session_state['g_cap'] *= (1 + (rend/100)); st.session_state['g_trades'] += 1; st.session_state['g_pos'] = False
-                        st.toast(f"✅ VENTA IA: {rend:.2f}%")
-                elif df['B_Score'].iloc[-1] >= 70:
-                    st.session_state['g_pos'] = True; st.session_state['g_price'] = p_actual; st.toast("🚀 COMPRA IA ACTIVADA")
+                        st.toast(f"✅ SALIDA GENESIS: {rend:.2f}%")
+                else:
+                    # La IA dispara si hay Compra Nuclear, Neón Up o Score brutal
+                    if df['Nuclear_B'].iloc[-1] or df['Neon_Up'].iloc[-1] or df['B_Score'].iloc[-1] >= 80:
+                        st.session_state['g_pos'] = True; st.session_state['g_price'] = p_actual; st.toast("🚀 ENTRADA TÁCTICA IA")
 
-                # 5. RENDERIZADO VISUAL "TRADINGVIEW CYBER-MIRROR"
+                # =============================================================
+                # 🎨 RENDERIZADO VISUAL (ESPEJO EXACTO V320)
+                # =============================================================
                 df_p = df.tail(120).copy()
                 fig = go.Figure()
 
-                # --- CAPA 1: RÍO Y SQUEEZE (Checklist 2, 4) ---
-                fig.add_trace(go.Scatter(x=df_p.index, y=df_p['Basis']+(df_p['ATR']*1.2), mode='lines', line=dict(color='rgba(0,180,255,0.1)', width=0), showlegend=False))
-                fig.add_trace(go.Scatter(x=df_p.index, y=df_p['Basis']-(df_p['ATR']*1.2), mode='lines', line=dict(color='rgba(0,180,255,0.1)', width=0), fill='tonexty', fillcolor='rgba(0,120,255,0.08)', showlegend=False))
+                # Río (Checklist 2)
+                df_p['RT'] = df_p['Basis'] + (df_p['ATR'] * 1.2)
+                df_p['RB'] = df_p['Basis'] - (df_p['ATR'] * 1.2)
+                fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RT'], mode='lines', line=dict(color='rgba(0,180,255,0.1)', width=0), showlegend=False))
+                fig.add_trace(go.Scatter(x=df_p.index, y=df_p['RB'], mode='lines', line=dict(color='rgba(0,180,255,0.1)', width=0), fill='tonexty', fillcolor='rgba(0,120,255,0.08)', showlegend=False))
 
-                # --- CAPA 2: VELAS (MORFOLOGÍA V320) ---
-                # Velas Base
+                # Malla y Lock (Checklist 1, 7)
+                fig.add_trace(go.Scatter(x=df_p.index, y=df_p['PH_100'], mode='lines', line=dict(color='rgba(255,0,0,0.2)', width=1, dash='dot'), name='Resistencia'))
+                fig.add_trace(go.Scatter(x=df_p.index, y=df_p['PL_100'], mode='lines', line=dict(color='rgba(0,255,0,0.2)', width=1, dash='dot'), name='Soporte'))
+                fig.add_trace(go.Scatter(x=df_p.index, y=df_p['Gravity'], mode='lines', line=dict(color='gold', width=2, dash='dashdot'), name='Gravity Lock'))
+
+                # Velas (Morfología limpia)
                 fig.add_trace(go.Candlestick(
                     x=df_p.index, open=df_p['Open'], high=df_p['High'], low=df_p['Low'], close=df_p['Close'],
                     increasing_line_color='#00ffcc', decreasing_line_color='#ff00ff',
-                    increasing_fillcolor='rgba(0,255,204,0.4)', decreasing_fillcolor='rgba(255,0,255,0.4)', name='Matrix'
+                    increasing_fillcolor='rgba(0,255,204,0.5)', decreasing_fillcolor='rgba(255,0,255,0.5)', name='Matrix'
                 ))
 
-                # Velas Magenta (High Score Compra/Venta)
-                mag_any = df_p[df_p['Is_Mag_B'] | df_p['Is_Mag_S']]
-                if not mag_any.empty:
-                    fig.add_trace(go.Candlestick(x=mag_any.index, open=mag_any['Open'], high=mag_any['High'], low=mag_any['Low'], close=mag_any['Close'], increasing_line_color='#FF00FF', decreasing_line_color='#FF00FF', increasing_fillcolor='#FF00FF', decreasing_fillcolor='#FF00FF', showlegend=False))
+                # Velas Magenta (Checklist 6)
+                mag = df_p[df_p['Magenta_B'] | df_p['Magenta_S']]
+                if not mag.empty: fig.add_trace(go.Candlestick(x=mag.index, open=mag['Open'], high=mag['High'], low=mag['Low'], close=mag['Close'], increasing_line_color='#FF00FF', decreasing_line_color='#FF00FF', increasing_fillcolor='#FF00FF', decreasing_fillcolor='#FF00FF', showlegend=False))
 
-                # --- CAPA 3: SEÑALES SIMÉTRICAS (COMPRA Y VENTA) ---
-                # Nucleares Buy (Abajo)
-                nb = df_p[df_p['Nuclear_B']]
-                if not nb.empty: fig.add_trace(go.Scatter(x=nb.index, y=nb['Low']*0.992, mode='markers+text', text="💥", textposition="bottom center", marker=dict(symbol='x', color='lime', size=14), name='NUCLEAR B'))
-                
-                # Nucleares Sell (Arriba - El espejo que faltaba)
-                ns = df_p[df_p['Nuclear_S']]
-                if not ns.empty: fig.add_trace(go.Scatter(x=ns.index, y=ns['High']*1.008, mode='markers+text', text="💥", textposition="top center", marker=dict(symbol='x', color='red', size=14), name='NUCLEAR S'))
+                # ICONOGRAFÍA 
+                # Neón (Checklist 5)
+                n_up = df_p[df_p['Neon_Up']]; n_dn = df_p[df_p['Neon_Dn']]
+                if not n_up.empty: fig.add_trace(go.Scatter(x=n_up.index, y=n_up['Low']*0.996, mode='markers', marker=dict(symbol='diamond', color='lime', size=10), name='Neon Up'))
+                if not n_dn.empty: fig.add_trace(go.Scatter(x=n_dn.index, y=n_dn['High']*1.004, mode='markers', marker=dict(symbol='diamond', color='red', size=10), name='Neon Dn'))
 
-                # Ballenas 🐋 (Simétricas)
-                wb = df_p[df_p['Whale_B']]
-                if not wb.empty: fig.add_trace(go.Scatter(x=wb.index, y=wb['Low']*0.988, mode='text', text="🐋", textfont=dict(size=18, color="cyan")))
-                ws = df_p[df_p['Whale_S']]
-                if not ws.empty: fig.add_trace(go.Scatter(x=ws.index, y=ws['High']*1.012, mode='text', text="🐋", textfont=dict(size=18, color="magenta")))
+                # Ballenas 🐋 (Checklist 13)
+                wb = df_p[df_p['Whale_Buy']]; ws = df_p[df_p['Whale_Sell']]
+                if not wb.empty: fig.add_trace(go.Scatter(x=wb.index, y=wb['Low']*0.990, mode='text', text="🐋", textfont=dict(size=18), name='Whale B'))
+                if not ws.empty: fig.add_trace(go.Scatter(x=ws.index, y=ws['High']*1.010, mode='text', text="🐋", textfont=dict(size=18), name='Whale S'))
 
-                # Etiquetas ENTRY / PUSH
-                df_p['Entry_B'] = (df_p['Close'] > df_p['BBL']) & (df_p['Close'].shift(1) < df_p['BBL'])
-                df_p['Entry_S'] = (df_p['Close'] < df_p['BBU']) & (df_p['Close'].shift(1) > df_p['BBU'])
-                eb = df_p[df_p['Entry_B']]
-                if not eb.empty: fig.add_trace(go.Scatter(x=eb.index, y=eb['Low']*0.995, mode='text', text="ENTRY", textfont=dict(color="#00FFFF", size=9)))
-                es = df_p[df_p['Entry_S']]
-                if not es.empty: fig.add_trace(go.Scatter(x=es.index, y=es['High']*1.005, mode='text', text="EXIT", textfont=dict(color="#FF00FF", size=9)))
+                # Climax / Relámpagos ⚡ (Checklist 9)
+                cb = df_p[df_p['Climax_B'] & ~df_p['Nuclear_B']]; cs = df_p[df_p['Climax_S'] & ~df_p['Nuclear_S']]
+                if not cb.empty: fig.add_trace(go.Scatter(x=cb.index, y=cb['Low']*0.994, mode='markers', marker=dict(symbol='star', color='yellow', size=12), name='Climax B ⚡'))
+                if not cs.empty: fig.add_trace(go.Scatter(x=cs.index, y=cs['High']*1.006, mode='markers', marker=dict(symbol='star', color='orange', size=12), name='Climax S ⚡'))
 
-                # --- HUD DE PRECIO (REQUERIMIENTO COMMANDER) ---
-                # 1. Esquina Superior Izquierda
-                fig.add_annotation(xref="paper", yref="paper", x=0.01, y=0.99, text=f"🤖 GÉNESIS IA | SCORE: {int(df['B_Score'].iloc[-1])}% B / {int(df['S_Score'].iloc[-1])}% S | P.O.C: {p_actual:.5f}", showarrow=False, font=dict(color="#00ffcc", size=16, family="Courier New"), bgcolor="rgba(0,0,0,0.85)", xanchor="left", yanchor="top")
-                
-                # 2. Etiqueta Eje Y Derecha (Posicionamiento absoluto)
+                # Nucleares 💥 (Checklist 10)
+                nuc_b = df_p[df_p['Nuclear_B']]; nuc_s = df_p[df_p['Nuclear_S']]
+                if not nuc_b.empty: fig.add_trace(go.Scatter(x=nuc_b.index, y=nuc_b['Low']*0.992, mode='markers+text', text="💥", textposition="bottom center", marker=dict(symbol='x', color='lime', size=14), name='NUC B'))
+                if not nuc_s.empty: fig.add_trace(go.Scatter(x=nuc_s.index, y=nuc_s['High']*1.008, mode='markers+text', text="💥", textposition="top center", marker=dict(symbol='x', color='red', size=14), name='NUC S'))
+
+                # Entry / Exit IA markers
+                if st.session_state['g_pos']:
+                    fig.add_annotation(x=df_p.index[-1], y=st.session_state['g_price'], text="ENTRY", showarrow=True, arrowhead=2, bgcolor="cyan", font=dict(color="black"))
+
+                # HUD COMMANDER
+                fig.add_annotation(xref="paper", yref="paper", x=0.01, y=0.99, text=f"🚀 V320 MATRIX | BUY: {int(df['B_Score'].iloc[-1])}% | SLL: {int(df['S_Score'].iloc[-1])}%", showarrow=False, font=dict(color="#00ffcc", size=16, family="Courier New"), bgcolor="rgba(0,0,0,0.85)", xanchor="left", yanchor="top")
                 fig.add_hline(y=p_actual, line_dash="dot", line_color="yellow", line_width=1)
-                fig.add_annotation(xref="paper", x=1.005, y=p_actual, text=f"  ${p_actual:.5f}  ", showarrow=False, bgcolor="yellow", font=dict(color="black", size=12, weight="bold"), xanchor="left")
+                fig.add_annotation(xref="paper", x=1.01, y=p_actual, text=f"  ${p_actual:.5f}  ", showarrow=False, bgcolor="yellow", font=dict(color="black", size=12, weight="bold"), xanchor="left")
 
                 fig.update_layout(
-                    template='plotly_dark', height=750, margin=dict(l=10, r=100, t=10, b=10),
+                    template='plotly_dark', height=750, margin=dict(l=10, r=80, t=10, b=10),
                     xaxis_rangeslider_visible=False,
                     yaxis=dict(side="right", gridcolor='rgba(255,255,255,0.03)', tickformat=".6f"),
                     xaxis=dict(gridcolor='rgba(255,255,255,0.03)', type='date')
                 )
 
-                st.plotly_chart(fig, use_container_width=True, key=f"mirror_v13_{ticker_rest}")
+                st.plotly_chart(fig, use_container_width=True, key=f"radar_v14_{ticker_rest}")
                 
             except Exception as e:
-                st.error(f"Error Crítico Mirror V13: {e}")
+                st.error(f"Error Crítico Codex 25: {e}")
         else:
             st.info(f"Sistema en Standby. IA lista para analizar {ticker_rest} en {tf_actual}. Pulsa Iniciar.")
 
