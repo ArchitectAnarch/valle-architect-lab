@@ -432,62 +432,105 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['Open'] = df['Open'].fillna(df['Close']); df['High'] = df['High'].fillna(df['Close']); df['Low'] = df['Low'].fillna(df['Close'])
         df['Volume'] = df['Volume'].fillna(0)
             
-        a_h, a_l, a_c, a_o = df['High'].values, df['Low'].values, df['Close'].values, df['Open'].values
+    # =============================================================
+        # 🧠 MOTOR DE CONCIENCIA V320: VALLE ARCHITECT [TOTAL ADN]
+        # =============================================================
         
-        df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
-        df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean() 
-        df['Vol_MA_100'] = df['Volume'].rolling(window=100).mean()
-        df['RVol'] = df['Volume'] / np.where(df['Vol_MA_100'] == 0, 1, df['Vol_MA_100'])
-        
-        tr = np.zeros_like(a_c); tr[0] = a_h[0] - a_l[0]
-        for i in range(1, len(a_c)): tr[i] = max(a_h[i] - a_l[i], abs(a_h[i] - a_c[i-1]), abs(a_l[i] - a_c[i-1]))
-        df['ATR'] = rma_pine(tr, 14); df['ATR'] = df['ATR'].fillna(df['High']-df['Low'])
-        
-        delta = np.zeros_like(a_c); delta[1:] = a_c[1:] - a_c[:-1]
-        u = np.where(delta > 0, delta, 0.0); d = np.where(delta < 0, -delta, 0.0)
-        rs_u = rma_pine(u, 14); rs_d = rma_pine(d, 14); rs = rs_u / np.where(rs_d == 0, 1e-10, rs_d)
-        df['RSI'] = np.where(rs_d == 0, 100.0, 100.0 - (100.0 / (1.0 + rs)))
-        df['RSI_MA'] = df['RSI'].rolling(14).mean()
-        
-        upm = np.zeros_like(a_h); upm[1:] = a_h[1:] - a_h[:-1]
-        downm = np.zeros_like(a_l); downm[1:] = a_l[:-1] - a_l[1:]
-        plusDM = np.where((upm > downm) & (upm > 0), upm, 0.0); minusDM = np.where((downm > upm) & (downm > 0), downm, 0.0)
-        trur = rma_pine(tr, 14); plus = 100 * rma_pine(plusDM, 14) / trur; minus = 100 * rma_pine(minusDM, 14) / trur
-        sum_dm = plus + minus; dx = 100 * np.abs(plus - minus) / np.where(sum_dm == 0, 1, sum_dm)
-        df['ADX'] = rma_pine(dx, 14)
-        
-        ap = (df['High'] + df['Low'] + df['Close']) / 3.0
-        esa = ap.ewm(span=10, adjust=False).mean(); d_wt = (ap - esa).abs().ewm(span=10, adjust=False).mean()
-        df['WT1'] = ((ap - esa) / (0.015 * np.where(d_wt == 0, 1, d_wt))).ewm(span=21, adjust=False).mean()
-        df['WT2'] = df['WT1'].rolling(4).mean()
-        
-        df['Basis'] = df['Close'].rolling(20).mean(); dev = df['Close'].rolling(20).std(ddof=0)
-        df['BBU'] = df['Basis'] + (2.0 * dev); df['BBL'] = df['Basis'] - (2.0 * dev)
-        df['BB_Width'] = (df['BBU'] - df['BBL']) / np.where(df['Basis'] == 0, 1, df['Basis'])
-        df['BB_Delta'] = df['BB_Width'] - df['BB_Width'].shift(1).fillna(0)
-        df['BB_Delta_Avg'] = df['BB_Delta'].rolling(10).mean()
-        
-        df['KC_Upper'] = df['Basis'] + (df['ATR'] * 1.5); df['KC_Lower'] = df['Basis'] - (df['ATR'] * 1.5)
-        df['Squeeze_On'] = (df['BBU'] < df['KC_Upper']) & (df['BBL'] > df['KC_Lower'])
-        df['Z_Score'] = np.where(dev == 0, 0, (df['Close'] - df['Basis']) / dev)
-        df['RSI_BB_Basis'] = df['RSI'].rolling(14).mean(); df['RSI_BB_Dev'] = df['RSI'].rolling(14).std(ddof=0) * 2.0
-        
-        df['Vela_Verde'], df['Vela_Roja'] = df['Close'] > df['Open'], df['Close'] < df['Open']
-        df['body_size'] = np.abs(df['Close'] - df['Open']) 
-        df['upper_wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
-        df['lower_wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
-        
-        df['PA_Engulfing_Buy'] = (df['Vela_Verde']) & (df['Vela_Roja'].shift(1)) & (df['Close'] > df['Open'].shift(1)) & (df['Open'] < df['Close'].shift(1))
-        df['PA_Engulfing_Sell'] = (df['Vela_Roja']) & (df['Vela_Verde'].shift(1)) & (df['Close'] < df['Open'].shift(1)) & (df['Open'] > df['Close'].shift(1))
-        df['PA_Pinbar_Buy'] = (df['lower_wick'] > df['body_size'] * 2.5) & (df['upper_wick'] < df['body_size'])
-        df['PA_Pinbar_Sell'] = (df['upper_wick'] > df['body_size'] * 2.5) & (df['lower_wick'] < df['body_size'])
-        df['PA_3_Soldiers'] = (df['Vela_Verde']) & (df['Vela_Verde'].shift(1)) & (df['Vela_Verde'].shift(2)) & (df['Close'] > df['Close'].shift(1)) & (df['Close'].shift(1) > df['Close'].shift(2))
-        df['PA_3_Crows'] = (df['Vela_Roja']) & (df['Vela_Roja'].shift(1)) & (df['Vela_Roja'].shift(2)) & (df['Close'] < df['Close'].shift(1)) & (df['Close'].shift(1) < df['Close'].shift(2))
+        # --- [SECCIÓN 4: MOTORES MATEMÁTICOS & FÍSICA] ---
+        # 1. Física Base
+        df['ATR'] = rma_pine(df['High'] - df['Low'], 14)
+        df['Basis_Sigma'] = df['Close'].rolling(20).mean()
+        df['Dev_Sigma'] = df['Close'].rolling(20).std(ddof=0)
+        df['Z_Score'] = (df['Close'] - df['Basis_Sigma']) / df['Dev_Sigma'].replace(0, 1)
+        df['PP_Slope'] = df['Close'].rolling(5).apply(lambda x: np.polyfit(np.arange(len(x)), x, 1)[0], raw=True)
 
-        df['PL100_L'] = df['Low'].shift(1).rolling(100, min_periods=1).min(); df['PH100_L'] = df['High'].shift(1).rolling(100, min_periods=1).max()
-        df['PL300_L'] = df['Low'].shift(1).rolling(300, min_periods=1).min(); df['PH300_L'] = df['High'].shift(1).rolling(300, min_periods=1).max()
-        df['PL800_L'] = df['Low'].shift(1).rolling(800, min_periods=1).min(); df['PH800_L'] = df['High'].shift(1).rolling(800, min_periods=1).max()
-        df['Macro_Bull'] = df['Close'] >= df['EMA_200'] 
+        # 2. RSI Completo (Velocity & Crosses)
+        delta = df['Close'].diff()
+        u = (delta.where(delta > 0, 0)).rolling(14).mean()
+        d = (-delta.where(delta < 0, 0)).rolling(14).mean()
+        df['RSI'] = 100 - (100 / (1 + (u / d.replace(0, 0.001))))
+        df['RSI_MA'] = df['RSI'].rolling(14).mean()
+        df['RSI_Velocity'] = df['RSI'].diff()
+
+        # 3. WaveTrend (TCI Master)
+        df['AP'] = (df['High'] + df['Low'] + df['Close']) / 3
+        df['ESA'] = df['AP'].ewm(span=10, adjust=False).mean()
+        df['D_WT'] = (df['AP'] - df['ESA']).abs().ewm(span=10, adjust=False).mean()
+        df['CI'] = (df['AP'] - df['ESA']) / (0.015 * df['D_WT']).replace(0, 0.001)
+        df['WT1'] = df['CI'].ewm(span=21, adjust=False).mean()
+        df['WT2'] = df['WT1'].rolling(4).mean()
+
+        # 4. Ballenas & Volumen (Whale Holograph)
+        vol_ma = df['Volume'].rolling(100).mean()
+        df['RVol'] = df['Volume'] / vol_ma.replace(0, 1)
+        df['Flash_Vol'] = (df['RVol'] > 2.0) & (np.abs(df['Close']-df['Open']) > (df['ATR'] * 0.3))
+        df['Whale_Buy'] = df['Flash_Vol'] & (df['Close'] > df['Open'])
+        df['Whale_Sell'] = df['Flash_Vol'] & (df['Close'] < df['Open'])
+
+        # --- [SECCIÓN 5: MALLA & MATRIX] ---
+        # Identificación de Pivots Exactos (Pine Logic)
+        def get_pivots(series, left, right):
+            pivots = np.full(len(series), np.nan)
+            for i in range(left, len(series) - right):
+                window = series.iloc[i-left : i+right+1]
+                if series.iloc[i] == window.max(): pivots[i] = series.iloc[i]
+            return pd.Series(pivots, index=series.index)
+
+        for p, w in zip([30, 100, 300, 800], [1, 3, 5, 8]):
+            df[f'PH_{p}'] = get_pivots(df['High'], p, 3).ffill()
+            df[f'PL_{p}'] = get_pivots(df['Low'], p, 3).ffill()
+            df[f'Weight_{p}'] = w
+
+        # --- [SECCIÓN 6: RADAR DE GRAVEDAD & FRICCIÓN] ---
+        # Calculamos cuántas líneas de la malla están cerca del precio actual
+        df['Friction_Weight'] = 0
+        hitbox = 0.015 # 1.5% del input
+        for p in [30, 100, 300, 800]:
+            df.loc[(df['Close'] - df[f'PH_{p}']).abs() < (df['Close'] * hitbox), 'Friction_Weight'] += df[f'Weight_{p}']
+            df.loc[(df['Close'] - df[f'PL_{p}']).abs() < (df['Close'] * hitbox), 'Friction_Weight'] += df[f'Weight_{p}']
+        
+        df['Gravity_Target'] = (df['PH_800'] + df['PL_800']) / 2
+        df['Gravity_Zone'] = (df['Close'] - df['Gravity_Target']).abs() < (df['ATR'] * 3)
+
+        # --- [SECCIÓN 7: SEÑALES & CERTEZA FÍSICA (SCORES)] ---
+        df['Buy_Score'] = 0.0
+        df['Sell_Score'] = 0.0
+        
+        # Lógica de Puntuación Sin Censura
+        retro_buy = (df['RSI'] < 30) & (df['Z_Score'] < -2.0)
+        df.loc[retro_buy, 'Buy_Score'] += 50.0
+        df.loc[df['Friction_Weight'] > 0, 'Buy_Score'] += 25.0
+        df.loc[df['RVol'] > 1.5, 'Buy_Score'] += 20.0
+        df.loc[(df['Low'] < df['Low'].shift(5)) & (df['RSI'] > df['RSI'].shift(5)), 'Buy_Score'] += 15.0 # Divergencia Bull
+        
+        retro_sell = (df['RSI'] > 70) & (df['Z_Score'] > 2.0)
+        df.loc[retro_sell, 'Sell_Score'] += 50.0
+        df.loc[df['Friction_Weight'] > 0, 'Sell_Score'] += 25.0
+        df.loc[df['RVol'] > 1.5, 'Sell_Score'] += 20.0
+
+        # --- [SECCIÓN 8: CLÍMAX & NUCLEAR] ---
+        df['Upper_Wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
+        df['Lower_Wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
+        df['Body_Size'] = (df['Close'] - df['Open']).abs()
+        
+        df['Climax_Buy'] = (df['Buy_Score'] >= 70) & (df['Lower_Wick'] > df['Body_Size'] * 0.4)
+        df['Climax_Sell'] = (df['Sell_Score'] >= 70) & (df['Upper_Wick'] > df['Body_Size'] * 0.4)
+        df['Nuclear_Buy'] = df['Climax_Buy'] & ((df['WT1'] < -60) | (df['WT1'] > df['WT2']))
+        df['Nuclear_Sell'] = df['Climax_Sell'] & ((df['WT1'] > 60) | (df['WT1'] < df['WT2']))
+
+        # --- [SECCIÓN DEFENSA: ADAPTABILIDAD HEIKIN ASHI] ---
+        df_ha = df.copy()
+        for i in range(1, len(df)):
+            df_ha.iat[i, 0] = (df_ha.iat[i-1, 0] + df_ha.iat[i-1, 3]) / 2
+        df['HA_Close'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
+        df['HA_Open'] = df_ha['Open']
+        df['HA_Bullish'] = df['HA_Close'] > df['HA_Open']
+
+        # --- [MÓDULO DE CRESTAS: APRENDIZAJE AUTÓNOMO] ---
+        df['Cresta_Real'] = 0
+        n_c = 10
+        df.loc[df['Low'] == df['Low'].rolling(n_c*2+1, center=True).min(), 'Cresta_Real'] = 1 # VALLE
+        df.loc[df['High'] == df['High'].rolling(n_c*2+1, center=True).max(), 'Cresta_Real'] = -1 # PICO
         
         target_start = pd.to_datetime(datetime.combine(start, datetime.min.time())) + timedelta(hours=offset)
         df = df[df.index >= target_start]
