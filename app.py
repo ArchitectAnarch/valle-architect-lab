@@ -1659,26 +1659,28 @@ with tab_live:
                 ex_radar = ccxt.coinbase({'enableRateLimit': False})
                 fetch_tf = '1h' if (tf_actual == '4h' and 'coinbase' in st.session_state['data_params']['ex'].lower()) else tf_actual
                 
-                # 1. CAPTURA DE DATOS CRUDA (Fidelidad 100% - Sin Rellenos de Barrotes)
-                velas = ex_radar.fetch_ohlcv(ticker_rest, fetch_tf, limit=600)
+                # 1. DESCARGA ESTRATÉGICA (800 velas para Malla Maestra)
+                velas = ex_radar.fetch_ohlcv(ticker_rest, fetch_tf, limit=800)
                 df = pd.DataFrame(velas, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
                 df['Time'] = pd.to_datetime(df['Time'], unit='ms') + timedelta(hours=offset_actual)
                 df.set_index('Time', inplace=True)
                 
-                # 2. MOTOR DE FÍSICA PREDATOR V320 (CÁLCULO LIVE)
+                # 2. MOTOR MATEMÁTICO V320 (REPLICACIÓN PINE SCRIPT)
                 def pine_rma(src, length):
                     return src.ewm(alpha=1/length, min_periods=length, adjust=False).mean()
 
-                # Indicadores Base
+                # Física Base
                 tr = np.maximum((df['High']-df['Low']), np.maximum(abs(df['High']-df['Close'].shift(1)), abs(df['Low']-df['Close'].shift(1))))
                 df['ATR'] = pine_rma(tr, 14)
                 diff = df['Close'].diff()
                 df['RSI'] = 100 - (100 / (1 + (pine_rma(diff.where(diff > 0, 0), 14) / pine_rma(diff.where(diff < 0, 0).abs(), 14).replace(0, 0.001))))
                 
-                # Z-Score (Física de Tensión)
-                df['Basis_20'] = df['Close'].rolling(20).mean()
-                df['Std_20'] = df['Close'].rolling(20).std()
-                df['Z_Score'] = (df['Close'] - df['Basis_20']) / df['Std_20'].replace(0, 1)
+                # Squeeze y Z-Score
+                df['Basis'] = df['Close'].rolling(20).mean()
+                df['Std'] = df['Close'].rolling(20).std()
+                df['Z_Score'] = (df['Close'] - df['Basis']) / df['Std'].replace(0, 1)
+                df['BBU'] = df['Basis'] + (df['Std'] * 2)
+                df['BBL'] = df['Basis'] - (df['Std'] * 2)
 
                 # WaveTrend Master
                 ap = (df['High'] + df['Low'] + df['Close']) / 3
@@ -1688,80 +1690,98 @@ with tab_live:
                 df['WT1'] = ci.ewm(span=21, adjust=False).mean()
                 df['WT2'] = df['WT1'].rolling(4).mean()
 
-                # 3. MALLA MATRIX & SCORE DE CERTEZA (EL CEREBRO LIVE)
-                df['PH_100'] = df['High'].rolling(100).max()
-                df['PL_100'] = df['Low'].rolling(100).min()
-                df['PH_300'] = df['High'].rolling(300).max()
-                df['PL_300'] = df['Low'].rolling(300).min()
-                df['Gravity_Target'] = (df['PH_300'] + df['PL_300']) / 2
+                # Malla Matrix (Múltiples capas)
+                for p in [30, 100, 300, 800]:
+                    df[f'PH_{p}'] = df['High'].rolling(p).max()
+                    df[f'PL_{p}'] = df['Low'].rolling(p).min()
+                df['Gravity_Target'] = (df['PH_800'] + df['PL_800']) / 2
 
-                # Cálculo de Score de Compra/Venta (Lógica V320 Exacta)
+                # 3. SISTEMA DE SCORE Y SEÑALES TÁCTICAS
+                vol_ma = df['Volume'].rolling(100).mean()
+                df['RVol'] = df['Volume'] / vol_ma.replace(0, 1)
+                
+                # Lógica de Score V320
                 df['Buy_Score'] = 0.0
-                df.loc[(df['RSI'] < 32) & (df['Close'] < df['PL_100']), 'Buy_Score'] = 50.0
-                df.loc[df['Z_Score'] < -2.0, 'Buy_Score'] += 25.0
-                df.loc[df['WT1'] < -60, 'Buy_Score'] += 24.0
-
+                df.loc[(df['RSI'] < 35) & (df['Close'] < df['BBL']), 'Buy_Score'] = 50.0
+                df.loc[df['Z_Score'] < -1.5, 'Buy_Score'] += 25.0
+                df.loc[df['WT1'] < -60, 'Buy_Score'] += 20.0
+                
                 df['Sell_Score'] = 0.0
-                df.loc[(df['RSI'] > 68) & (df['Close'] > df['PH_100']), 'Sell_Score'] = 50.0
-                df.loc[df['Z_Score'] > 2.0, 'Sell_Score'] += 25.0
-                df.loc[df['WT1'] > 60, 'Sell_Score'] += 24.0
+                df.loc[(df['RSI'] > 65) & (df['Close'] > df['BBU']), 'Sell_Score'] = 50.0
+                df.loc[df['Z_Score'] > 1.5, 'Sell_Score'] += 25.0
+                df.loc[df['WT1'] > 60, 'Sell_Score'] += 20.0
 
-                # Señales Nucleares
-                df['Nuclear_B'] = (df['Buy_Score'] >= 70) & (df['WT1'] > df['WT2'])
-                df['Nuclear_S'] = (df['Sell_Score'] >= 70) & (df['WT1'] < df['WT2'])
+                # Clasificación de Anomalías
+                df['Is_Magenta_B'] = df['Buy_Score'] >= 70
+                df['Is_Magenta_S'] = df['Sell_Score'] >= 70
+                df['Push_Up'] = (df['Low'] <= (df['Basis'] + df['ATR'])) & (df['Close'] > (df['Basis'] + df['ATR']))
+                df['Entry_Up'] = (df['Close'].shift(1) < df['BBL']) & (df['Close'] > df['BBL'])
+                df['Nuclear_B'] = df['Is_Magenta_B'] & (df['WT1'] < -60)
+                df['Nuclear_S'] = df['Is_Magenta_S'] & (df['WT1'] > 60)
 
-                # 4. GESTIÓN DE OPERACIONES GENESIS V2
+                # 4. INTELIGENCIA GENESIS IA (DISPARO REAL)
                 p_actual = df['Close'].iloc[-1]
                 umbral_ia = leer_conciencia(ticker_rest, tf_actual)['best_certeza']
 
                 if st.session_state['g_pos']:
                     p_ent = st.session_state['g_price']
                     rend = ((p_actual - p_ent) / p_ent) * 100
-                    # Venta por: Nuclear Sell, Agotamiento WaveTrend o Stop Loss
-                    if df['Nuclear_S'].iloc[-1] or (df['WT1'].iloc[-1] < df['WT2'].iloc[-1] and df['WT1'].iloc[-1] > 50) or rend < -1.5:
+                    # Venta por: Score de Venta, Agotamiento WaveTrend o Stop Loss
+                    if df['Sell_Score'].iloc[-1] >= 70 or (df['WT1'].iloc[-1] < df['WT2'].iloc[-1] and df['WT1'].iloc[-1] > 50) or rend < -1.2:
                         st.session_state['g_cap'] *= (1 + (rend/100)); st.session_state['g_trades'] += 1; st.session_state['g_pos'] = False
                         guardar_aprendizaje(ticker_rest, tf_actual, rend > 0)
-                        st.toast(f"💰 VENTA: {rend:.2f}%", icon="✅")
+                        st.toast(f"✅ VENTA: {rend:.2f}%")
                 elif df['Buy_Score'].iloc[-1] >= 70:
-                    st.session_state['g_pos'] = True; st.session_state['g_price'] = p_actual; st.toast("🚀 IA: COMPRA NUCLEAR", icon="📥")
+                    st.session_state['g_pos'] = True; st.session_state['g_price'] = p_actual; st.toast("🚀 COMPRA IA ACTIVADA")
 
-                # 5. RENDERIZADO VISUAL "TRADINGVIEW MIRROR"
-                df_plot = df.tail(120).copy()
+                # 5. RENDERIZADO VISUAL "TRADINGVIEW PARITY"
+                df_p = df.tail(120).copy()
                 fig = go.Figure()
 
-                # Río y Squeeze
-                df_plot['River_T'] = df_plot['Basis_20'] + (df_plot['ATR'] * 1.5)
-                df_plot['River_B'] = df_plot['Basis_20'] - (df_plot['ATR'] * 1.5)
-                fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['River_T'], mode='lines', line=dict(color='rgba(0,180,255,0)', width=0), showlegend=False))
-                fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['River_B'], mode='lines', line=dict(color='rgba(0,180,255,0)', width=0), fill='tonexty', fillcolor='rgba(0,100,255,0.08)', showlegend=False))
+                # Capas de Malla (PH/PL 100 y 300)
+                fig.add_trace(go.Scatter(x=df_p.index, y=df_p['PH_100'], mode='lines', line=dict(color='rgba(255,0,0,0.1)', width=1), showlegend=False))
+                fig.add_trace(go.Scatter(x=df_p.index, y=df_p['PL_100'], mode='lines', line=dict(color='rgba(0,255,0,0.1)', width=1), showlegend=False))
+                fig.add_trace(go.Scatter(x=df_p.index, y=df_p['Gravity_Target'], mode='lines', line=dict(color='rgba(255,215,0,0.2)', width=2, dash='dashdot'), name='Target Lock'))
 
-                # Mallas Matrix (Líneas finas de soporte/resistencia)
-                fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['PH_100'], mode='lines', line=dict(color='rgba(255,0,0,0.15)', width=1, dash='dot'), showlegend=False))
-                fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['PL_100'], mode='lines', line=dict(color='rgba(0,255,0,0.15)', width=1, dash='dot'), showlegend=False))
-                fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['Gravity_Target'], mode='lines', line=dict(color='rgba(255,215,0,0.3)', width=2, dash='dashdot'), name='Target Lock'))
-
-                # VELAS (Cuerpo calibrado para que no tape las mechas)
+                # Velas Morfológicas (Ajuste de Cuerpos)
                 fig.add_trace(go.Candlestick(
-                    x=df_plot.index, open=df_plot['Open'], high=df_plot['High'], low=df_plot['Low'], close=df_plot['Close'],
+                    x=df_p.index, open=df_p['Open'], high=df_p['High'], low=df_p['Low'], close=df_p['Close'],
                     increasing_line_color='#00ffcc', decreasing_line_color='#ff00ff',
                     increasing_fillcolor='rgba(0,255,204,0.6)', decreasing_fillcolor='rgba(255,0,255,0.6)',
                     name='Price'
                 ))
 
-                # Señales Nucleares (Cruces X Neón)
-                nb = df_plot[df_plot['Nuclear_B']]
-                if not nb.empty: fig.add_trace(go.Scatter(x=nb.index, y=nb['Low']*0.995, mode='markers', marker=dict(symbol='x', color='lime', size=14, line=dict(width=2, color='white')), name='NUCLEAR BUY'))
+                # Pintado de Velas Magenta (High Score)
+                mag_b = df_p[df_p['Is_Magenta_B']]
+                if not mag_b.empty: fig.add_trace(go.Candlestick(x=mag_b.index, open=mag_b['Open'], high=mag_b['High'], low=mag_b['Low'], close=mag_b['Close'], increasing_line_color='#FF00FF', decreasing_line_color='#FF00FF', increasing_fillcolor='#FF00FF', decreasing_fillcolor='#FF00FF', showlegend=False))
+
+                # ICONOGRAFÍA TÁCTICA (Labels y Símbolos)
+                # Nucleares (Explosión 💥)
+                nuc = df_p[df_p['Nuclear_B']]
+                if not nuc.empty: fig.add_trace(go.Scatter(x=nuc.index, y=nuc['Low']*0.992, mode='markers+text', text="💥", textposition="bottom center", marker=dict(symbol='x', color='lime', size=12), name='NUCLEAR'))
                 
-                ns = df_plot[df_plot['Nuclear_S']]
-                if not ns.empty: fig.add_trace(go.Scatter(x=ns.index, y=ns['High']*1.005, mode='markers', marker=dict(symbol='x', color='red', size=14, line=dict(width=2, color='white')), name='NUCLEAR SELL'))
+                # Rayos y Estrellas (⚡ ⭐)
+                early_b = df_p[(df_p['Buy_Score'] >= 50) & (df_p['Buy_Score'] < 70)]
+                if not early_b.empty: fig.add_trace(go.Scatter(x=early_b.index, y=early_b['Low']*0.995, mode='markers', marker=dict(symbol='star', color='yellow', size=10), name='Early Signal'))
+                
+                # Etiquetas de Texto (ENTRY / PUSH)
+                entry_idx = df_p[df_p['Entry_Up']]
+                if not entry_idx.empty: fig.add_trace(go.Scatter(x=entry_idx.index, y=entry_idx['Low']*0.997, mode='text', text="ENTRY", textfont=dict(color="#00FFFF", size=9), name='Entry Label'))
+                
+                push_idx = df_p[df_p['Push_Up']]
+                if not push_idx.empty: fig.add_trace(go.Scatter(x=push_idx.index, y=push_idx['Low']*0.997, mode='text', text="PUSH", textfont=dict(color="#00FF00", size=9), name='Push Label'))
+
+                # Score Porcentual sobre la vela
+                high_scores = df_p[df_p['Buy_Score'] >= 35]
+                if not high_scores.empty: fig.add_trace(go.Scatter(x=high_scores.index, y=high_scores['Low']*0.990, mode='text', text=high_scores['Buy_Score'].astype(int).astype(str) + "%", textfont=dict(color="white", size=8), showlegend=False))
 
                 # --- HUD DE PRECIO LIVE ---
-                # 1. Esquina Superior Izquierda (Comando)
+                # 1. Esquina Superior Izquierda
                 fig.add_annotation(xref="paper", yref="paper", x=0.02, y=0.98, text=f"⚡ {ticker_rest} | LIVE: ${p_actual:.6f}", showarrow=False, font=dict(color="#00ffcc", size=18, family="Courier New"), bgcolor="rgba(0,0,0,0.8)")
                 
-                # 2. Etiqueta Derecha (Alineada al precio actual)
+                # 2. Etiqueta Derecha (Fuera del panel)
                 fig.add_hline(y=p_actual, line_dash="dot", line_color="yellow", line_width=1)
-                fig.add_annotation(xref="paper", x=1.05, y=p_actual, text=f"${p_actual:.5f}", showarrow=False, bgcolor="yellow", font=dict(color="black", size=12, weight="bold"))
+                fig.add_annotation(xref="paper", x=1.08, y=p_actual, text=f"${p_actual:.5f}", showarrow=False, bgcolor="yellow", font=dict(color="black", size=12, weight="bold"))
 
                 fig.update_layout(
                     template='plotly_dark', height=750, margin=dict(l=10, r=120, t=10, b=10),
@@ -1770,10 +1790,10 @@ with tab_live:
                     xaxis=dict(gridcolor='rgba(255,255,255,0.03)', type='date')
                 )
 
-                st.plotly_chart(fig, use_container_width=True, key=f"radar_v7_{ticker_rest}")
+                st.plotly_chart(fig, use_container_width=True, key=f"radar_v8_{ticker_rest}")
                 
             except Exception as e:
-                st.error(f"Sincronizando Matrix: {e}")
+                st.error(f"Sincronizando Matrix V8: {e}")
         else:
             st.info(f"Sistema en Standby. IA lista para analizar {ticker_rest} en {tf_actual}. Pulsa Iniciar.")
 
