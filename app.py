@@ -1540,9 +1540,14 @@ st.title("🛡️ PREDATOR LAB (V320 FUSION)")
 st.markdown("---")
 st.subheader("🛸 NÚCLEO DE CONCIENCIA GENESIS IA")
 
-# Extraemos la última neurona usando df_global
 if not df_global.empty:
     ultima_neurona = df_global.iloc[-1]
+    
+    # --- 🛰️ CONEXIÓN CON LA MEMORIA (PASO 2) ---
+    tf_actual = iv_download if 'iv_download' in locals() else '1m'
+    conciencia = leer_conciencia(ticker_rest, tf_actual)
+    umbral_ia = conciencia['best_certeza'] # <--- Aquí recupera lo aprendido
+    
     certeza_compra = ultima_neurona.get('Certeza_Compra', 0)
     certeza_venta = ultima_neurona.get('Certeza_Venta', 0)
     decision_index = ultima_neurona.get('IA_Decision_Index', 0)
@@ -1553,26 +1558,16 @@ if not df_global.empty:
     # 1. Indicadores de Mando Superior
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("ÍNDICE DECISIÓN", f"{decision_index:.2f}", delta="BULL" if decision_index > 0 else "BEAR")
-    c2.metric("FRICCIÓN MALLA", f"{friccion} pts")
+    c2.metric("UMBRAL APRENDIDO", f"{umbral_ia}%", help="Certeza mínima requerida por la IA para este token y temporalidad.")
     c3.metric("ALERTA IA", f"DEFCON {defcon_ia}")
     c4.metric("FUERZA BALLENA", f"{rvol_ia:.2f}x")
 
-    # 2. TERMÓMETRO CUÁNTICO
-    st.write(f"🎯 Correlación Valles (COMPRA): **{certeza_compra:.1f}%**")
+    # 2. TERMÓMETRO CUÁNTICO (Ahora comparado contra el Umbral IA)
+    st.write(f"🎯 Correlación Valles (COMPRA): **{certeza_compra:.1f}%** / Objetivo: {umbral_ia}%")
     st.progress(min(max(certeza_compra/100, 0.0), 1.0))
     
-    st.write(f"🏔️ Correlación Picos (VENTA): **{certeza_venta:.1f}%**")
+    st.write(f"🏔️ Correlación Picos (VENTA): **{certeza_venta:.1f}%** / Objetivo: {umbral_ia}%")
     st.progress(min(max(certeza_venta/100, 0.0), 1.0))
-
-    # 3. CONCLUSIÓN AUTÓNOMA
-    if certeza_compra > 80:
-        st.success(f"**CONCIENCIA IA:** Estructura detectada. Certeza de Compra al {certeza_compra:.1f}%. Fricción de Malla nivel {friccion}. ¡ALTA PROBABILIDAD DE REBOTE!")
-    elif certeza_venta > 80:
-        st.error(f"**CONCIENCIA IA:** Agotamiento detectado. Certeza de Venta al {certeza_venta:.1f}%. ¡ALTA PROBABILIDAD DE CAÍDA!")
-    else:
-        st.info("**CONCIENCIA IA:** Analizando Matrix... Sin confluencia clara. Manteniendo posición defensiva.")
-st.markdown("---")
-# --- FIN DEL NÚCLEO DE CONCIENCIA ---
 
 with st.expander("🏆 SALÓN DE LA FAMA GENÉTICA", expanded=True):
     leaderboard_data = []
