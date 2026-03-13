@@ -374,19 +374,14 @@ dp = st.session_state['data_params']
 # ==========================================
 # 🛑 EXTRACCIÓN Y WARM-UP (V320 MATH)
 # ==========================================
-@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Matrix V320 Predator...")
+@st.cache_data(ttl=3600, show_spinner="📡 Sincronizando Matrix V320 Predator (V6 Multi-Core)...")
 def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, version_key):
     try:
+        from concurrent.futures import ThreadPoolExecutor
         ex_class = getattr(ccxt, exchange_id)({'enableRateLimit': True})
         warmup_days = 40 if is_micro else 150
         start_ts = int(datetime.combine(start - timedelta(days=warmup_days), datetime.min.time()).timestamp() * 1000)
         end_ts = int((datetime.combine(end, datetime.min.time()) + timedelta(days=1)).timestamp() * 1000)
-        
-        all_ohlcv, current_ts, error_count = [], start_ts, 0
-        req_limit = 1000
-        if 'coinbase' in exchange_id.lower(): req_limit = 300
-      # ---> DEBE EMPEZAR AQUÍ <---
-        from concurrent.futures import ThreadPoolExecutor
         
         req_limit = 300 if 'coinbase' in exchange_id.lower() else 1000
         total_range = end_ts - start_ts
@@ -424,7 +419,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         
         all_ohlcv = [dict(t) for t in {tuple(d) for d in all_ohlcv}]
         all_ohlcv.sort(key=lambda x: x[0])
-        # ---> DEBE TERMINAR AQUÍ <---
+        
         if not all_ohlcv: return pd.DataFrame(), f"El Exchange devolvió 0 velas."
         df = pd.DataFrame(all_ohlcv, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
         df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms'); df.set_index('timestamp', inplace=True)
