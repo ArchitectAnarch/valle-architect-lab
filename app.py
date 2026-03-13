@@ -1489,10 +1489,9 @@ st.title("🛡️ PREDATOR LAB (V320 FUSION)")
 st.markdown("---")
 st.subheader("🛸 NÚCLEO DE CONCIENCIA GENESIS IA")
 
-# Extraemos la última neurona (el estado actual del mercado)
-# Nota: 'df' debe ser el DataFrame ya procesado con el motor V320
-if not df.empty:
-    ultima_neurona = df.iloc[-1]
+# Extraemos la última neurona usando df_global
+if not df_global.empty:
+    ultima_neurona = df_global.iloc[-1]
     certeza_compra = ultima_neurona.get('Certeza_Compra', 0)
     certeza_venta = ultima_neurona.get('Certeza_Venta', 0)
     decision_index = ultima_neurona.get('IA_Decision_Index', 0)
