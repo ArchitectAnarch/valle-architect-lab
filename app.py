@@ -1691,14 +1691,15 @@ with tab_live:
                 # Usamos la misma función matemática de tu núcleo para paridad total
                 df['ATR'] = rma_pine((df['High'] - df['Low']).values, 14)
                 
-                # 2. Río Histórico Dinámico (Fórmula Exacta del df_global)
+                # 2. Río Histórico Dinámico (Corregido a Escala Real)
+                df['ATR'] = (df['High'] - df['Low']).rolling(14).mean() 
                 delta = df['Close'].diff()
                 u = (delta.where(delta > 0, 0)).rolling(14).mean()
                 d = (-delta.where(delta < 0, 0)).rolling(14).mean()
                 df['RSI'] = 100 - (100 / (1 + (u / d.replace(0, 0.001))))
                 df['RSI_Velocity'] = df['RSI'].diff()
                 
-                df['River_Width'] = (df['ATR'] * 1.2) + (df['RSI_Velocity'].abs() / 10.0)
+                df['River_Width'] = df['ATR'] * (1.2 + (df['RSI_Velocity'].abs() / 10.0))
                 df['River_Top'] = df['Basis'] + (df['River_Width'] / 2)
                 df['River_Bot'] = df['Basis'] - (df['River_Width'] / 2)
 
