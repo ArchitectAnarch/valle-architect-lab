@@ -430,7 +430,7 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['Open'] = df['Open'].fillna(df['Close']); df['High'] = df['High'].fillna(df['Close']); df['Low'] = df['Low'].fillna(df['Close'])
         df['Volume'] = df['Volume'].fillna(0)
             
-    # =============================================================
+  # =============================================================
         # 🧠 MOTOR DE CONCIENCIA V320: VALLE ARCHITECT [TOTAL ADN]
         # =============================================================
         
@@ -450,6 +450,14 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['RSI_MA'] = df['RSI'].rolling(14).mean()
         df['RSI_Velocity'] = df['RSI'].diff()
 
+        # ### NUEVO: ADX (DMI) ###
+        plus_dm = df['High'].diff().where(lambda x: (x > df['Low'].diff().abs()) & (x > 0), 0)
+        minus_dm = df['Low'].diff().abs().where(lambda x: (x > df['High'].diff()) & (x > 0), 0)
+        atr_14_adx = df['ATR'].replace(0, 1)
+        plus_di = 100 * (plus_dm.rolling(14).mean() / atr_14_adx)
+        minus_di = 100 * (minus_dm.rolling(14).mean() / atr_14_adx)
+        df['ADX'] = 100 * (abs(plus_di - minus_di) / (plus_di + minus_di).replace(0, 1)).rolling(14).mean()
+
         # 3. WaveTrend (TCI Master)
         df['AP'] = (df['High'] + df['Low'] + df['Close']) / 3
         df['ESA'] = df['AP'].ewm(span=10, adjust=False).mean()
@@ -466,7 +474,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['Whale_Sell'] = df['Flash_Vol'] & (df['Close'] < df['Open'])
 
         # --- [SECCIÓN 5: MALLA & MATRIX] ---
-        # Identificación de Pivots Exactos (Pine Logic)
         def get_pivots(series, left, right):
             pivots = np.full(len(series), np.nan)
             for i in range(left, len(series) - right):
@@ -480,26 +487,40 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
             df[f'Weight_{p}'] = w
 
         # --- [SECCIÓN 6: RADAR DE GRAVEDAD & FRICCIÓN] ---
-        # Calculamos cuántas líneas de la malla están cerca del precio actual
         df['Friction_Weight'] = 0
-        hitbox = 0.015 # 1.5% del input
+        hitbox = 0.015 
         for p in [30, 100, 300, 800]:
             df.loc[(df['Close'] - df[f'PH_{p}']).abs() < (df['Close'] * hitbox), 'Friction_Weight'] += df[f'Weight_{p}']
             df.loc[(df['Close'] - df[f'PL_{p}']).abs() < (df['Close'] * hitbox), 'Friction_Weight'] += df[f'Weight_{p}']
         
         df['Gravity_Target'] = (df['PH_800'] + df['PL_800']) / 2
         df['Gravity_Zone'] = (df['Close'] - df['Gravity_Target']).abs() < (df['ATR'] * 3)
+        # ### NUEVO: DISTANCIA DE GRAVEDAD ###
+        df['Gravity_Dist'] = (df['Close'] - df['Gravity_Target']) / df['Close'].replace(0, 1)
+
+        # ### NUEVO: DINÁMICA DEFCON ###
+        bb_u = df['Basis_Sigma'] + (df['Dev_Sigma'] * 2)
+        bb_l = df['Basis_Sigma'] - (df['Dev_Sigma'] * 2)
+        bb_width = (bb_u - bb_l) / df['Basis_Sigma'].replace(0, 1)
+        bb_delta = bb_width.diff()
+        bb_delta_avg = bb_delta.rolling(10).mean()
+        
+        df['DEFCON_Level'] = 5
+        neon_up = (df['Close'] >= bb_u * 0.999) & (df['Close'] > df['Open'])
+        neon_dn = (df['Close'] <= bb_l * 1.001) & (df['Close'] < df['Open'])
+        df.loc[neon_up | neon_dn, 'DEFCON_Level'] = 4
+        df.loc[(df['DEFCON_Level'] == 4) & (bb_delta > 0), 'DEFCON_Level'] = 3
+        df.loc[(df['DEFCON_Level'] == 3) & (bb_delta > bb_delta_avg) & (df['ADX'] > 20), 'DEFCON_Level'] = 2
+        df.loc[(df['DEFCON_Level'] == 2) & (bb_delta > bb_delta_avg * 1.5) & (df['ADX'] > 25) & (df['RVol'] > 1.2), 'DEFCON_Level'] = 1
 
         # --- [SECCIÓN 7: SEÑALES & CERTEZA FÍSICA (SCORES)] ---
         df['Buy_Score'] = 0.0
         df['Sell_Score'] = 0.0
-        
-        # Lógica de Puntuación Sin Censura
         retro_buy = (df['RSI'] < 30) & (df['Z_Score'] < -2.0)
         df.loc[retro_buy, 'Buy_Score'] += 50.0
         df.loc[df['Friction_Weight'] > 0, 'Buy_Score'] += 25.0
         df.loc[df['RVol'] > 1.5, 'Buy_Score'] += 20.0
-        df.loc[(df['Low'] < df['Low'].shift(5)) & (df['RSI'] > df['RSI'].shift(5)), 'Buy_Score'] += 15.0 # Divergencia Bull
+        df.loc[(df['Low'] < df['Low'].shift(5)) & (df['RSI'] > df['RSI'].shift(5)), 'Buy_Score'] += 15.0 
         
         retro_sell = (df['RSI'] > 70) & (df['Z_Score'] > 2.0)
         df.loc[retro_sell, 'Sell_Score'] += 50.0
@@ -510,7 +531,6 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         df['Upper_Wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
         df['Lower_Wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
         df['Body_Size'] = (df['Close'] - df['Open']).abs()
-        
         df['Climax_Buy'] = (df['Buy_Score'] >= 70) & (df['Lower_Wick'] > df['Body_Size'] * 0.4)
         df['Climax_Sell'] = (df['Sell_Score'] >= 70) & (df['Upper_Wick'] > df['Body_Size'] * 0.4)
         df['Nuclear_Buy'] = df['Climax_Buy'] & ((df['WT1'] < -60) | (df['WT1'] > df['WT2']))
@@ -527,8 +547,8 @@ def cargar_matriz(exchange_id, sym, start, end, iv_down, offset, is_micro, versi
         # --- [MÓDULO DE CRESTAS: APRENDIZAJE AUTÓNOMO] ---
         df['Cresta_Real'] = 0
         n_c = 10
-        df.loc[df['Low'] == df['Low'].rolling(n_c*2+1, center=True).min(), 'Cresta_Real'] = 1 # VALLE
-        df.loc[df['High'] == df['High'].rolling(n_c*2+1, center=True).max(), 'Cresta_Real'] = -1 # PICO
+        df.loc[df['Low'] == df['Low'].rolling(n_c*2+1, center=True).min(), 'Cresta_Real'] = 1 
+        df.loc[df['High'] == df['High'].rolling(n_c*2+1, center=True).max(), 'Cresta_Real'] = -1
 
         # =============================================================
         # 🛰️ TELEMETRÍA CONTINUA: GENERACIÓN DE CONCIENCIA ADAPTATIVA
