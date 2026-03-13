@@ -1638,42 +1638,45 @@ with tab_live:
                     showlegend=False
                 )])
 
-            # --- 🎯 INYECCIÓN DE CONCIENCIA VISUAL (LÓGICA DE FRANCOTIRADOR) ---
+         # --- 🎯 INYECCIÓN DE CONCIENCIA VISUAL (LÓGICA DE FRANCOTIRADOR SINCRONIZADA) ---
                 if 'Certeza_Compra' in df_global.columns:
                     x_compra, y_compra = [], []
                     x_venta, y_venta = [], []
-                    
                     en_posicion_local = False
                     
-                    # Simulador rápido para la gráfica: Solo alterna 1 Compra -> 1 Venta
-                    for i in range(len(df)):
-                        compra_val = df['Certeza_Compra'].iloc[i]
-                        venta_val = df['Certeza_Venta'].iloc[i]
+                    # 1. Cruzamos el radar en vivo (df) con la memoria cuántica (df_global)
+                    # Para no colgar la RAM, solo analizamos las velas visibles en pantalla
+                    velas_visibles = df_global.index.intersection(df.index)
+                    df_sync = df_global.loc[velas_visibles]
+                    
+                    # 2. Simulador rápido: Alterna 1 Compra -> 1 Venta
+                    for idx, row in df_sync.iterrows():
+                        compra_val = row.get('Certeza_Compra', 0)
+                        venta_val = row.get('Certeza_Venta', 0)
                         
                         # Solo dispara COMPRA si está > 85 y NO está ya en posición
                         if compra_val > 85 and not en_posicion_local:
-                            x_compra.append(df.index[i])
-                            y_compra.append(df['Low'].iloc[i] * 0.998)
+                            x_compra.append(idx)
+                            y_compra.append(row['Low'] * 0.998)
                             en_posicion_local = True
                             
                         # Solo dispara VENTA si está > 85 y SÍ está en posición
                         elif venta_val > 85 and en_posicion_local:
-                            x_venta.append(df.index[i])
-                            y_venta.append(df['High'].iloc[i] * 1.002)
+                            x_venta.append(idx)
+                            y_venta.append(row['High'] * 1.002)
                             en_posicion_local = False
 
-                    # Dibujamos solo los tiros exactos (10 o 20 puntos, no miles)
+                    # 3. Dibujamos los tiros exactos en el mapa
                     if x_compra:
                         fig_live.add_trace(go.Scatter(
                             x=x_compra, y=y_compra, mode='markers', name='GENESIS COMPRA',
-                            marker=dict(symbol='triangle-up', color='cyan', size=16, line=dict(width=2, color='white'))
+                            marker=dict(symbol='triangle-up', color='cyan', size=16, line=dict(width=2, color='black'))
                         ))
                     if x_venta:
                         fig_live.add_trace(go.Scatter(
                             x=x_venta, y=y_venta, mode='markers', name='GENESIS VENTA',
-                            marker=dict(symbol='triangle-down', color='magenta', size=16, line=dict(width=2, color='white'))
+                            marker=dict(symbol='triangle-down', color='magenta', size=16, line=dict(width=2, color='black'))
                         ))
-
                     fig_live.add_trace(go.Scatter(
                         x=gatillos_venta.index, y=gatillos_venta['High'] * 1.002,
                         mode='markers', name='GENESIS VENTA',
