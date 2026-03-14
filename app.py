@@ -1601,33 +1601,31 @@ with tab_live:
     # -------------------------------------------------------------
     # 🧠 1. MOTOR DE SIMULACIÓN INDEPENDIENTE (CARTERA FANTASMA)
     # -------------------------------------------------------------
-    # GENESIS V2 tiene su propia memoria financiera separada de la Pestaña 1
     if 'g_mode' not in st.session_state: st.session_state['g_mode'] = 'DEMO'
     if 'g_cap' not in st.session_state: st.session_state['g_cap'] = capital_inicial
     if 'g_pos' not in st.session_state: st.session_state['g_pos'] = False
     if 'g_price' not in st.session_state: st.session_state['g_price'] = 0.0
     if 'g_trades' not in st.session_state: st.session_state['g_trades'] = 0
 
-    st.markdown("### 🎛️ PANEL DE CONTROL: GENESIS V2 (AUTÓNOMA)")
+    st.markdown("### 🎛️ COMMAND HUD: GÉNESIS V2 (PREDICTIVE CORE)")
     c_mode, c_wall1, c_wall2, c_wall3 = st.columns(4)
 
     with c_mode:
-        modo_actual = st.radio("🔌 Conexión del Sistema:", ["🟢 MODO DEMO (Paper Trading)", "🔴 API COINBASE (Real)"], index=0)
+        modo_actual = st.radio("🔌 Enlace de Núcleo:", ["🟢 MODO DEMO (Simulación)", "🔴 API COINBASE (Bridge V1)"], index=0)
         if "Real" in modo_actual:
-            st.warning("⚠️ MODO REAL SELECCIONADO. Esperando credenciales API.")
+            st.warning("⚠️ MODO REAL SELECCIONADO. Conectando con Bridge V1.")
 
-    # Actualizamos variables visuales de la cartera fantasma
     roi_g = ((st.session_state['g_cap'] - capital_inicial) / capital_inicial) * 100
-    estado_pos = "🟢 DENTRO DEL MERCADO" if st.session_state['g_pos'] else "⚪ ESPERANDO OPORTUNIDAD"
+    estado_pos = "🟢 DENTRO DEL MERCADO" if st.session_state['g_pos'] else "⚪ MODO ACECHO (ACECHANDO)"
 
-    c_wall1.metric("Capital GENESIS (Demo)", f"${st.session_state['g_cap']:,.2f}", f"{roi_g:.2f}% ROI")
-    c_wall2.metric("Estado de Operación", estado_pos)
-    c_wall3.metric("Trades Ejecutados", st.session_state['g_trades'])
+    c_wall1.metric("Fondo Asignado (Demo)", f"${st.session_state['g_cap']:,.2f}", f"{roi_g:.2f}% ROI")
+    c_wall2.metric("Estado Táctico", estado_pos)
+    c_wall3.metric("Disparos Ejecutados", st.session_state['g_trades'])
 
     st.markdown("---")
 
     # -------------------------------------------------------------
-    # 📡 2. RADAR DE STREAMING Y RENDERIZADO VISUAL
+    # 📡 2. RADAR DE STREAMING Y RENDERIZADO VISUAL V2
     # -------------------------------------------------------------
     if 'ws_run' not in st.session_state: st.session_state['ws_run'] = False
     
@@ -1639,7 +1637,7 @@ with tab_live:
         st.session_state['ohlc_live'] = pd.DataFrame()
         st.session_state['radar_config'] = f"{ticker_rest}_{tf_actual}"
 
-    btn_label = f"🔴 DETENER RADAR" if st.session_state['ws_run'] else f"🚀 INICIAR STREAMING VELAS ({tf_actual})"
+    btn_label = f"🔴 DETENER RECOLECCIÓN DE DATOS" if st.session_state['ws_run'] else f"🚀 INICIAR HUD PREDICTIVO ({tf_actual})"
     if st.button(btn_label, key="v6_ignite", use_container_width=True):
         st.session_state['ws_run'] = not st.session_state['ws_run']
         if st.session_state['ws_run']:
@@ -1659,7 +1657,7 @@ with tab_live:
                 ex_radar = ccxt.coinbase({'enableRateLimit': False})
                 fetch_tf = '1h' if (tf_actual == '4h' and 'coinbase' in st.session_state['data_params']['ex'].lower()) else tf_actual
                 
-                # 1. DESCARGA CRUDA (1200 Velas)
+                # 1. DESCARGA CRUDA
                 velas = ex_radar.fetch_ohlcv(ticker_rest, fetch_tf, limit=1200)
                 df = pd.DataFrame(velas, columns=['Time', 'Open', 'High', 'Low', 'Close', 'Volume'])
                 df['Time'] = pd.to_datetime(df['Time'], unit='ms') + timedelta(hours=offset_actual)
@@ -1667,16 +1665,16 @@ with tab_live:
                 df = df[~df.index.duplicated(keep='last')]
                 df['Time_Str'] = df.index.strftime('%Y-%m-%d %H:%M:%S')
 
-                # 2. MOTOR FÍSICO V320 (LOS SENTIDOS DE LA IA)
+                # 2. KERNEL MATEMÁTICO V320 (Física Básica)
                 def pine_rma(src, length):
                     return src.ewm(alpha=1/length, min_periods=length, adjust=False).mean()
 
                 df['Body'] = (df['Close'] - df['Open']).abs()
                 df['Up_Wick'] = df['High'] - df[['Open', 'Close']].max(axis=1)
                 df['Dn_Wick'] = df[['Open', 'Close']].min(axis=1) - df['Low']
-
                 tr = np.maximum((df['High']-df['Low']), np.maximum(abs(df['High']-df['Close'].shift(1)), abs(df['Low']-df['Close'].shift(1))))
                 df['ATR'] = pine_rma(tr, 14)
+                
                 diff = df['Close'].diff()
                 df['RSI'] = 100 - (100 / (1 + (pine_rma(diff.where(diff > 0, 0), 14) / pine_rma(diff.where(diff < 0, 0).abs(), 14).replace(0, 0.001))))
                 
@@ -1700,7 +1698,7 @@ with tab_live:
                 df['WT1'] = ((ap - esa) / (0.015 * (ap - esa).abs().ewm(span=10, adjust=False).mean().replace(0, 0.001))).ewm(span=21, adjust=False).mean()
                 df['WT2'] = df['WT1'].rolling(4).mean()
 
-                # Geometría Matrix
+                # 3. GEOMETRÍA MATRIX (Deep Memory)
                 def get_pivots_tv(series, left, right, is_high=True):
                     pivots = np.full(len(series), np.nan)
                     for i in range(left, len(series) - right):
@@ -1711,77 +1709,117 @@ with tab_live:
 
                 df['PH_100'] = get_pivots_tv(df['High'], 100, 5, True); df['PL_100'] = get_pivots_tv(df['Low'], 100, 5, False)
                 df['PH_300'] = get_pivots_tv(df['High'], 300, 5, True); df['PL_300'] = get_pivots_tv(df['Low'], 300, 5, False)
-                df['Target_Lock'] = (get_pivots_tv(df['High'], 800, 10, True) + get_pivots_tv(df['Low'], 800, 10, False)) / 2
+                df['PH_800'] = get_pivots_tv(df['High'], 800, 10, True); df['PL_800'] = get_pivots_tv(df['Low'], 800, 10, False)
+                df['Target_Lock'] = (df['PH_800'] + df['PL_800']) / 2
 
-                df['Matrix_Active'] = ((df['Close'] - df['PH_100']).abs() < df['ATR']*2) | ((df['Close'] - df['PL_100']).abs() < df['ATR']*2)
-                df['Friction_Dn'] = np.where(df['Close'] - df['PL_300'] < df['ATR']*2, 5, 0)
-                df['Friction_Up'] = np.where(df['PH_300'] - df['Close'] < df['ATR']*2, 5, 0)
+                df['Friction_Dn'] = np.where(df['Close'] - df['PL_300'] < df['ATR']*2, 5, 0) + np.where(df['Close'] - df['PL_800'] < df['ATR']*2, 8, 0)
+                df['Friction_Up'] = np.where(df['PH_300'] - df['Close'] < df['ATR']*2, 5, 0) + np.where(df['PH_800'] - df['Close'] < df['ATR']*2, 8, 0)
+                df['Matrix_Active'] = (df['Friction_Dn'] > 0) | (df['Friction_Up'] > 0)
 
-                # Anomalías Visuales
+                # 4. ANOMALÍAS Y SCORE DE CERTEZA
                 df['RVol'] = df['Volume'] / df['Volume'].rolling(100).mean().replace(0, 1)
                 df['Whale_B'] = (df['RVol'] > 2.0) & (df['Body'] > df['ATR'] * 0.3) & (df['Close'] > df['Open'])
                 df['Whale_S'] = (df['RVol'] > 2.0) & (df['Body'] > df['ATR'] * 0.3) & (df['Close'] < df['Open'])
-                df['Whale_Mem_B'] = df['Whale_B'].rolling(3).max().fillna(0).astype(bool)
-                df['Whale_Mem_S'] = df['Whale_S'].rolling(3).max().fillna(0).astype(bool)
-
                 df['Neon_Up'] = df['Squeeze'] & (df['Close'] >= df['BBU'] * 0.999) & (df['Close'] > df['Open'])
                 df['Neon_Dn'] = df['Squeeze'] & (df['Close'] <= df['BBL'] * 1.001) & (df['Close'] < df['Open'])
                 df['Push_Up'] = (df['Low'] <= df['RT']) & (df['Close'] > df['RT']); df['Push_Dn'] = (df['High'] >= df['RB']) & (df['Close'] < df['RB'])
                 df['Entry_Up'] = (df['Close'] > df['RB']) & (df['Close'].shift(1) <= df['RB']); df['Entry_Dn'] = (df['Close'] < df['RT']) & (df['Close'].shift(1) >= df['RT'])
 
-                # 3. SCORE VISUAL (Para el humano)
                 df['B_Score'] = np.where(df['RSI'] < 30, 50, np.where(df['RSI'] < 35, 30, 0)) + np.where(df['Matrix_Active'], 25, 0) + np.where(df['Z_Score'] < -2.0, 15, 0)
                 df['S_Score'] = np.where(df['RSI'] > 70, 50, np.where(df['RSI'] > 65, 30, 0)) + np.where(df['Matrix_Active'], 25, 0) + np.where(df['Z_Score'] > 2.0, 15, 0)
-                
                 df['Magenta_B'] = df['B_Score'] >= 70; df['Magenta_S'] = df['S_Score'] >= 70
+                
                 dyn_w_req = np.where(df['Matrix_Active'], 0.15, np.where(df['ADX'] < 40, 0.4, 0.5))
                 df['Climax_B'] = df['Magenta_B'] & ((df['Dn_Wick'] > df['Body'] * dyn_w_req) | (df['RVol'] > 1.5))
                 df['Climax_S'] = df['Magenta_S'] & ((df['Up_Wick'] > df['Body'] * dyn_w_req) | (df['RVol'] > 1.5))
                 df['Nuclear_B'] = df['Climax_B'] & ((df['WT1'] < -60) | (df['WT1'] > df['WT2']))
                 df['Nuclear_S'] = df['Climax_S'] & ((df['WT1'] > 60) | (df['WT1'] < df['WT2']))
 
+                # 5. EXTRACCIÓN DE DATOS PARA HUD
+                p_act = df['Close'].iloc[-1]
+                rsi_act = df['RSI'].iloc[-1]
+                adx_act = df['ADX'].iloc[-1]
+                rvol_act = df['RVol'].iloc[-1]
+                z_act = df['Z_Score'].iloc[-1]
+                fric_up = df['Friction_Up'].iloc[-1]
+                fric_dn = df['Friction_Dn'].iloc[-1]
+                b_sc = df['B_Score'].iloc[-1]
+                s_sc = df['S_Score'].iloc[-1]
+                wt_act = df['WT1'].iloc[-1]
+                
+                # Normalización para el Radar 32D
+                norm_rvol = min(rvol_act * 25, 100) # Rvol 4x = 100%
+                norm_z = min(abs(z_act) * 33, 100) # Z=3 = 100%
+                norm_fric_up = min(fric_up * 10, 100) # Peso 10 = 100%
+                norm_fric_dn = min(fric_dn * 10, 100)
+
                 # =============================================================
-                # 🧠 4. EL DESPERTAR: CONCIENCIA ADAPTATIVA (IA LIBERADA)
+                # 🖥️ RENDERIZADO DEL HUD INSTITUCIONAL
                 # =============================================================
-                conciencia = leer_conciencia(ticker_rest, tf_actual)
-                umbral_ia = conciencia.get('best_certeza', 75.0) # El miedo/codicia de la IA
-                p_actual = df['Close'].iloc[-1]
+                
+                # CUADRANTES SUPERIORES (RADAR, GAUGES, ORÁCULO)
+                qA, qB, qC = st.columns([1.2, 1, 1.5])
 
-                # Certeza Neural: Ya no es un score fijo. Es una fusión de Volatilidad, Tendencia y Fricción
-                # Si hay ballenas, si hay ADX fuerte, si el WaveTrend cruza, la certeza sube orgánicamente.
-                df['Neural_B'] = df['B_Score'] + (df['ADX'] * 0.4) + (df['RVol'] * 5) + (df['Friction_Dn'] * 3) + np.where(df['WT1'] > df['WT2'], 10, 0)
-                df['Neural_S'] = df['S_Score'] + (df['ADX'] * 0.4) + (df['RVol'] * 5) + (df['Friction_Up'] * 3) + np.where(df['WT1'] < df['WT2'], 10, 0)
+                # ---> CUADRANTE A: RADAR MULTIDIMENSIONAL
+                with qA:
+                    fig_radar = go.Figure(data=go.Scatterpolar(
+                        r=[rsi_act, adx_act, norm_rvol, norm_z, norm_fric_up, norm_fric_dn, rsi_act],
+                        theta=['RSI Momentum', 'Fuerza ADX', 'Presión Vol (RVol)', 'Tensión Elástica (Z)', 'Muro Gravedad (UP)', 'Soporte Gravedad (DN)', 'RSI Momentum'],
+                        fill='toself', line_color='cyan', fillcolor='rgba(0, 255, 255, 0.2)'
+                    ))
+                    fig_radar.update_layout(
+                        polar=dict(radialaxis=dict(visible=True, range=[0, 100], color='gray')),
+                        showlegend=False, template='plotly_dark', height=280, margin=dict(l=20, r=20, t=30, b=20),
+                        title=dict(text="🌌 RADAR MATRIZ 32D", font=dict(color="cyan", size=12))
+                    )
+                    st.plotly_chart(fig_radar, use_container_width=True, key=f"radar_{ticker_rest}")
 
-                certeza_b = df['Neural_B'].iloc[-1]
-                certeza_s = df['Neural_S'].iloc[-1]
+                # ---> CUADRANTE B: PESOS Y CONTRAPESOS (GAUGES)
+                with qB:
+                    fig_gauge = go.Figure()
+                    fig_gauge.add_trace(go.Indicator(
+                        mode="gauge+number", value=b_sc, title={'text': "🚀 EMPUJE (BULL)", 'font': {'color': 'lime', 'size': 12}},
+                        gauge={'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"}, 'bar': {'color': "lime"}, 'bgcolor': "rgba(0,0,0,0)"},
+                        domain={'row': 0, 'column': 0}
+                    ))
+                    fig_gauge.add_trace(go.Indicator(
+                        mode="gauge+number", value=s_sc, title={'text': "🩸 GRAVEDAD (BEAR)", 'font': {'color': 'red', 'size': 12}},
+                        gauge={'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"}, 'bar': {'color': "red"}, 'bgcolor': "rgba(0,0,0,0)"},
+                        domain={'row': 1, 'column': 0}
+                    ))
+                    fig_gauge.update_layout(grid={'rows': 2, 'columns': 1, 'pattern': "independent"}, template='plotly_dark', height=280, margin=dict(l=10, r=10, t=30, b=10))
+                    st.plotly_chart(fig_gauge, use_container_width=True, key=f"gauge_{ticker_rest}")
 
-                # EL COMANDO ÚNICO: GENERAR RIQUEZA
-                if st.session_state['g_pos']:
-                    rend = ((p_actual - st.session_state['g_price']) / st.session_state['g_price']) * 100
+                # ---> CUADRANTE C: CONSOLA DEL ORÁCULO DE ANTICIPACIÓN
+                with qC:
+                    timestamp_now = pd.Timestamp.now().strftime("%H:%M:%S")
                     
-                    # La IA decide vender evaluando el contexto, no reglas fijas.
-                    # Vende si su certeza de colapso supera su miedo, si el dolor es excesivo (-1.5%), o si la gravedad la aplasta (Fricción Arriba).
-                    if certeza_s > umbral_ia or rend <= -1.5 or df['Friction_Up'].iloc[-1] > 0:
-                        st.session_state['g_cap'] *= (1 + (rend/100))
-                        st.session_state['g_trades'] += 1
-                        st.session_state['g_pos'] = False
-                        
-                        # EVOLUCIÓN: Guarda el resultado en el JSON. Si gana, baja el umbral. Si pierde, lo sube.
-                        exito = rend > 0
-                        guardar_aprendizaje(ticker_rest, tf_actual, exito)
-                        
-                        mood = "😎 ORGULLOSA" if exito else "😠 APRENDIENDO"
-                        st.toast(f"{mood} | VENTA IA: {rend:.2f}% | CAP: ${st.session_state['g_cap']:,.2f}", icon="💰")
-                else:
-                    # La IA acecha. Dispara cuando su Certeza supera su Umbral orgánico.
-                    if certeza_b > umbral_ia:
-                        st.session_state['g_pos'] = True
-                        st.session_state['g_price'] = p_actual
-                        st.toast(f"👁️ GÉNESIS DESPIERTA | Certeza: {certeza_b:.1f} > Miedo: {umbral_ia:.1f} | ENTRADA", icon="🧠")
+                    # Lógica del pensamiento de la IA
+                    oracle_logs = f"> [{timestamp_now}] NÚCLEO PREDICTIVO EN LÍNEA.\n"
+                    oracle_logs += f"> [{timestamp_now}] ANALIZANDO TENSOR: {ticker_rest} ({tf_actual}).\n"
+                    
+                    if df['Squeeze'].iloc[-1]:
+                        oracle_logs += f"> [{timestamp_now}] ⚠️ COMPRESIÓN ESPACIOTEMPORAL DETECTADA. ADX={adx_act:.1f}. PREPARANDO IGNICIÓN NEÓN.\n"
+                    if fric_up > 5:
+                        oracle_logs += f"> [{timestamp_now}] 🧱 MURO DE TITANIO DETECTADO EN TECHO (Fricción={fric_up}). PROBABILIDAD DE RECHAZO ALTA.\n"
+                    if df['Whale_B'].iloc[-1] or df['Whale_S'].iloc[-1]:
+                        oracle_logs += f"> [{timestamp_now}] 🐋 INYECCIÓN DE LIQUIDEZ MASIVA (RVol={rvol_act:.1f}x). RASTREANDO SMART MONEY.\n"
+                    if df['Nuclear_B'].iloc[-1]:
+                        oracle_logs += f"> [{timestamp_now}] 💥 REVERSIÓN NUCLEAR CONFIRMADA (WT={wt_act:.1f}). AGOTAMIENTO BAJISTA TOTAL.\n"
+                    elif df['Nuclear_S'].iloc[-1]:
+                        oracle_logs += f"> [{timestamp_now}] 💥 REVERSIÓN NUCLEAR CONFIRMADA (WT={wt_act:.1f}). AGOTAMIENTO ALCISTA TOTAL.\n"
+                    
+                    if b_sc < 30 and s_sc < 30 and not df['Squeeze'].iloc[-1]:
+                        oracle_logs += f"> [{timestamp_now}] ⚖️ MERCADO EN EQUILIBRIO. ESPERANDO DISLOCACIÓN MATEMÁTICA.\n"
 
-                # =============================================================
-                # 🎨 5. RENDERIZADO VISUAL (ESPEJO INTOCABLE)
-                # =============================================================
+                    st.markdown(f"""
+                    <div style="background-color: #050505; color: #00FFcc; font-family: 'Courier New', Courier, monospace; font-size: 13px; padding: 15px; height: 280px; overflow-y: auto; border: 1px solid #00FFcc; border-radius: 5px; box-shadow: 0 0 10px rgba(0,255,204,0.2);">
+                        <div style="color: white; border-bottom: 1px solid #333; margin-bottom: 10px; padding-bottom: 5px;"><b>👁️ CONSOLA DEL ORÁCULO (PENSAMIENTO IA)</b></div>
+                        {oracle_logs.replace(chr(10), '<br>')}
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                # ---> CUADRANTE PRINCIPAL: LA GRÁFICA DE ORIENTACIÓN ESPACIAL
                 df_p = df.tail(120).copy()
                 fig = go.Figure()
                 x_val = df_p['Time_Str']
@@ -1790,10 +1828,10 @@ with tab_live:
                 fig.add_trace(go.Scatter(x=x_val, y=df_p['RT'], mode='lines', line=dict(color='rgba(0,180,255,0)', width=0), showlegend=False))
                 fig.add_trace(go.Scatter(x=x_val, y=df_p['RB'], mode='lines', line=dict(color='rgba(0,180,255,0)', width=0), fill='tonexty', fillcolor='rgba(0,120,255,0.08)', showlegend=False))
 
-                # Malla
-                fig.add_trace(go.Scatter(x=x_val, y=df_p['PH_100'], mode='lines', line=dict(color='rgba(255,0,0,0.15)', width=1, dash='dot'), name='Malla Res'))
-                fig.add_trace(go.Scatter(x=x_val, y=df_p['PL_100'], mode='lines', line=dict(color='rgba(0,255,0,0.15)', width=1, dash='dot'), name='Malla Sup'))
-                fig.add_trace(go.Scatter(x=x_val, y=df_p['Target_Lock'], mode='lines', line=dict(color='gold', width=2, dash='dashdot'), name='Target Lock'))
+                # Malla y Target Lock
+                fig.add_trace(go.Scatter(x=x_val, y=df_p['PH_300'], mode='lines', line=dict(color='rgba(255,0,0,0.2)', width=1, dash='dash'), name='Res Maestro'))
+                fig.add_trace(go.Scatter(x=x_val, y=df_p['PL_300'], mode='lines', line=dict(color='rgba(0,255,0,0.2)', width=1, dash='dash'), name='Sup Maestro'))
+                fig.add_trace(go.Scatter(x=x_val, y=df_p['Target_Lock'], mode='lines', line=dict(color='gold', width=2, dash='dashdot'), name='Gravity Lock'))
 
                 # Velas
                 fig.add_trace(go.Candlestick(
@@ -1809,10 +1847,6 @@ with tab_live:
                 if not pb.empty: fig.add_trace(go.Scatter(x=pb['Time_Str'], y=pb['Low']*0.996, mode='text', text="PUSH", textfont=dict(color="#00FF00", size=10), name='Push UP'))
                 if not pdn.empty: fig.add_trace(go.Scatter(x=pdn['Time_Str'], y=pdn['High']*1.004, mode='text', text="PUSH", textfont=dict(color="#FF0000", size=10), name='Push DN'))
 
-                eu = df_p[df_p['Entry_Up']]; edn = df_p[df_p['Entry_Dn']]
-                if not eu.empty: fig.add_trace(go.Scatter(x=eu['Time_Str'], y=eu['Low']*0.992, mode='text', text="ENTRY", textfont=dict(color="#00FFFF", size=10), name='Entry UP'))
-                if not edn.empty: fig.add_trace(go.Scatter(x=edn['Time_Str'], y=edn['High']*1.008, mode='text', text="ENTRY", textfont=dict(color="#FF00FF", size=10), name='Entry DN'))
-
                 nu = df_p[df_p['Neon_Up']]; nd = df_p[df_p['Neon_Dn']]
                 if not nu.empty: fig.add_trace(go.Scatter(x=nu['Time_Str'], y=nu['Basis'], mode='markers', marker=dict(symbol='diamond', color='lime', size=10), name='Neon UP'))
                 if not nd.empty: fig.add_trace(go.Scatter(x=nd['Time_Str'], y=nd['Basis'], mode='markers', marker=dict(symbol='diamond', color='red', size=10), name='Neon DN'))
@@ -1821,10 +1855,6 @@ with tab_live:
                 if not wb.empty: fig.add_trace(go.Scatter(x=wb['Time_Str'], y=wb['Low']*0.985, mode='text', text="🐋", textfont=dict(size=20), name='Ballena UP'))
                 if not ws.empty: fig.add_trace(go.Scatter(x=ws['Time_Str'], y=ws['High']*1.015, mode='text', text="🐋", textfont=dict(size=20), name='Ballena DN'))
 
-                cb = df_p[df_p['Climax_B'] & ~df_p['Nuclear_B']]; cs = df_p[df_p['Climax_S'] & ~df_p['Nuclear_S']]
-                if not cb.empty: fig.add_trace(go.Scatter(x=cb['Time_Str'], y=cb['Low']*0.990, mode='markers', marker=dict(symbol='star', color='yellow', size=14), name='Climax UP'))
-                if not cs.empty: fig.add_trace(go.Scatter(x=cs['Time_Str'], y=cs['High']*1.010, mode='markers', marker=dict(symbol='star', color='orange', size=14), name='Climax DN'))
-
                 nb = df_p[df_p['Nuclear_B']]; ns = df_p[df_p['Nuclear_S']]
                 if not nb.empty: fig.add_trace(go.Scatter(x=nb['Time_Str'], y=nb['Low']-(nb['ATR']*0.8), mode='markers+text', text="💥", textposition="bottom center", marker=dict(symbol='x', color='lime', size=16), name='NUC UP'))
                 if not ns.empty: fig.add_trace(go.Scatter(x=ns['Time_Str'], y=ns['High']+(ns['ATR']*0.8), mode='markers+text', text="💥", textposition="top center", marker=dict(symbol='x', color='red', size=16), name='NUC DN'))
@@ -1832,20 +1862,11 @@ with tab_live:
                 y_min = df_p['Low'].min() - (df_p['ATR'].iloc[-1] * 2)
                 y_max = df_p['High'].max() + (df_p['ATR'].iloc[-1] * 2)
 
-                # --- EL HUD DE LA CONCIENCIA ---
-                if st.session_state['g_pos']:
-                    fig.add_hline(y=st.session_state['g_price'], line_dash="dash", line_color="cyan", annotation_text="IA ENTRY")
-
-                hud_txt = f"🧠 GÉNESIS AWAKE | CERTEZA: {certeza_b:.1f}% | UMBRAL: {umbral_ia:.1f}% | CAP: ${st.session_state['g_cap']:.2f}"
-                fig.add_annotation(xref="paper", yref="paper", x=0.01, y=0.99, text=hud_txt, showarrow=False, font=dict(color="#00ffcc", size=14, family="Courier New"), bgcolor="rgba(0,0,0,0.85)", xanchor="left", yanchor="top")
-                fig.add_hline(y=p_actual, line_dash="dot", line_color="yellow", line_width=1)
-                fig.add_annotation(xref="paper", x=1.005, y=p_actual, text=f" ${p_actual:.5f} ", showarrow=False, bgcolor="yellow", font=dict(color="black", size=13, weight="bold"), xanchor="left")
-
                 tick_vals = x_val[::15]
                 tick_texts = df_p.index[::15].strftime('%H:%M\n%d %b')
 
                 fig.update_layout(
-                    template='plotly_dark', height=800, margin=dict(l=10, r=80, t=10, b=10),
+                    template='plotly_dark', height=600, margin=dict(l=10, r=40, t=10, b=10),
                     xaxis_rangeslider_visible=False, 
                     yaxis=dict(side="right", gridcolor='rgba(255,255,255,0.04)', tickformat=".6f", range=[y_min, y_max]), 
                     xaxis=dict(tickmode='array', tickvals=tick_vals, ticktext=tick_texts, gridcolor='rgba(255,255,255,0.04)')
@@ -1856,7 +1877,7 @@ with tab_live:
             except Exception as e:
                 st.error(f"Error Núcleo Despertar: {e}")
         else:
-            st.info(f"Sistema en Standby. IA lista para analizar {ticker_rest} en {tf_actual}. Pulsa Iniciar.")
+            st.info(f"Sistema en Standby. Radares listos para analizar {ticker_rest} en {tf_actual}. Pulsa Iniciar.")
 
     monitor_velas_v2()
 with tab_forja:
